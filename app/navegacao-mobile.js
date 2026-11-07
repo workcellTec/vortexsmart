@@ -17,7 +17,10 @@
 // abrem direto na primeira aba, com a faixa de abas fixa no topo; tocar numa aba ou deslizar
 // pro lado troca a tela SEM empilhar histórico (o voltar sai do módulo).
 //
-// Expõe via window.*: _vsBarraRender, _vsBarraAtiva, _vsBarraSincronizar, _vsAbas
+// Botão do meio: "Vender" em todo lugar; dentro da lista de Concertos vira "Novo concerto"
+// (quem tem a permissão de cadastrar OS) — ver atualizarCentro().
+//
+// Expõe via window.*: _vsBarraRender, _vsBarraAtiva, _vsBarraCentro, _vsBarraSincronizar, _vsAbas
 // Depende de (via window.*): _usuarioPrefRef, _dbUpdate, _firebaseAuthUid, _nomeUsuario,
 //   _configCustomizacoes, openVendaSection, openEstoqueSection, openDocumentosSection,
 //   openCalculatorSection, _temPermissao, _papelUsuario, _vsPedirTransicao, safeStorage
@@ -136,7 +139,27 @@
         secaoAtual = secao;
         if (abaAtual && SECAO_DO_MODULO[abaAtual.mod] !== secao) abaAtual = null;
         marcarAtiva();
+        atualizarCentro();
     };
+
+    // ── Botão do meio: Vender, ou Novo concerto na lista de Concertos ──
+    const emConcertos = () => {
+        const lista = el('reparosLista');
+        return secaoAtual === 'reparos' && !!lista && lista.style.display !== 'none'
+            && (typeof window._temPermissao !== 'function' || window._temPermissao('reparos_criar'));
+    };
+    function atualizarCentro() {
+        const b = el('ctwNavVender');
+        if (!b) return;
+        const novo = emConcertos();
+        b.dataset.acao = novo ? 'concerto' : 'venda';
+        const rotulo = novo ? 'Novo concerto' : 'Vender';
+        b.title = rotulo;
+        b.setAttribute('aria-label', rotulo);
+        b.querySelector('.ctw-nav-label').textContent = rotulo;
+        b.querySelector('.ctw-nav-vender-ic use').setAttribute('href', novo ? '#vsi-toolplus' : '#vsi-bag');
+    }
+    window._vsBarraCentro = atualizarCentro;   // o router de Concertos chama depois de trocar de sub-tela
 
 
     // ── Abas dos módulos ───────────────────────────────────────
@@ -333,7 +356,11 @@
     // ── Vender ─────────────────────────────────────────────────
     function ligarVender() {
         el('ctwNavVender')?.addEventListener('click', () => {
-            if (typeof window.openVendaSection === 'function') window.openVendaSection('lancarVenda');
+            if (emConcertos()) {
+                if (typeof window.openReparosSection === 'function') window.openReparosSection('reparosForm');
+            } else if (typeof window.openVendaSection === 'function') {
+                window.openVendaSection('lancarVenda');
+            }
         });
     }
 

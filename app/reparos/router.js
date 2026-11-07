@@ -36,6 +36,8 @@
         });
         const el = document.getElementById(sectionId);
         if (el) el.style.display = 'flex';
+        // Celular: o botão do meio da barra vira "Novo concerto" só dentro da lista.
+        if (typeof window._vsBarraCentro === 'function') window._vsBarraCentro();
 
         if (sectionId === 'reparosLista' && typeof window._renderReparosLista === 'function') {
             window._renderReparosLista(contexto);

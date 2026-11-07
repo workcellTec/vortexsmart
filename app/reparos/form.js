@@ -350,7 +350,8 @@
             payload.status = primeiraEtapa;
             payload.criadoEm = Date.now();
             payload.criadoPorUid = window._firebaseAuthUid || null;
-            payload.timeline = { [primeiraEtapa]: { ts: Date.now(), uid: window._firebaseAuthUid || null } };
+            payload.criadoPorNome = window._nomeUsuario || null;
+            payload.timeline = { [primeiraEtapa]: { ts: Date.now(), uid: window._firebaseAuthUid || null, nome: window._nomeUsuario || null } };
             return window._dbPush(window._lojaRef('reparos'), payload).then(res => res.key);
         };
 
