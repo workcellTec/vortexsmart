@@ -256,7 +256,7 @@
     };
 
     // ── Deslizar pro lado troca de aba ─────────────────────────
-    const FORA_DO_GESTO = 'input, textarea, select, canvas, [contenteditable="true"], .no-swipe, .vs-abas';
+    const FORA_DO_GESTO = 'input, textarea, select, canvas, video, [contenteditable="true"], .no-swipe, .vs-abas';
     function rolaNaHorizontal(n) {
         for (; n && n !== document.body; n = n.parentElement) {
             if (n.scrollWidth > n.clientWidth + 2) {
@@ -267,8 +267,8 @@
         return false;
     }
     function haJanelaAberta() {
-        return Array.from(document.querySelectorAll('.custom-modal-overlay.active, .vs-folha-overlay.active, .ctw-sheet-overlay.active, .stq-modal-backdrop, .apr-modal-backdrop'))
-            .some(n => n.getClientRects().length > 0 && getComputedStyle(n).visibility !== 'hidden');
+        return Array.from(document.querySelectorAll('.custom-modal-overlay.active, .vs-folha-overlay.active, .ctw-sheet-overlay.active, .stq-modal-backdrop.show, .apr-modal-backdrop.show, .rep-lightbox-backdrop'))
+            .some(n => getComputedStyle(n).display !== 'none');
     }
     let toque = null;
     document.addEventListener('touchstart', e => {
@@ -292,6 +292,51 @@
         if (typeof window._vsPedirTransicao === 'function') window._vsPedirTransicao(dx < 0 ? 'frente' : 'tras');
         ABAS[ini.mod].abrir(livres[i].sub);
     }, { passive: true });
+
+    // ── Ícones no lugar de emoji ───────────────────────────────
+    // Várias telas (Configurações, Backup, Taxas...) são montadas por código compartilhado
+    // com o PC e escrevem emoji nos títulos/ícones. No celular troca por ícone do app;
+    // emoji fora da tabela (ex: o que o usuário escolhe pra uma forma de pagamento) fica como está.
+    const EMOJI_ICONE = {
+        '📦': 'box-seam-fill', '🏷': 'tag-fill', '👥': 'people-fill', '🔐': 'shield-lock-fill',
+        '📄': 'file-earmark-text-fill', '✨': 'stars', '🔔': 'bell-fill', '🔧': 'wrench-adjustable',
+        '🧠': 'cpu-fill', '🗄': 'database-fill', '🔄': 'arrow-repeat', '🖨': 'printer-fill',
+        '🩺': 'heart-pulse-fill', '🎨': 'palette-fill', '🌗': 'circle-half', '🌙': 'moon-stars-fill',
+        '☀': 'sun-fill', '🧮': 'calculator-fill', '💰': 'cash-coin', '🛒': 'cart-fill',
+        '🎂': 'cake2-fill', '💳': 'credit-card-fill', '💾': 'floppy-fill', '📤': 'box-arrow-up',
+        '📥': 'box-arrow-in-down', '👑': 'award-fill', '👤': 'person-fill', '📓': 'journal-text',
+        '💵': 'cash-stack', '⚡': 'lightning-charge-fill', '🗓': 'calendar3', '📆': 'calendar-event',
+        '✅': 'check-circle-fill', '✕': 'x-lg', '✏': 'pencil-fill', '🗑': 'trash3-fill',
+        '🙈': 'eye-slash-fill', '👁': 'eye-fill', '⬇': 'download', '⬆': 'upload', '⚠': 'exclamation-triangle-fill',
+    };
+    const ALVOS_EMOJI = [
+        '.cfgA-icon', '.cz-item-ic', '.cz-sec-title', '.cb-hero-ic', '.cb-block-ic', '.ctx-machine-ic',
+        '.ctx-icon-btn', '.pulse-icon-box', '.cfgA-name', '.cb-notice', '#cbBaixarTudoBtn', '#cbRestaurarTudoBtn',
+        '.form-label', '#profileSheetPapel', '#profileSheetAvatar',
+        '.stq-cat-pill[data-v="escuro"]', '.stq-cat-pill[data-v="claro"]',
+    ].join(',');
+    const RE_EMOJI = new RegExp('^(\\s*)(' + Object.keys(EMOJI_ICONE).join('|') + ')\\uFE0F?\\s*');
+    function trocarEmojis() {
+        document.querySelectorAll(ALVOS_EMOJI).forEach(alvo => {
+            for (const no of Array.from(alvo.childNodes)) {
+                if (no.nodeType !== 3) continue;
+                const m = RE_EMOJI.exec(no.nodeValue);
+                if (!m) continue;
+                const icone = document.createElement('i');
+                icone.className = 'bi bi-' + EMOJI_ICONE[m[2]];
+                const resto = no.nodeValue.slice(m[0].length);
+                no.nodeValue = resto ? ' ' + resto : '';
+                alvo.insertBefore(icone, no);
+            }
+        });
+    }
+    let trocaAgendada = false;
+    new MutationObserver(() => {
+        if (trocaAgendada) return;
+        trocaAgendada = true;
+        requestAnimationFrame(() => { trocaAgendada = false; trocarEmojis(); });
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    trocarEmojis();
 
     // ── Vender ─────────────────────────────────────────────────
     function ligarVender() {

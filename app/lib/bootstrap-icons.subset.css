@@ -1,4 +1,4 @@
-/* Bootstrap Icons v1.11.3 (MIT) — apenas os 165 ícones que o app usa.
+/* Bootstrap Icons v1.11.3 (MIT) — apenas os 177 ícones que o app usa.
    Gerado a partir da fonte oficial: se um ícone novo for usado no código,
    ele precisa ser acrescentado aqui (nome e código estão em
    bootstrap-icons.json do pacote oficial). */
@@ -13,6 +13,7 @@
 .bi-arrow-repeat::before{content:"\f130"}
 .bi-arrow-right::before{content:"\f138"}
 .bi-arrow-right-circle-fill::before{content:"\f133"}
+.bi-award-fill::before{content:"\f153"}
 .bi-bag-check-fill::before{content:"\f170"}
 .bi-bag-fill::before{content:"\f174"}
 .bi-bar-chart::before{content:"\f17e"}
@@ -29,9 +30,11 @@
 .bi-box-seam-fill::before{content:"\f7d3"}
 .bi-box2-heart::before{content:"\f70c"}
 .bi-cake2::before{content:"\f6ed"}
+.bi-cake2-fill::before{content:"\f8e9"}
 .bi-calculator::before{content:"\f1e0"}
 .bi-calculator-fill::before{content:"\f1df"}
 .bi-calendar-check::before{content:"\f1e2"}
+.bi-calendar-event::before{content:"\f1e8"}
 .bi-calendar3::before{content:"\f214"}
 .bi-calendar3-range::before{content:"\f211"}
 .bi-camera-fill::before{content:"\f219"}
@@ -71,6 +74,7 @@
 .bi-credit-card-fill::before{content:"\f2db"}
 .bi-currency-dollar::before{content:"\f636"}
 .bi-dash::before{content:"\f2ea"}
+.bi-database-fill::before{content:"\f8be"}
 .bi-download::before{content:"\f30a"}
 .bi-envelope::before{content:"\f32f"}
 .bi-exclamation-circle-fill::before{content:"\f332"}
@@ -86,6 +90,7 @@
 .bi-file-earmark-text::before{content:"\f38b"}
 .bi-file-earmark-text-fill::before{content:"\f38a"}
 .bi-flag-fill::before{content:"\f3cb"}
+.bi-floppy-fill::before{content:"\f7c5"}
 .bi-funnel::before{content:"\f3e1"}
 .bi-gear::before{content:"\f3e5"}
 .bi-gear-fill::before{content:"\f3e2"}
@@ -94,6 +99,7 @@
 .bi-graph-down-arrow::before{content:"\f672"}
 .bi-graph-up-arrow::before{content:"\f673"}
 .bi-grid-3x3-gap-fill::before{content:"\f3f8"}
+.bi-heart-pulse-fill::before{content:"\f76e"}
 .bi-hourglass-split::before{content:"\f41f"}
 .bi-house-fill::before{content:"\f424"}
 .bi-house-gear-fill::before{content:"\f890"}
@@ -104,14 +110,18 @@
 .bi-inbox-fill::before{content:"\f42c"}
 .bi-info-circle::before{content:"\f431"}
 .bi-info-circle-fill::before{content:"\f430"}
+.bi-journal-text::before{content:"\f444"}
 .bi-key::before{content:"\f44f"}
 .bi-key-fill::before{content:"\f44e"}
 .bi-lightbulb-fill::before{content:"\f468"}
+.bi-lightning-charge-fill::before{content:"\f46c"}
 .bi-list-ol::before{content:"\f475"}
 .bi-list-ul::before{content:"\f478"}
 .bi-lock-fill::before{content:"\f47a"}
 .bi-magic::before{content:"\f675"}
+.bi-moon-stars-fill::before{content:"\f495"}
 .bi-palette::before{content:"\f4b1"}
+.bi-palette-fill::before{content:"\f4b0"}
 .bi-patch-check::before{content:"\f4b6"}
 .bi-pen::before{content:"\f4c8"}
 .bi-pencil::before{content:"\f4cb"}
@@ -149,6 +159,7 @@
 .bi-slash-circle::before{content:"\f567"}
 .bi-sliders::before{content:"\f56b"}
 .bi-stars::before{content:"\f589"}
+.bi-sun-fill::before{content:"\f5a1"}
 .bi-tag-fill::before{content:"\f5af"}
 .bi-telephone::before{content:"\f5c1"}
 .bi-telephone-fill::before{content:"\f5b4"}
@@ -164,6 +175,7 @@
 .bi-upload::before{content:"\f603"}
 .bi-wallet2::before{content:"\f615"}
 .bi-whatsapp::before{content:"\f618"}
+.bi-wrench-adjustable::before{content:"\f790"}
 .bi-wrench-adjustable-circle::before{content:"\f78f"}
 .bi-wrench-adjustable-circle-fill::before{content:"\f78e"}
 .bi-x::before{content:"\f62a"}
