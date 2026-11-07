@@ -291,15 +291,31 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
 }
 
 /* Quando o content-card é a continuação direta do cabeçalho da tela
-   (o caso mais comum — Relatórios, Histórico, Documentos, Estoque...),
-   ele não deve parecer um "card dentro da página": sem borda, sem
-   sombra, sem canto arredondado no topo — é a mesma superfície branca
-   do cabeçalho, só continuando pra baixo. */
-.section-header + .content-card {
+   (o caso mais comum — Relatórios, Histórico, Documentos, Estoque,
+   Configurações...), ele é só a área da página: sem caixa, no mesmo fundo
+   do cabeçalho. Os cartões de verdade (grupos, listas, resumos) ficam
+   dentro dele e é só neles que aparece a cor de cartão. */
+.section-header + .content-card,
+.vs-fin-largura > .content-card {
+    background: transparent;
     border: none;
     box-shadow: none;
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
+    border-radius: 0;
+    padding: 4px 14px 24px;
+}
+/* No tema claro o fundo é cinza e o campo (--input-bg) ficaria quase da mesma
+   cor; solto na página, o campo vira branco. */
+html.tema-claro .section-header + .content-card .form-control,
+html.tema-claro .section-header + .content-card .form-select,
+html.tema-claro .vs-fin-largura > .content-card .form-control,
+html.tema-claro .vs-fin-largura > .content-card .form-select {
+    background: var(--surface);
+}
+
+/* Seta de voltar sempre à esquerda, mesmo nas telas cuja marcação (que o PC
+   também usa) coloca a seta depois do título. */
+.section-header > [aria-label="Voltar"]:last-child:not(:only-child) {
+    order: -1;
 }
 
 code { overflow-wrap: anywhere; }
@@ -1335,12 +1351,12 @@ button.vs-linha { width: 100%; background: none; border-top: 0; border-left: 0; 
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: rgba(10, 14, 26, 0.92);
-    border: 1px solid rgba(var(--primary-rgb), 0.35);
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 16px;
     padding: 12px 16px;
     margin-top: 8px;
-    box-shadow: 0 8px 28px rgba(0,0,0,.45);
+    box-shadow: var(--shadow);
     z-index: 900;
 }
 .bk-total-label {
@@ -2784,20 +2800,21 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 
 /* ══════════════════════════════════════════════════════════════
    NOVA VENDA no celular — a tela usa a mesma marcação do PC (venda/lancar.js),
-   aqui apresentada em coluna única: seta de voltar à esquerda, título ao
-   centro, e o Salvar fica no card Resumo, embaixo (o botão do topo é só do PC).
+   aqui apresentada em coluna única: seta de voltar à esquerda, título ao lado
+   (igual às outras telas), e o Salvar fica no card Resumo, embaixo (o botão do
+   topo é só do PC).
    ══════════════════════════════════════════════════════════════ */
 .vs-nv-header {
     display: grid; grid-template-columns: 40px 1fr minmax(40px, auto); align-items: center;
-    padding: 22px 14px 12px; background: var(--surface); flex-shrink: 0; width: 100%;
+    padding: 12px 14px 8px; background: transparent; flex-shrink: 0; width: 100%;
 }
-.vs-nv-header > div:first-child { grid-column: 2; grid-row: 1; text-align: center; }
-.vs-nv-header h3 { font-size: 1.4rem; font-weight: 700; color: var(--text-strong); margin: 0; text-align: center; }
+.vs-nv-header > div:first-child { grid-column: 2; grid-row: 1; padding-left: 10px; }
+.vs-nv-header h3 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-strong); margin: 0; text-align: left; }
 .vs-nv-header-actions { display: contents; }
 .vs-nv-btn-cancelar { grid-column: 1; grid-row: 1; }
 .vs-nv-btn-cancelar .vs-nv-txt { display: none; }
 .vs-nv-btn-salvar { display: none; }
-.vs-nv-layout { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0; }
+.vs-nv-layout { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 0 14px 24px; }
 .vs-nv-col-main, .vs-nv-col-resumo { width: 100%; display: flex; flex-direction: column; align-items: center; }
 .vs-nv-carrinho-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .vs-nv-carrinho-count { font-size: .75rem; color: var(--text-secondary); }

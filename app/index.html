@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-07.12';
+        window._VS_VERSAO = '2026-11-07.13';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -622,6 +622,7 @@
     <!-- Configurações Home -->
     <div class="container text-center" id="configuracoesHome" style="display:none;">
         <div class="section-header">
+            <button type="button" class="btn-back" data-shell-only="mobile" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
             <h3>Configurações</h3>
         </div>
         <div class="content-card w-100">
@@ -1284,7 +1285,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v19';
+  const SW_VERSION = 'v20';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;
