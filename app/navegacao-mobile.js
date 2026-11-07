@@ -2,8 +2,8 @@
 // navegacao-mobile.js — VortexSmart · Barra inferior personalizável (só celular)
 //
 // Barra: Início · até 3 atalhos escolhidos pelo usuário · botão Vender (Nova venda).
-// Os módulos que NÃO estão na barra aparecem na grade da Início (#vsGradeModulos).
-// "Editar barra" abre uma folha com um interruptor por módulo (máx. 3).
+// Os módulos que NÃO estão na barra aparecem em "Seus módulos", na Início (#vsGradeModulos).
+// "Editar barra" abre uma folha com um interruptor por módulo (máx. 3; ligar um 4º tira o mais antigo).
 //
 // Os botões da grade e da barra são os mesmos elementos/ids de sempre (goToEstoque…):
 // cliques, visibilidade por papel e cadeado de Concertos continuam vindo do core.js.
@@ -30,18 +30,20 @@
     const PADRAO = ['vendas', 'estoque', 'calculadora'];
     // id da chave → botão da grade (fonte de verdade de visibilidade e de clique) + dados da barra
     const MODULOS = [
-        { id: 'vendas',      btn: 'goToVenda',       nome: 'Vendas',      icone: 'bi-cart-check-fill',                secao: 'venda' },
-        { id: 'estoque',     btn: 'goToEstoque',     nome: 'Estoque',     icone: 'bi-box-seam-fill',                  secao: 'estoque' },
-        { id: 'calculadora', btn: 'goToCalculator',  nome: 'Calculadora', icone: 'bi-calculator-fill',                secao: 'calculator' },
-        { id: 'documentos',  btn: 'goToDocumentos',  nome: 'Documentos',  icone: 'bi-file-earmark-text-fill',         secao: 'documentos' },
-        { id: 'reparos',     btn: 'goToReparos',     nome: 'Concertos',   icone: 'bi-wrench-adjustable-circle-fill',  secao: 'reparos' },
-        { id: 'reposicao',   btn: 'goToReposicao',   nome: 'Reposição',   icone: 'bi-cart3',                          secao: 'reposicao' },
-        { id: 'financeiro',  btn: 'goToFinanceiro',  nome: 'Financeiro',  icone: 'bi-graph-up-arrow',                 secao: 'financeiro' },
-        { id: 'credscan',    btn: 'goToCredscan',    nome: 'CredScan',    icone: 'bi-cpu-fill',                       secao: 'credscan' },
+        { id: 'vendas',        btn: 'goToVenda',      nome: 'Vendas',        icone: 'bag',   secao: 'venda' },
+        { id: 'calculadora',   btn: 'goToCalculator', nome: 'Calculadora',   icone: 'calc',  secao: 'calculator' },
+        { id: 'estoque',       btn: 'goToEstoque',    nome: 'Estoque',       icone: 'box',   secao: 'estoque' },
+        { id: 'reparos',       btn: 'goToReparos',    nome: 'Concertos',     icone: 'tool',  secao: 'reparos' },
+        { id: 'financeiro',    btn: 'goToFinanceiro', nome: 'Financeiro',    icone: 'chart', secao: 'financeiro' },
+        { id: 'reposicao',     btn: 'goToReposicao',  nome: 'Reposição',     icone: 'cart',  secao: 'reposicao' },
+        { id: 'documentos',    btn: 'goToDocumentos', nome: 'Documentos',    icone: 'doc',   secao: 'documentos' },
+        { id: 'credscan',      btn: 'goToCredscan',   nome: 'CredScan',      icone: 'cpu',   secao: 'credscan' },
+        { id: 'configuracoes', btn: 'goToConfig',     nome: 'Configurações', icone: 'gear',  secao: 'configuracoes' },
     ];
     const POR_ID = Object.fromEntries(MODULOS.map(m => [m.id, m]));
 
     const el = id => document.getElementById(id);
+    const iconeSvg = (nome, tam) => `<svg class="vs-ic" width="${tam}" height="${tam}" aria-hidden="true"><use href="#vsi-${nome}"/></svg>`;
     let escolha = null;        // array de ids, ou null = padrão
     let secaoAtual = 'main';
 
@@ -109,32 +111,16 @@
             b.dataset.mod = id;
             b.title = m.nome;
             b.style.gridColumn = String(colunas[i]);
-            b.innerHTML = `<span class="ctw-nav-icon"><i class="bi ${m.icone}"></i></span><span class="ctw-nav-label"></span>`;
+            b.innerHTML = `<span class="ctw-nav-icon">${iconeSvg(m.icone, 23)}</span><span class="ctw-nav-label"></span>`;
             b.querySelector('.ctw-nav-label').textContent = m.nome;
             b.addEventListener('click', () => el(m.btn)?.click());
             nav.insertBefore(b, vender);
         });
         if (vender) vender.style.gridColumn = '3';
 
-        // Grade: só o que está disponível E fora da barra.
-        let restantes = 0;
-        MODULOS.forEach(m => {
-            const b = el(m.btn);
-            if (!b) return;
-            const naBarra = ids.includes(m.id);
-            b.classList.toggle('vs-na-barra', naBarra);
-            if (!naBarra && disponivel(m)) restantes++;
-        });
-        const vazia = el('vsGradeVazia');
-        if (vazia) vazia.style.display = restantes === 0 ? '' : 'none';
-
-        // Avatar do topo: iniciais do usuário.
-        const ini = el('vsTopoIniciais');
-        const nome = (window._nomeUsuario || '').trim();
-        if (ini && nome) {
-            const p = nome.split(/\s+/);
-            ini.textContent = ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase();
-        }
+        // "Seus módulos": quem já está na barra sai da grade (a visibilidade por papel continua vindo do core.js).
+        MODULOS.forEach(m => el(m.btn)?.classList.toggle('vs-na-barra', ids.includes(m.id)));
+        if (typeof window._vsInicioPerfil === 'function') window._vsInicioPerfil();
         marcarAtiva();
     }
     window._vsBarraRender = render;
@@ -157,7 +143,7 @@
     const ehGestor = () => window._papelUsuario === 'gestor';
     const ABAS = {
         venda: {
-            cont: 'vendaContainer', hubs: ['vendaHome'],
+            titulo: 'Vendas', cont: 'vendaContainer', hubs: ['vendaHome'],
             abrir: sub => window.openVendaSection(sub, null, true),
             itens: [
                 { sub: 'historicoVendas', nome: 'Histórico' },
@@ -165,7 +151,7 @@
             ],
         },
         estoque: {
-            cont: 'estoqueContainer', hubs: ['estoqueHome'],
+            titulo: 'Estoque', cont: 'estoqueContainer', hubs: ['estoqueHome'],
             abrir: sub => window.openEstoqueSection(sub, undefined, true),
             itens: [
                 { sub: 'estoqueProdutos', nome: 'Produtos' },
@@ -174,7 +160,7 @@
             ],
         },
         documentos: {
-            cont: 'documentosContainer', hubs: ['documentosHome'],
+            titulo: 'Documentos', cont: 'documentosContainer', hubs: ['documentosHome'],
             abrir: sub => window.openDocumentosSection(sub, undefined, true),
             itens: [
                 { sub: 'documentosContrato', nome: 'Contrato' },
@@ -184,7 +170,7 @@
             ],
         },
         calculadora: {
-            cont: 'calculatorContainer', hubs: ['calculatorHome'],
+            titulo: 'Calculadora', cont: 'calculatorContainer', hubs: ['calculatorHome'],
             abrir: sub => window.openCalculatorSection(sub, true),
             itens: [
                 { sub: 'fecharVenda', nome: 'Remover taxa' },
@@ -207,7 +193,12 @@
         if (!cont) return null;
         f = document.createElement('div');
         f.className = 'vs-abas';
-        f.setAttribute('role', 'tablist');
+        f.innerHTML = '<div class="vs-mod-topo"><h1 class="vs-mod-titulo"></h1>' +
+            '<span class="vs-ini-sino"><button type="button" class="vs-ini-btn" aria-label="Notificações">' + iconeSvg('bell', 20) + '</button><span class="ctw-nav-dot"></span></span></div>' +
+            '<div class="vs-abas-linha" role="tablist"></div>';
+        f.querySelector('.vs-mod-titulo').textContent = cfg.titulo;
+        f.querySelector('.vs-ini-btn').addEventListener('click', () => el('ctwNavNotif')?.click());
+        if (typeof window._atualizarBadgeNotificacoes === 'function') window._atualizarBadgeNotificacoes();
         f.addEventListener('click', e => {
             const b = e.target.closest('[data-sub]');
             if (b && abaAtual && b.dataset.sub !== abaAtual.sub) cfg.abrir(b.dataset.sub);
@@ -238,7 +229,8 @@
             el(cfg.cont).classList.toggle('vs-com-abas', comFaixa);
             if (!comFaixa) { f.style.display = 'none'; return; }
             f.style.display = '';
-            f.innerHTML = '';
+            const linha = f.querySelector('.vs-abas-linha');
+            linha.innerHTML = '';
             livres.forEach(i => {
                 const b = document.createElement('button');
                 b.type = 'button';
@@ -248,10 +240,10 @@
                 const ativa = i.sub === sub;
                 b.className = ativa ? 'on' : '';
                 b.setAttribute('aria-selected', ativa ? 'true' : 'false');
-                f.appendChild(b);
+                linha.appendChild(b);
             });
-            const on = f.querySelector('.on');
-            if (on) f.scrollLeft = on.offsetLeft - (f.clientWidth - on.offsetWidth) / 2;
+            const on = linha.querySelector('.on');
+            if (on) linha.scrollLeft = on.offsetLeft - (linha.clientWidth - on.offsetWidth) / 2;
         },
     };
 
@@ -267,7 +259,7 @@
         return false;
     }
     function haJanelaAberta() {
-        return Array.from(document.querySelectorAll('.custom-modal-overlay.active, .vs-folha-overlay.active, .ctw-sheet-overlay.active, .stq-modal-backdrop.show, .apr-modal-backdrop.show, .rep-lightbox-backdrop'))
+        return Array.from(document.querySelectorAll('.custom-modal-overlay.active, .vs-folha-overlay.active, .stq-modal-backdrop.show, .apr-modal-backdrop.show, .rep-lightbox-backdrop'))
             .some(n => getComputedStyle(n).display !== 'none');
     }
     let toque = null;
@@ -312,7 +304,7 @@
     const ALVOS_EMOJI = [
         '.cfgA-icon', '.cz-item-ic', '.cz-sec-title', '.cb-hero-ic', '.cb-block-ic', '.ctx-machine-ic',
         '.ctx-icon-btn', '.pulse-icon-box', '.cfgA-name', '.cb-notice', '#cbBaixarTudoBtn', '#cbRestaurarTudoBtn',
-        '.form-label', '#profileSheetPapel', '#profileSheetAvatar',
+        '.form-label',
         '.stq-cat-pill[data-v="escuro"]', '.stq-cat-pill[data-v="claro"]',
     ].join(',');
     const RE_EMOJI = new RegExp('^(\\s*)(' + Object.keys(EMOJI_ICONE).join('|') + ')\\uFE0F?\\s*');
@@ -352,26 +344,24 @@
         const lista = el('vsBarraLista');
         if (!lista) return;
         const marcados = atalhosVisiveis();
-        const cheio = marcados.length >= MAX_ATALHOS;
         lista.innerHTML = '';
         MODULOS.filter(disponivel).forEach(m => {
             const on = marcados.includes(m.id);
             const li = document.createElement('label');
-            li.className = 'vs-barra-item' + (!on && cheio ? ' desativado' : '');
-            li.innerHTML = `<span class="vs-barra-ic"><i class="bi ${m.icone}"></i></span><span class="vs-barra-nome"></span>` +
-                `<span class="vs-sw"><input type="checkbox"${on ? ' checked' : ''}${!on && cheio ? ' disabled' : ''}/><span class="vs-sw-trilho"></span></span>`;
-            li.querySelector('.vs-barra-nome').textContent = m.nome;
+            li.className = 'vs-linha';
+            li.innerHTML = `<span class="vs-linha-ic">${iconeSvg(m.icone, 21)}</span><span class="vs-linha-nome"></span>` +
+                `<span class="vs-sw"><input type="checkbox"${on ? ' checked' : ''}/><span class="vs-sw-trilho"></span></span>`;
+            li.querySelector('.vs-linha-nome').textContent = m.nome;
             li.querySelector('input').addEventListener('change', e => {
                 const atual = atalhosVisiveis();
-                const novo = e.target.checked ? atual.concat(m.id).slice(0, MAX_ATALHOS) : atual.filter(id => id !== m.id);
+                // Ligar um 4º tira o mais antigo da barra.
+                const novo = e.target.checked ? atual.concat(m.id).slice(-MAX_ATALHOS) : atual.filter(id => id !== m.id);
                 salvarEscolha(novo);
                 render();
                 desenharLista();
             });
             lista.appendChild(li);
         });
-        const dica = el('vsBarraDica');
-        if (dica) dica.textContent = `${marcados.length} de ${MAX_ATALHOS} atalhos na barra` + (cheio ? ' — desligue um pra trocar.' : '.');
     }
 
     function abrirFolha() {
@@ -381,17 +371,14 @@
             f.id = 'vsBarraFolha';
             f.className = 'vs-folha-overlay';
             f.innerHTML = `
-                <div class="vs-folha" role="dialog" aria-label="Editar barra">
+                <div class="vs-folha" role="dialog" aria-label="Personalizar barra">
                     <div class="vs-folha-alca"></div>
-                    <div class="vs-folha-titulo">Editar barra</div>
-                    <div class="vs-folha-sub">Escolha até ${MAX_ATALHOS} módulos pra ficarem sempre à mão. O botão Vender e o Início não mudam.</div>
+                    <div class="vs-folha-titulo">Personalizar barra</div>
+                    <div class="vs-folha-sub">Início e Vender sempre ficam. Escolha até ${MAX_ATALHOS} telas para a barra. O que ficar de fora aparece em <b>Seus módulos</b>, no Início.</div>
                     <div id="vsBarraLista"></div>
-                    <div class="vs-folha-dica" id="vsBarraDica"></div>
-                    <button type="button" class="btn btn-primary w-100" id="vsBarraOk">Concluído</button>
                 </div>`;
             document.body.appendChild(f);
             f.addEventListener('click', e => { if (e.target === f) fecharFolha(); });
-            f.querySelector('#vsBarraOk').addEventListener('click', fecharFolha);
         }
         desenharLista();
         // força o reflow antes de ativar, senão a transição de entrada não anima
@@ -400,7 +387,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        el('vsEditarBarra')?.addEventListener('click', abrirFolha);
+        document.querySelectorAll('[data-editar-barra]').forEach(b => b.addEventListener('click', abrirFolha));
         ligarVender();
         render();
     });

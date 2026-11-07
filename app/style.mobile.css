@@ -198,7 +198,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar {
     align-items: stretch;
 }
 #mainMenu {
-    padding-top: 24px;
+    padding: 6px 0 0;
     justify-content: flex-start;
 }
 #mainMenu h2 {
@@ -224,43 +224,34 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
 
 /* ── Section header ─────────────────────────────────────────── */
 .section-header {
-    display: grid;
-    grid-template-columns: 40px 1fr minmax(40px, auto);
+    display: flex;
     align-items: center;
-    padding: 22px 14px 12px;
-    background: var(--surface);
+    gap: 10px;
+    min-height: 44px;
+    padding: 12px 14px 8px;
+    background: transparent;
     flex-shrink: 0;
     width: 100%;
     margin-bottom: 0;
 }
-.section-header > * { grid-row: 1; }
 .section-header h3 {
-    grid-column: 2;
-    font-size: 1.4rem;
-    font-weight: 700;
+    flex: 1;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
     color: var(--text-strong);
-    text-align: center;
+    text-align: left;
     margin: 0;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.section-header .btn-back {
-    grid-column: 1;
-    justify-self: start;
-}
-.section-header .btn-icon-circle {
-    grid-column: 1;
-    justify-self: start;
-}
 .section-header .btn-header-action {
-    grid-column: 3;
-    justify-self: end;
     width:36px; height:36px; border-radius:50%;
     background:var(--primary); border:none;
     color:#fff; font-size:1.05rem; display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
+    cursor:pointer; flex-shrink: 0;
 }
 .section-header .btn-header-action:active { filter:brightness(1.15); }
 .section-header .btn-header-action.amber {
@@ -397,19 +388,18 @@ code { overflow-wrap: anywhere; }
 .btn-cancel:active { color: var(--text); }
 
 .btn-back {
-    width: 38px; height: 38px; border-radius: 50%;
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
     display: inline-flex; align-items: center; justify-content: center;
-    background: rgba(var(--overlay-rgb), 0.07);
-    border: 1px solid rgba(var(--overlay-rgb), 0.09);
-    box-shadow: 0 8px 18px -10px rgba(0,0,0,0.35);
-    color: var(--text-secondary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-strong);
     font-size: 1.05rem;
     padding: 0;
     cursor: pointer;
     transition: transform var(--transition), background var(--transition), color var(--transition);
 }
 .btn-back:active { transform: scale(0.9); }
-@media (hover: hover) { .btn-back:hover { color: var(--text-strong); background: rgba(var(--overlay-rgb), 0.12); } }
+@media (hover: hover) { .btn-back:hover { background: var(--surface-raised); } }
 
 /* Mesmo visual de .btn-back, mas para botões cuja navegação NÃO deve
    ser um simples history.back() — o handler central de navegação
@@ -417,19 +407,18 @@ code { overflow-wrap: anywhere; }
    automaticamente nele; usar essa classe evita que esse handler
    dispare junto com uma lógica própria de "voltar" condicional. */
 .btn-icon-circle {
-    width: 38px; height: 38px; border-radius: 50%;
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
     display: inline-flex; align-items: center; justify-content: center;
-    background: rgba(var(--overlay-rgb), 0.07);
-    border: 1px solid rgba(var(--overlay-rgb), 0.09);
-    box-shadow: 0 8px 18px -10px rgba(0,0,0,0.35);
-    color: var(--text-secondary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-strong);
     font-size: 1.05rem;
     padding: 0;
     cursor: pointer;
     transition: transform var(--transition), background var(--transition), color var(--transition);
 }
 .btn-icon-circle:active { transform: scale(0.9); }
-@media (hover: hover) { .btn-icon-circle:hover { color: var(--text-strong); background: rgba(var(--overlay-rgb), 0.12); } }
+@media (hover: hover) { .btn-icon-circle:hover { background: var(--surface-raised); } }
 
 .btn-gear-large { font-size: 1.3rem; }
 
@@ -619,77 +608,6 @@ code { overflow-wrap: anywhere; }
 }
 .extra-value-container.is-active { max-height: 160px; margin-top: 12px; }
 
-/* ── Perfil FAB Menu (emana do botão Perfil, não desliza de baixo) */
-.ctw-sheet-overlay {
-    position: fixed; inset: 0;
-    background: transparent;
-    z-index: 1070; /* acima do navbar (1060) — corrige sobreposição */
-    opacity: 0; visibility: hidden;
-    pointer-events: none;
-    display: block;
-    transition: opacity 0.18s ease, visibility 0.18s ease;
-}
-.ctw-sheet-overlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
-.ctw-sheet {
-    position: fixed;
-    width: min(250px, calc(100vw - 28px));
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 10px;
-    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55);
-    transform-origin: bottom right;
-    transform: scale(0.85) translateY(8px);
-    opacity: 0;
-    transition: transform 0.2s cubic-bezier(.2, .9, .3, 1.15), opacity 0.16s ease;
-}
-.ctw-sheet-overlay.active .ctw-sheet { transform: scale(1) translateY(0); opacity: 1; }
-.ctw-sheet-handle { display: none; }
-.ctw-sheet-header {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 8px 14px;
-    margin-bottom: 6px;
-    border-bottom: 1px solid var(--border);
-}
-.ctw-sheet-avatar {
-    width: 44px; height: 44px; border-radius: 14px;
-    background: var(--primary);
-    color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.15rem; font-weight: 700; flex-shrink: 0;
-}
-.ctw-sheet-idbox { min-width: 0; }
-.ctw-sheet-name {
-    font-size: 0.92rem; font-weight: 700; color: var(--text-strong);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.ctw-sheet-papel {
-    font-size: 0.68rem; font-weight: 700; color: var(--primary);
-    text-transform: uppercase; letter-spacing: 0.04em;
-    margin-top: 2px;
-}
-.ctw-sheet-item {
-    display: flex; align-items: center; gap: 10px;
-    width: 100%;
-    background: none; border: none;
-    padding: 8px;
-    border-radius: 12px;
-    color: var(--text);
-    font-size: 0.85rem; font-weight: 600;
-    font-family:var(--font);
-    cursor: pointer;
-}
-.ctw-sheet-item-ic {
-    width: 30px; height: 30px; border-radius: 9px;
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 0.85rem; flex-shrink: 0;
-}
-.ctw-sheet-item span:not(.ctw-sheet-item-ic) { flex: 1; text-align: left; }
-.ctw-sheet-chevron { font-size: 0.78rem; color: var(--text-muted); }
-.ctw-sheet-item:active { background: rgba(var(--overlay-rgb), 0.05); }
-.ctw-sheet-divider { height: 1px; background: var(--border); margin: 6px 4px; }
-.ctw-sheet-item-danger span:not(.ctw-sheet-item-ic) { color: var(--danger); }
-
 /* ── Modal ──────────────────────────────────────────────────── */
 .custom-modal-overlay {
     position: fixed; inset: 0;
@@ -870,11 +788,6 @@ code { overflow-wrap: anywhere; }
 }
 .pulse-hero-label { font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; opacity:.8; }
 .pulse-hero-value { font-family:var(--font); font-weight:800; font-size:1.7rem; margin-top:4px; }
-.pulse-hero-stats { display:flex; gap:10px; margin-top:12px; }
-.pulse-hero-stat { flex:1; min-width:0; background:rgba(255,255,255,.14); border-radius:12px; padding:8px 10px; display:flex; flex-direction:column; }
-.pulse-hero-stat-label { font-size:.6rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; opacity:.75; }
-.pulse-hero-stat-value { font-family:var(--font); font-weight:700; font-size:1rem; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.pulse-hero-stat-delta { font-size:.62rem; opacity:.8; min-height:.9em; }
 .pulse-hero-bars { display:flex; align-items:flex-end; gap:5px; height:28px; margin-top:14px; }
 .pulse-hero-bars span { flex:1; background:rgba(255,255,255,.35); border-radius:3px; }
 .pulse-hero-bars span.on { background:#fff; }
@@ -1180,9 +1093,13 @@ code { overflow-wrap: anywhere; }
    estoura a largura da tela e nunca precisa rolar: o espaço entre
    os círculos é sempre o que sobrar do contêiner{ margin-bottom: 18px; }
 
+/* ── Ícones de linha (sprite do index.html) ─────────────────── */
+.vs-ic { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
 /* ── Barra inferior ─────────────────────────────────────────
-   Encostada no rodapé (sólida, sem vidro): Início · até 3 atalhos · Vender.
-   5 colunas fixas — Vender fica sempre no meio (ver navegacao-mobile.js). */
+   Encostada no rodapé (sólida): Início · até 3 atalhos · Vender.
+   5 colunas fixas — Vender fica sempre no meio (ver navegacao-mobile.js).
+   O item ativo ganha um círculo suave atrás do ícone; Vender é um quadrado arredondado elevado. */
 .ctw-bottom-nav {
     position: fixed;
     left: 0; right: 0; bottom: 0;
@@ -1190,86 +1107,124 @@ code { overflow-wrap: anywhere; }
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     align-items: end;
-    padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
+    padding: 0 4px max(22px, calc(env(safe-area-inset-bottom, 0px) + 10px));
     background: var(--surface);
     border-top: 1px solid var(--border);
 }
 .ctw-bottom-nav > * { grid-row: 1; }
-.ctw-nav-btn {
+.ctw-nav-btn, .ctw-nav-vender {
     display: flex; flex-direction: column; align-items: center; gap: 4px;
     background: none; border: none; cursor: pointer;
-    padding: 4px 0; min-width: 0;
-    color: var(--text-muted);
-    transition: color var(--transition);
+    padding: 8px 0 0; min-width: 0;
+    color: var(--text-secondary);
+    -webkit-tap-highlight-color: transparent;
 }
-.ctw-nav-btn:active { opacity: .6; }
-.ctw-nav-icon { font-size: 1.3rem; color: inherit; line-height: 1; }
-.ctw-nav-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .62rem; font-weight: 700; color: inherit; }
-.ctw-nav-btn.ctw-nav-active { color: var(--primary); }
-
-/* Vender — botão central elevado. O anel na cor da barra "recorta" a borda de cima. */
-.ctw-nav-vender {
-    position: relative; align-self: stretch;
-    display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
-    background: none; border: none; cursor: pointer; padding: 4px 0; min-width: 0; color: var(--primary);
-}
-.ctw-nav-vender:active .ctw-nav-vender-ic { transform: scale(.92); }
-.ctw-nav-vender-ic {
-    position: absolute; top: -30px; left: 50%; margin-left: -28px;
-    width: 56px; height: 56px; border-radius: 50%;
+.ctw-nav-btn:active, .ctw-nav-vender:active { opacity: .7; }
+.ctw-nav-icon {
+    width: 30px; height: 30px; border-radius: 16px;
     display: flex; align-items: center; justify-content: center;
-    background: var(--primary); color: var(--on-primary); font-size: 1.6rem;
-    box-shadow: 0 0 0 6px var(--surface);
+    color: inherit; transition: background var(--transition), color var(--transition);
+}
+.ctw-nav-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: inherit; }
+.ctw-nav-btn.ctw-nav-active .ctw-nav-icon { background: var(--primary-soft); color: var(--primary); }
+.ctw-nav-btn.ctw-nav-active .ctw-nav-label { font-weight: 800; color: var(--text-strong); }
+
+.ctw-nav-vender-ic {
+    width: 50px; height: 50px; margin-top: -18px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--primary); color: var(--on-primary);
     transition: transform var(--transition);
 }
-.ctw-nav-vender .ctw-nav-label { color: var(--primary); }
+.ctw-nav-vender:active .ctw-nav-vender-ic { transform: scale(.94); }
+.ctw-nav-vender .ctw-nav-label { font-weight: 800; color: var(--text-strong); }
 
-/* ── Topo da Início: saudação + sino + avatar ─────────────── */
-.vs-topo { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 2px 12px; text-align: left; }
-.vs-topo-saudacao { flex: 1; min-width: 0; }
-.vs-topo-oi { font-size: .74rem; color: var(--text-secondary); }
-.vs-topo-nome { display: block; font-size: 1.05rem; font-weight: 800; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vs-topo-btn {
-    position: relative; width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%;
+/* ── Início: topo (avatar · saudação · sino) ──────────────── */
+.vs-ini-topo { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 22px; text-align: left; }
+.vs-ini-avatar {
+    width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    background: var(--surface); border: 1px solid var(--border); color: var(--text-strong);
-    font-size: 1.05rem; cursor: pointer;
+    background: var(--surface-raised); border: 1px solid var(--border); color: var(--text-strong);
+    font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
 }
-.vs-topo-avatar { background: var(--primary-soft); border-color: transparent; color: var(--primary); font-size: .82rem; font-weight: 800; }
-/* Cabeçalho no tema claro: era branco chapado sem profundidade —
-   destoava do resto do tema (que usa cards brancos com sombra suave
-   flutuando sobre o fundo cinza-azulado, nunca uma cor sólida sem
-   relevo nenhum). Sombra leve + borda quase invisível resolve. */
-body.tema-claro .section-header { background: transparent; box-shadow: none; border-bottom: none; }
+.vs-ini-quem { flex: 1; min-width: 0; }
+.vs-ini-oi { font-size: 12px; color: var(--text-secondary); }
+.vs-ini-nome { font-size: 17px; font-weight: 700; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vs-ini-sino { position: relative; flex-shrink: 0; }
+.vs-ini-btn {
+    width: 42px; height: 42px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-strong); cursor: pointer;
+}
 .ctw-nav-dot {
-    position: absolute; z-index: 2; top: -3px; right: -3px; min-width: 18px; height: 18px;
-    border-radius: 99px; background: var(--danger-solid); border: 2px solid var(--bg);
+    position: absolute; z-index: 2; top: -4px; right: -4px; min-width: 18px; height: 18px;
+    border-radius: 9px; background: var(--primary); color: var(--on-primary);
     display: none; align-items: center; justify-content: center;
-    font-size: .6rem; font-weight: 800; color: #fff; padding: 0 4px;
+    font-size: 10px; font-weight: 800; padding: 0 5px;
 }
 
-/* ── Grade de módulos da Início (os que ficaram fora da barra) ─ */
-.vs-grade-cab { width: 100%; display: flex; align-items: center; justify-content: space-between; margin: 6px 0 10px; }
-.vs-grade-titulo { font-size: .74rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
-.vs-grade-editar { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 6px 2px; color: var(--primary); font-size: .78rem; font-weight: 700; cursor: pointer; }
-.vs-grade { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+/* ── Início: quanto entrou hoje ───────────────────────────── */
+.vs-ini-dia { width: 100%; padding: 22px 22px 0; text-align: left; }
+.vs-ini-dia-rot { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.vs-ini-dia-valor { font-size: clamp(34px, 11.3vw, 44px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; color: var(--text-strong); white-space: nowrap; }
+.vs-ini-dia-delta { margin-top: 2px; font-size: 13px; font-weight: 700; color: var(--success); min-height: 1.2em; }
+.vs-ini-dia-delta.neg { color: var(--danger); }
+.vs-ini-dia-delta.neutro { color: var(--text-secondary); }
+
+/* ── Início: cards (forma de pagamento · meta · concertos) ─── */
+.vs-ini-cards { width: 100%; display: flex; gap: 10px; padding: 20px 22px 0; text-align: left; }
+.vs-ini-card { box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 14px; color: var(--text-strong); font-family: inherit; text-align: left; min-width: 0; }
+.vs-ini-card-rot { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.vs-ini-pgto { flex: 1.15; }
+.vs-ini-pgto .vs-ini-card-rot { display: block; margin-bottom: 10px; }
+.vs-ini-rosca { position: relative; width: 104px; height: 104px; margin: 0 auto; }
+.vs-ini-rosca svg { display: block; }
+.vs-ini-rosca circle { fill: none; stroke-width: 14; }
+.vs-ini-rosca-fundo { stroke: var(--border); }
+.vs-ini-rosca-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.vs-ini-rosca-centro span:first-child { font-size: 15px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-strong); }
+.vs-ini-rosca-centro span:last-child { font-size: 10px; color: var(--text-secondary); }
+.vs-ini-legenda { margin-top: 8px; }
+.vs-ini-leg { display: flex; align-items: center; gap: 8px; margin-top: 7px; font-size: 12px; }
+.vs-ini-leg i { width: 8px; height: 8px; border-radius: 4px; flex-shrink: 0; }
+.vs-ini-leg b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--text-strong); }
+.vs-ini-leg span { font-weight: 700; color: var(--text-secondary); }
+.vs-ini-vazio { margin-top: 10px; font-size: 12px; line-height: 1.35; color: var(--text-secondary); text-align: center; }
+.vs-ini-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.vs-ini-meta { display: block; padding: 14px 16px; cursor: pointer; }
+.vs-ini-meta-topo { display: flex; align-items: baseline; justify-content: space-between; }
+.vs-ini-meta-pct { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-strong); }
+.vs-ini-barra { display: block; height: 6px; border-radius: 3px; background: var(--border); margin-top: 8px; }
+.vs-ini-barra > span { display: block; height: 6px; border-radius: 3px; background: var(--primary); width: 0; transition: width .5s ease; }
+.vs-ini-meta-txt { display: block; margin-top: 6px; font-size: 11px; color: var(--text-secondary); }
+.vs-ini-conc { flex-grow: 1; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; }
+.vs-ini-conc-n { display: block; font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; color: var(--text-strong); }
+.vs-ini-conc-sub { font-size: 11px; font-weight: 700; color: var(--success); }
+.vs-ini-conc-sub.neutro { color: var(--text-secondary); font-weight: 600; }
+
+/* ── Início: Seus módulos (os que ficaram fora da barra) ──── */
+.vs-grade-cab { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 24px 22px 10px; }
+.vs-grade-titulo { font-size: 17px; font-weight: 700; color: var(--text-strong); }
+.vs-grade-editar { background: none; border: none; padding: 0; font-family: inherit; font-size: 13px; font-weight: 700; color: var(--primary); cursor: pointer; }
+.vs-grade { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0 22px; }
 .vs-grade-item {
-    position: relative; min-width: 0;
-    display: flex; flex-direction: column; align-items: center; gap: 8px;
-    padding: 14px 6px 12px; border-radius: 16px;
+    box-sizing: border-box; position: relative; min-width: 0;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+    padding: 14px 12px; border-radius: 22px; text-align: left;
     background: var(--surface); border: 1px solid var(--border);
     color: var(--text-strong); font-family: inherit; cursor: pointer;
 }
 .vs-grade-item.vs-na-barra { display: none !important; }
-.vs-grade-ic { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: var(--primary-soft); color: var(--primary); font-size: 1.2rem; }
-.vs-grade-nome { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .76rem; font-weight: 700; }
-.vs-grade-sub { max-width: 100%; max-height: 2.5em; overflow: hidden; font-size: .6rem; line-height: 1.25; color: var(--text-muted); text-align: center; }
+.vs-grade-editar-tile { border-style: dashed; }
+.vs-grade-ic { width: 42px; height: 42px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: var(--surface-raised); color: var(--primary); }
+.vs-grade-txt { display: block; min-width: 0; align-self: stretch; margin-right: -11px; }   /* o nome pode avançar sobre o respiro da direita */
+.vs-grade-nome { display: block; font-size: clamp(12px, 3.4vw, 14px); font-weight: 700; color: var(--text-strong); letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vs-grade-sub { display: block; margin-top: 1px; font-size: 11px; line-height: 1.25; color: var(--text-secondary); }
+@media (max-width: 380px) { .vs-grade-item { padding-left: 10px; padding-right: 10px; } .vs-grade-nome { letter-spacing: -0.03em; } }
 .vs-grade-sub:empty { display: none; }
-.vs-grade-lock { position: absolute; top: 8px; right: 8px; margin: 0 !important; }
+.vs-grade-lock { position: absolute; top: 10px; right: 10px; margin: 0 !important; }
 .vs-grade-item.locked .vs-grade-ic { opacity: .55; }
-.vs-grade-vazia { width: 100%; padding: 18px 0; text-align: center; font-size: .8rem; color: var(--text-muted); }
 
-/* ── Folha "Editar barra" ─────────────────────────────────── */
+/* ── Folha de baixo (Editar barra, Meta do mês) ───────────── */
 .vs-folha-overlay {
     position: fixed; inset: 0; z-index: 1100;
     display: flex; align-items: flex-end;
@@ -1280,27 +1235,36 @@ body.tema-claro .section-header { background: transparent; box-shadow: none; bor
 .vs-folha-overlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
 .vs-folha {
     width: 100%; max-height: 86dvh; overflow: hidden;
-    display: flex; flex-direction: column;
-    padding: 10px 18px calc(18px + env(safe-area-inset-bottom, 0px));
-    background: var(--surface); border-radius: 22px 22px 0 0;
+    display: flex; flex-direction: column; text-align: left;
+    padding: 10px 20px calc(30px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface); border-radius: 28px 28px 0 0;
     transform: translateY(100%); transition: transform .28s cubic-bezier(.32,.72,0,1);
 }
 .vs-folha-overlay.active .vs-folha { transform: translateY(0); }
-.vs-folha-alca { width: 38px; height: 4px; border-radius: 4px; background: var(--border); margin: 0 auto 14px; }
-.vs-folha-titulo { font-size: 1.1rem; font-weight: 800; color: var(--text-strong); }
-.vs-folha-sub { margin: 4px 0 8px; font-size: .78rem; line-height: 1.4; color: var(--text-secondary); }
+.vs-folha-alca { width: 44px; height: 5px; border-radius: 3px; background: var(--text-muted); margin: 0 auto; }
+.vs-folha-titulo { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-strong); padding: 16px 4px 8px; }
+.vs-folha-sub { padding: 0 4px 6px; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.vs-folha-sub b { color: var(--text-strong); }
 #vsBarraLista { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-.vs-folha-dica { margin: 10px 0 14px; font-size: .74rem; color: var(--text-muted); }
-.vs-barra-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
-.vs-barra-item.desativado { opacity: .45; }
-.vs-barra-ic { width: 38px; height: 38px; flex-shrink: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--primary-soft); color: var(--primary); font-size: 1.05rem; }
-.vs-barra-nome { flex: 1; font-size: .92rem; font-weight: 700; color: var(--text-strong); }
+.vs-linha { display: flex; align-items: center; gap: 14px; padding: 11px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.vs-linha-ic { width: 40px; height: 40px; flex-shrink: 0; border-radius: 13px; display: flex; align-items: center; justify-content: center; background: var(--surface-raised); color: var(--primary); }
+.vs-linha-nome { flex: 1; min-width: 0; font-size: 15px; font-weight: 700; color: var(--text-strong); }
+.vs-linha-nome small { display: block; margin-top: 1px; font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+.vs-linha-badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--primary); color: var(--on-primary); font-size: 11px; font-weight: 800; }
+.vs-linha.perigo .vs-linha-ic { background: var(--danger-soft); color: var(--danger); }
+.vs-linha.perigo .vs-linha-nome { color: var(--danger); }
+button.vs-linha { width: 100%; background: none; border-top: 0; border-left: 0; border-right: 0; font-family: inherit; text-align: left; }
 .vs-sw { position: relative; width: 46px; height: 28px; flex-shrink: 0; }
 .vs-sw input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
-.vs-sw-trilho { position: absolute; inset: 0; border-radius: 28px; background: var(--input-border); transition: background .2s; pointer-events: none; }
+.vs-sw-trilho { position: absolute; inset: 0; border-radius: 14px; background: var(--border); transition: background .2s; pointer-events: none; }
 .vs-sw-trilho::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .2s; }
 .vs-sw input:checked + .vs-sw-trilho { background: var(--primary); }
 .vs-sw input:checked + .vs-sw-trilho::after { transform: translateX(18px); }
+.vs-meta-campo { display: flex; align-items: baseline; gap: 8px; margin: 10px 4px 0; padding: 14px 18px; background: var(--bg); border: 1px solid var(--border); border-radius: 24px; }
+.vs-meta-campo span { font-size: 18px; font-weight: 700; color: var(--text-secondary); }
+.vs-meta-campo input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-family: inherit; font-size: 32px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-strong); }
+.vs-meta-acoes { display: flex; gap: 10px; margin: 16px 4px 0; }
+.vs-meta-acoes .btn { flex: 1; }
 
 /* ── Loading ────────────────────────────────────────────────── */
 #loadingOverlay.d-none { display: none !important; }
@@ -2579,9 +2543,8 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 .scan-input-principal input:focus { outline: none; border-color: #d97706; background: rgba(217,119,6,.12); }
 .fl { max-width: 1240px; margin: 0 auto; padding: 22px 32px 44px; }
 .fl, .fl *, .fin-pd, .fin-pd * { box-sizing: border-box; }
-.fl .section-header { background: none; padding: 0; margin-bottom: 20px; grid-template-columns: 40px 1fr; column-gap: 16px; }
-.fl .section-header > div { grid-column: 2; min-width: 0; }
-.fl .section-header h3 { text-align: left; font-family:var(--font); font-weight: 800; font-size: 1.55rem; letter-spacing: -.01em; }
+.fl .section-header { padding: 0; margin-bottom: 20px; gap: 16px; }
+.fl .section-header > div { flex: 1; min-width: 0; }
 .fl .section-header p { margin: 2px 0 0; font-size: .78rem; color: var(--text-secondary); }
 .fl-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 .fl-bar-l { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -2746,7 +2709,6 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 .vs-fin-largura { padding-bottom: 100px; }   /* a barra de baixo é flutuante: não cobre o fim da tela */
 .fl { display: flex; flex-direction: column; padding: 10px 14px 30px; }
 .fl .section-header { margin-bottom: 10px; }
-.fl .section-header h3 { font-size: 1.35rem; }
 .fl .section-header p { display: none; }
 .fl-abas, .vs-fin-largura > .fl-abas { display: grid; grid-template-columns: 1fr 1fr; width: auto; margin: 0 0 12px; }
 .vs-fin-largura > .fl-abas { margin: 0 14px 12px; }
@@ -2863,35 +2825,37 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 #vsConexaoBar.vs-conexao-off { color: var(--danger);  border-bottom: 2px solid var(--danger); }
 #vsConexaoBar.vs-conexao-on  { color: var(--success); border-bottom: 2px solid var(--success); }
 
-/* ── Abas dos módulos (Vendas, Estoque, Documentos, Calculadora) ──
-   Faixa fixa logo abaixo do notch; a aba ativa fica centralizada. */
+/* ── Topo dos módulos com abas (Vendas, Estoque, Documentos, Calculadora) ──
+   Título grande + sino, e embaixo as abas em texto com a ativa sublinhada. Fixo logo abaixo do notch;
+   a aba ativa fica centralizada na linha. */
 .vs-abas {
     position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40;
-    display: flex; gap: 8px; align-items: center;
-    margin: 0 0 12px; padding: 10px 14px;
-    background: var(--bg); border-bottom: 1px solid var(--border);
+    margin: 0 0 16px; background: var(--bg);
+}
+.vs-mod-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 6px 14px 0; }
+.vs-mod-titulo { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 26px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-strong); }
+.vs-abas-linha {
+    display: flex; gap: 22px; padding: 14px 14px 0; border-bottom: 1px solid var(--border);
     overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
 }
-.vs-abas::-webkit-scrollbar { display: none; }
-.vs-abas button {
-    flex: 0 0 auto; height: 38px; padding: 0 18px; border: 1px solid var(--border);
-    border-radius: 19px; background: var(--surface); color: var(--text-secondary);
-    font: 600 .86rem var(--font); white-space: nowrap; cursor: pointer;
-    transition: background-color .18s, color .18s, border-color .18s, transform .12s;
+.vs-abas-linha::-webkit-scrollbar { display: none; }
+.vs-abas-linha button {
+    flex: 0 0 auto; padding: 0 0 12px; margin-bottom: -1px; border: 0; border-bottom: 3px solid transparent;
+    background: none; color: var(--text-secondary);
+    font: 600 15px var(--font); white-space: nowrap; cursor: pointer;
+    transition: color .18s, border-color .18s;
 }
-.vs-abas button:active { transform: scale(.96); }
-.vs-abas button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.vs-abas-linha button.on { font-weight: 800; color: var(--text-strong); border-bottom-color: var(--primary); }
 
 /* Com a faixa de abas à vista, o título e a seta de voltar de cada tela são redundantes
    (a aba já nomeia a tela; sair do módulo é pela barra de baixo ou pelo gesto de voltar).
    Sobram só os botões de ação da tela, alinhados à direita. A Movimentação fica de fora:
    o título dela muda pro nome do produto escolhido. */
 .vs-com-abas .fv-hdr { display: none; }
-.vs-com-abas .section-header:not(:has(#movTitulo)) { background: transparent; padding: 0 14px 6px; }
+.vs-com-abas .section-header:not(:has(#movTitulo)) { padding: 0 14px 6px; justify-content: flex-end; }
 .vs-com-abas .section-header:not(:has(#movTitulo)) > .btn-back,
 .vs-com-abas .section-header:not(:has(#movTitulo)) > h3 { display: none; }
-.vs-com-abas .section-header:not(:has(#movTitulo)) > :not(.btn-back):not(h3) { grid-column: 1 / -1; justify-self: end; }
 .vs-com-abas .section-header:not(:has(#movTitulo)):not(:has(button:not(.btn-back))) { display: none; }
 
 /* ══════════ Identidade sólida — cores escritas direto no HTML/JS ══════════

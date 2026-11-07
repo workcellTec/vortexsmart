@@ -43,7 +43,7 @@
             const nav = document.getElementById(id);
             if (nav) nav.style.display = 'none';
         });
-        ['profileSheetOverlay', 'notifDrawerOverlay'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+        ['profileSheetOverlay', 'notifDrawerOverlay', 'vsContaFolha', 'vsBarraFolha', 'vsMetaFolha'].forEach(id => document.getElementById(id)?.classList.remove('active'));
         TELAS_DO_APP.forEach(id => {
             const elem = document.getElementById(id);
             if (elem) { elem.style.display = 'none'; elem.classList.add('hidden'); }

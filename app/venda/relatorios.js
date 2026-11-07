@@ -25,6 +25,8 @@
 //   _entradasPorForma(inicio, fim, {atualizar}) → Promise<{grupos, bruto,
 //     liquido, qtd}> — quanto ENTROU de dinheiro no período, por forma de
 //     pagamento (usado pelo Resumo do período do Financeiro).
+//   _percorrerEntradas(vendas, inicio, fim, aoEntrar) — a regra de caixa pura (sem
+//     cache nem leitura), usada também pela Início do celular (inicio-mobile.js).
 // ================================================================
 (function () {
     'use strict';
@@ -265,30 +267,40 @@
     // avulso conta quando foi lançado (p.criadoEm; se for antigo e não tiver,
     // a data da venda) e cada parcela de promissória conta quando foi PAGA
     // (it.pagaEm). Venda cancelada não conta. Valores líquidos (já sem taxa).
-    function resumirEntradas(inicio, fim) {
-        const grupos = {};
-        const somar = (rotulo, bruto, liquido) => {
-            const g = grupos[rotulo] || (grupos[rotulo] = { rotulo, qtd: 0, bruto: 0, liquido: 0 });
-            g.qtd += 1; g.bruto += bruto; g.liquido += liquido;
-        };
-        const comoLista = x => (Array.isArray(x) ? x : Object.values(x || {}));
-        (vendasCache || []).forEach(v => {
+    // Percorre as entradas de caixa de uma lista de vendas no período e chama
+    // aoEntrar(pagamento, bruto, liquido) pra cada uma. Parcela paga de promissória
+    // chega com o pagamento "pai" (forma 'parcelado'). É a única definição de
+    // "o que entrou" do app: o Resumo do Financeiro e a Início do celular usam esta.
+    const comoLista = x => (Array.isArray(x) ? x : Object.values(x || {}));
+    function percorrerEntradas(vendas, inicio, fim, aoEntrar) {
+        (vendas || []).forEach(v => {
             if (!v || v.status === 'cancelada') return;
             comoLista(v.pagamentos).forEach(p => {
                 if (!p) return;
                 if (p.forma === 'parcelado' && p.itens) {
-                    // Parcelado renomeado (ex: "Promissória") aparece com o nome gravado no pagamento.
-                    const rotuloParcelas = (p.formaLabel && p.formaLabel !== 'Parcelado') ? `${p.formaLabel} — parcelas recebidas` : 'Parcelas recebidas';
                     comoLista(p.itens).forEach(it => {
                         if (!it || !it.paga) return;
                         const ts = it.pagaEm || v.criadoEm || 0;
-                        if (ts >= inicio && ts <= fim) somar(rotuloParcelas, it.valor || 0, it.valor || 0);
+                        if (ts >= inicio && ts <= fim) aoEntrar(p, it.valor || 0, it.valor || 0);
                     });
                 } else {
                     const ts = p.criadoEm || v.criadoEm || 0;
-                    if (ts >= inicio && ts <= fim) somar(rotuloDaFormaDeEntrada(p), p.valor || 0, p.valorLiquido ?? p.valor ?? 0);
+                    if (ts >= inicio && ts <= fim) aoEntrar(p, p.valor || 0, p.valorLiquido ?? p.valor ?? 0);
                 }
             });
+        });
+    }
+    window._percorrerEntradas = percorrerEntradas;
+
+    function resumirEntradas(inicio, fim) {
+        const grupos = {};
+        percorrerEntradas(vendasCache, inicio, fim, (p, bruto, liquido) => {
+            // Parcelado renomeado (ex: "Promissória") aparece com o nome gravado no pagamento.
+            const rotulo = (p.forma === 'parcelado' && p.itens)
+                ? ((p.formaLabel && p.formaLabel !== 'Parcelado') ? `${p.formaLabel} — parcelas recebidas` : 'Parcelas recebidas')
+                : rotuloDaFormaDeEntrada(p);
+            const g = grupos[rotulo] || (grupos[rotulo] = { rotulo, qtd: 0, bruto: 0, liquido: 0 });
+            g.qtd += 1; g.bruto += bruto; g.liquido += liquido;
         });
         const lista = Object.values(grupos).sort((a, b) => b.liquido - a.liquido);
         return {

@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-07.9';
+        window._VS_VERSAO = '2026-11-07.10';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -131,6 +131,24 @@
     </div>
 </div>
 
+<!-- ── Ícones de linha do celular (mesmo desenho do mockup aprovado); uso: <svg class="vs-ic"><use href="#vsi-nome"/></svg> ── -->
+<svg data-shell-only="mobile" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="vsi-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="vsi-bag" viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7zM9 8a3 3 0 0 1 6 0"/></symbol>
+    <symbol id="vsi-box" viewBox="0 0 24 24"><path d="M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8"/></symbol>
+    <symbol id="vsi-tool" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.1L3 17.7 6.3 21l6.3-6.3a4 4 0 0 0 5.1-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></symbol>
+    <symbol id="vsi-chart" viewBox="0 0 24 24"><path d="M5 20v-7M12 20V5M19 20v-10"/></symbol>
+    <symbol id="vsi-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="vsi-calc" viewBox="0 0 24 24"><path d="M6 4h12a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM8 8h8M8 12h2M14 12h2M8 16h2M14 16h2"/></symbol>
+    <symbol id="vsi-bell" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4"/></symbol>
+    <symbol id="vsi-gear" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="vsi-doc" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></symbol>
+    <symbol id="vsi-cart" viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h10.2l2-8H6.2M9 20h.01M17 20h.01"/></symbol>
+    <symbol id="vsi-spark" viewBox="0 0 24 24"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></symbol>
+    <symbol id="vsi-exit" viewBox="0 0 24 24"><path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/></symbol>
+    <symbol id="vsi-cpu" viewBox="0 0 24 24"><path d="M7 7h10v10H7zM10 10h4v4h-4zM9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4"/></symbol>
+</svg>
+
 <!-- ── Toast ───────────────────────────────────────────────── -->
 <div id="toastNotification"></div>
 
@@ -140,76 +158,101 @@
 <div class="container text-center" id="mainMenu" style="display:none;">
     <div data-shell-only="mobile" data-shell-unwrap>
 
-    <!-- Cabeçalho: saudação + sino de notificações + avatar (abre o menu do perfil) -->
-    <div class="vs-topo">
-        <div class="vs-topo-saudacao">
-            <div class="vs-topo-oi">Bem-vindo(a),</div>
-            <b id="userName" class="vs-topo-nome">Usuário</b>
+    <!-- Cabeçalho: avatar (abre o menu do perfil) + saudação + sino de notificações -->
+    <header class="vs-ini-topo">
+        <button type="button" class="vs-ini-avatar" id="ctwNavProfile" title="Perfil" aria-label="Perfil e configurações"><span id="vsTopoIniciais">··</span></button>
+        <div class="vs-ini-quem">
+            <div class="vs-ini-oi" id="vsTopoSaudacao">Olá</div>
+            <div class="vs-ini-nome" id="vsTopoNome">Usuário</div>
         </div>
-        <button type="button" class="vs-topo-btn" id="ctwNavNotif" title="Notificações" aria-label="Notificações">
-            <i class="bi bi-bell-fill"></i><span class="ctw-nav-dot" id="ctwNavNotifDot" style="display:none;"></span>
-        </button>
-        <button type="button" class="vs-topo-btn vs-topo-avatar" id="ctwNavProfile" title="Perfil" aria-label="Perfil e configurações"><span id="vsTopoIniciais"><i class="bi bi-person-fill"></i></span></button>
-    </div>
+        <div class="vs-ini-sino">
+            <button type="button" class="vs-ini-btn" id="ctwNavNotif" title="Notificações" aria-label="Notificações"><svg class="vs-ic" width="20" height="20" aria-hidden="true"><use href="#vsi-bell"/></svg></button>
+            <span class="ctw-nav-dot" id="ctwNavNotifDot" style="display:none;"></span>
+        </div>
+    </header>
 
-    <!-- Hero "Vendas Hoje" — estilo Vortex Pulse -->
-    <div class="pulse-hero" id="pulseHeroVendas">
-        <div class="pulse-hero-label" id="pulseHeroLabel">VENDAS HOJE</div>
-        <div class="pulse-hero-value" id="pulseHeroValor">0</div>
-        <div class="pulse-hero-stats">
-            <div class="pulse-hero-stat">
-                <span class="pulse-hero-stat-label">Faturado</span>
-                <span class="pulse-hero-stat-value" id="pulseHeroFaturado">R$ 0,00</span>
-                <span class="pulse-hero-stat-delta" id="pulseHeroFaturadoDelta"></span>
-            </div>
-            <div class="pulse-hero-stat">
-                <span class="pulse-hero-stat-label">Pendentes</span>
-                <span class="pulse-hero-stat-value" id="pulseHeroPendentes">0</span>
-                <span class="pulse-hero-stat-delta">aguardando pgto</span>
-            </div>
-        </div>
-        <div class="pulse-hero-bars" id="pulseHeroBars">
-            <span style="height:35%;"></span><span style="height:55%;"></span><span style="height:40%;"></span>
-            <span class="on" style="height:95%;"></span><span style="height:60%;"></span><span style="height:75%;"></span>
-            <span style="height:45%;"></span><span style="height:65%;"></span><span style="height:30%;"></span>
-        </div>
-    </div>
+    <!-- Quanto entrou hoje -->
+    <section class="vs-ini-dia">
+        <div class="vs-ini-dia-rot" id="vsIniRotulo">Entrou hoje</div>
+        <div class="vs-ini-dia-valor" id="vsIniValor">R$ 0,00</div>
+        <div class="vs-ini-dia-delta" id="vsIniDelta"></div>
+    </section>
 
-    <!-- Módulos que ficaram fora da barra inferior. Os ids (goTo…) são os mesmos de sempre: a visibilidade por papel,
-         os cliques e o cadeado de Concertos continuam vindo do core.js. Quem está na barra ganha .vs-na-barra (navegacao-mobile.js). -->
+    <!-- Entradas por forma de pagamento · Meta do mês · Concertos -->
+    <section class="vs-ini-cards">
+        <div class="vs-ini-card vs-ini-pgto" id="vsIniPgto">
+            <div class="vs-ini-card-rot">Entrou por forma de pagamento</div>
+            <div class="vs-ini-rosca">
+                <svg viewBox="0 0 100 100" width="104" height="104" aria-hidden="true">
+                    <circle class="vs-ini-rosca-fundo" cx="50" cy="50" r="40"/>
+                    <g id="vsIniRoscaFatias" transform="rotate(-90 50 50)"></g>
+                </svg>
+                <div class="vs-ini-rosca-centro"><span id="vsIniRoscaTotal">R$ 0</span><span>no mês</span></div>
+            </div>
+            <div class="vs-ini-legenda" id="vsIniLegenda"></div>
+        </div>
+        <div class="vs-ini-col">
+            <button type="button" class="vs-ini-card vs-ini-meta" id="vsIniMeta">
+                <span class="vs-ini-meta-topo"><span class="vs-ini-card-rot">Meta do mês</span><span class="vs-ini-meta-pct" id="vsIniMetaPct">—</span></span>
+                <span class="vs-ini-barra"><span id="vsIniMetaBarra"></span></span>
+                <span class="vs-ini-meta-txt" id="vsIniMetaTxt">Toque para definir</span>
+            </button>
+            <button type="button" class="vs-ini-card vs-ini-conc" id="vsIniConcertos">
+                <span class="vs-ini-card-rot">Concertos</span>
+                <span><span class="vs-ini-conc-n" id="vsIniConcN">0</span><span class="vs-ini-conc-sub" id="vsIniConcSub"></span></span>
+            </button>
+        </div>
+    </section>
+
+    <!-- Módulos que ficaram fora da barra inferior. Os ids (goTo…) são os mesmos de sempre: a visibilidade por papel
+         e os cliques vêm do core.js (Configurações, do inicio-mobile.js). Quem está na barra ganha .vs-na-barra (navegacao-mobile.js). -->
     <div class="vs-grade-cab">
-        <span class="vs-grade-titulo">Módulos</span>
-        <button type="button" class="vs-grade-editar" id="vsEditarBarra"><i class="bi bi-sliders"></i> Editar barra</button>
+        <span class="vs-grade-titulo">Seus módulos</span>
+        <button type="button" class="vs-grade-editar" data-editar-barra>Editar barra</button>
     </div>
     <div class="vs-grade" id="vsGradeModulos">
         <button type="button" class="vs-grade-item" id="goToVenda" data-mod="vendas">
-            <span class="vs-grade-ic"><i class="bi bi-cart-check-fill"></i></span><span class="vs-grade-nome">Vendas</span>
-        </button>
-        <button type="button" class="vs-grade-item" id="goToEstoque" data-mod="estoque">
-            <span class="vs-grade-ic"><i class="bi bi-box-seam-fill"></i></span><span class="vs-grade-nome">Estoque</span>
+            <span class="vs-grade-ic"><svg class="vs-ic" width="22" height="22" aria-hidden="true"><use href="#vsi-bag"/></svg></span>
+            <span class="vs-grade-txt"><span class="vs-grade-nome">Vendas</span><span class="vs-grade-sub">histórico e relatórios</span></span>
         </button>
         <button type="button" class="vs-grade-item" id="goToCalculator" data-mod="calculadora">
-            <span class="vs-grade-ic"><i class="bi bi-calculator-fill"></i></span><span class="vs-grade-nome">Calculadora</span>
+            <span class="vs-grade-ic"><svg class="vs-ic" width="22" height="22" aria-hidden="true"><use href="#vsi-calc"/></svg></span>
+            <span class="vs-grade-txt"><span class="vs-grade-nome">Calculadora</span><span class="vs-grade-sub">taxas e juros</span></span>
         </button>
-        <button type="button" class="vs-grade-item" id="goToDocumentos" data-mod="documentos">
-            <span class="vs-grade-ic"><i class="bi bi-file-earmark-text-fill"></i></span><span class="vs-grade-nome">Documentos</span>
+        <button type="button" class="vs-grade-item" id="goToEstoque" data-mod="estoque">
+            <span class="vs-grade-ic"><svg class="vs-ic" width="22" height="22" aria-hidden="true"><use href="#vsi-box"/></svg></span>
+            <span class="vs-grade-txt"><span class="vs-grade-nome">Estoque</span><span class="vs-grade-sub">produtos e conferência</span></span>
         </button>
         <button type="button" class="vs-grade-item" id="goToReparos" data-mod="reparos">
-            <span class="vs-grade-ic"><i class="bi bi-wrench-adjustable-circle-fill"></i></span><span class="vs-grade-nome">Concertos</span>
-            <span class="vs-grade-sub" id="goToReparosSub"></span>
+            <span class="vs-grade-ic"><svg class="vs-ic" width="22" height="22" aria-hidden="true"><use href="#vsi-tool"/></svg></span>
+            <span class="vs-grade-txt"><span class="vs-grade-nome">Concertos</span><span class="vs-grade-sub" id="goToReparosSub"></span></span>
             <span class="lockbadge vs-grade-lock" id="goToReparosLock" style="display:none;"><i class="bi bi-lock-fill"></i></span>
         </button>
-        <button type="button" class="vs-grade-item" id="goToReposicao" data-mod="reposicao">
-            <span class="vs-grade-ic"><i class="bi bi-cart3"></i></span><span class="vs-grade-nome">Reposição</span>
-        </button>
         <button type="button" class="vs-grade-item" id="goToFinanceiro" data-mod="financeiro" style="display:none;">
-            <span class="vs-grade-ic"><i class="bi bi-graph-up-arrow"></i></span><span class="vs-grade-nome">Financeiro</span>
+            <span class="vs-grade-ic"><svg class="vs-ic" width="22" height="22" aria-hidden="true"><use href="#vsi-chart"/></svg></span>
+            <span class="vs-grade-txt"><span class="vs-grade-nome">Financeiro</span><span class="vs-grade-sub">entradas e saídas</span></span>
+        </button>
+        <button type="button" class="vs-grade-item" id="goToReposicao" data-mod="reposicao">
+            <span class="vs-grade-ic"><svg class="vs-ic" width="22" height="22" aria-hidden="true"><use href="#vsi-cart"/></svg></span>
+            <span class="vs-grade-txt"><span class="vs-grade-nome">Reposição</span><span class="vs-grade-sub" id="goToReposicaoSub">lista de compras</span></span>
+        </button>
+        <button type="button" class="vs-grade-item" id="goToDocumentos" data-mod="documentos">
+            <span class="vs-grade-ic"><svg class="vs-ic" width="22" height="22" aria-hidden="true"><use href="#vsi-doc"/></svg></span>
+            <span class="vs-grade-txt"><span class="vs-grade-nome">Documentos</span><span class="vs-grade-sub">4 modelos</span></span>
         </button>
         <button type="button" class="vs-grade-item" id="goToCredscan" data-mod="credscan" style="display:none;">
-            <span class="vs-grade-ic"><i class="bi bi-cpu-fill"></i></span><span class="vs-grade-nome">CredScan</span>
+            <span class="vs-grade-ic"><svg class="vs-ic" width="22" height="22" aria-hidden="true"><use href="#vsi-cpu"/></svg></span>
+            <span class="vs-grade-txt"><span class="vs-grade-nome">CredScan</span><span class="vs-grade-sub">análise de crédito</span></span>
+        </button>
+        <button type="button" class="vs-grade-item" id="goToConfig" data-mod="configuracoes" style="display:none;">
+            <span class="vs-grade-ic"><svg class="vs-ic" width="22" height="22" aria-hidden="true"><use href="#vsi-gear"/></svg></span>
+            <span class="vs-grade-txt"><span class="vs-grade-nome">Configurações</span><span class="vs-grade-sub">loja e sistema</span></span>
+        </button>
+        <button type="button" class="vs-grade-item vs-grade-editar-tile" data-editar-barra>
+            <span class="vs-grade-ic"><svg class="vs-ic" width="22" height="22" aria-hidden="true"><use href="#vsi-plus"/></svg></span>
+            <span class="vs-grade-txt"><span class="vs-grade-nome">Editar barra</span><span class="vs-grade-sub">escolher a barra</span></span>
         </button>
     </div>
-    <div class="vs-grade-vazia" id="vsGradeVazia" style="display:none;">Todos os módulos estão na barra de baixo.</div>
     </div>
     <div data-shell-only="pc" data-shell-unwrap>
 
@@ -1002,6 +1045,7 @@
 </div>
 
 <!-- Perfil Sheet -->
+<div data-shell-only="pc" data-shell-unwrap>
 <div class="ctw-sheet-overlay" id="profileSheetOverlay">
     <div class="ctw-sheet" id="profileSheet">
         <div class="ctw-sheet-handle"></div>
@@ -1035,17 +1079,18 @@
         </button>
     </div>
 </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════
      NAVBAR
 ══════════════════════════════════════════════════════════ -->
 <nav data-shell-only="mobile" id="ctwBottomNav" class="ctw-bottom-nav" aria-label="Navegação principal" style="display:none;">
     <button type="button" class="ctw-nav-btn ctw-nav-active" id="ctwNavHome" title="Início" style="grid-column:1;">
-        <span class="ctw-nav-icon"><i class="bi bi-house-fill"></i></span>
+        <span class="ctw-nav-icon"><svg class="vs-ic" width="23" height="23" aria-hidden="true"><use href="#vsi-home"/></svg></span>
         <span class="ctw-nav-label">Início</span>
     </button>
     <button type="button" class="ctw-nav-vender" id="ctwNavVender" title="Nova venda" aria-label="Nova venda">
-        <span class="ctw-nav-vender-ic"><i class="bi bi-plus-lg"></i></span>
+        <span class="ctw-nav-vender-ic"><svg class="vs-ic" width="23" height="23" aria-hidden="true"><use href="#vsi-bag"/></svg></span>
         <span class="ctw-nav-label">Vender</span>
     </button>
 </nav>
@@ -1201,6 +1246,7 @@
 <script src="configuracoes/config-credscan.js" defer></script>
 <script src="notificacoes-central.js" defer></script>
 <script src="navegacao-mobile.js" defer></script>
+<script src="inicio-mobile.js" defer></script>
 
 <script>
   // Registro do Service Worker — habilita instalação como PWA de verdade
@@ -1214,7 +1260,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v16';
+  const SW_VERSION = 'v17';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;

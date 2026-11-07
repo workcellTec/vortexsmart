@@ -616,14 +616,14 @@ window._showSuccessOverlay = showSuccessOverlay;
 // (Gestor libera) vê a soma de todos também — mesma exceção usada no
 // Histórico.
 function atualizarHeroVendasHoje() {
+    // Celular: a Início tem outro desenho e outra conta (inicio-mobile.js); aqui só aciona.
+    if (typeof window._vsInicioAtualizar === 'function') window._vsInicioAtualizar();
     const valorEl = document.getElementById('pulseHeroValor');
     const labelEl = document.getElementById('pulseHeroLabel');
-    // O app tem dois layouts no mesmo HTML (celular e PC); os números do resumo existem nos dois, com ids
-    // diferentes — atualiza todos que existirem.
     const achar = (...ids) => ids.map(id => document.getElementById(id)).filter(Boolean);
-    const faturadoEls = achar('pulseHeroFaturado', 'vsStatFaturadoValor');
-    const faturadoDeltaEls = achar('pulseHeroFaturadoDelta', 'vsStatFaturadoDelta');
-    const pendentesEls = achar('pulseHeroPendentes', 'vsStatPendentesValor');
+    const faturadoEls = achar('vsStatFaturadoValor');
+    const faturadoDeltaEls = achar('vsStatFaturadoDelta');
+    const pendentesEls = achar('vsStatPendentesValor');
     const poeTexto = (els, txt) => els.forEach(e => { e.textContent = txt; });
     if (!valorEl) return;
     if (!window._lojaId || typeof window._dbGet !== 'function') return;
@@ -960,10 +960,7 @@ function showMainSection(sectionId) {
     document.querySelectorAll('.ctw-nav-btn').forEach(b => b.classList.remove('ctw-nav-active'));
     document.getElementById('ctwNavHome')?.classList.toggle('ctw-nav-active', sectionId === 'main');
     if (typeof window._vsBarraAtiva === 'function') window._vsBarraAtiva(sectionId);
-    if (sectionId === 'main') {
-        atualizarHeroVendasHoje();
-        atualizarContagemConcertosHub();
-    }
+    if (sectionId === 'main') atualizarHeroVendasHoje();
     pedirTransicao(window._vsNavRestoring ? 'tras' : 'fade');
 }
 window.showMainSection = showMainSection;
@@ -1208,6 +1205,7 @@ function loadReparosConfig() {
         reparosConfig = snap.val() || {};
         window._reparosConfig = reparosConfig;
         aplicarVisibilidadePorPapel();
+        if (currentMainSectionId === 'main' && typeof window._vsInicioAtualizar === 'function') window._vsInicioAtualizar();
         if (typeof window._reparosOnConfigLoaded === 'function') window._reparosOnConfigLoaded();
     });
 }
@@ -1325,19 +1323,21 @@ function loadNotificacoesRecebidas() {
 window._loadNotificacoesRecebidas = loadNotificacoesRecebidas;
 
 function atualizarBadgeNotificacoes() {
-    const dot = document.getElementById('ctwNavNotifDot');
-    if (!dot) return;
     // Só conta o que está ativo (não limpo) E não lido — uma limpa,
     // mesmo nunca tendo sido aberta, já some do contador na hora.
     const naoLidas = notificacoesRecebidas.filter(n => !n.lida && !n.limparEm).length;
-    if (naoLidas > 0) {
-        dot.style.display = 'flex';
-        dot.textContent = naoLidas > 9 ? '9+' : String(naoLidas);
-    } else {
-        dot.style.display = 'none';
-        dot.textContent = '';
-    }
+    // No celular há um sino por tela (Início e faixa de cada módulo); todos mostram o mesmo número.
+    document.querySelectorAll('#ctwNavNotifDot, .ctw-nav-dot').forEach(dot => {
+        if (naoLidas > 0) {
+            dot.style.display = 'flex';
+            dot.textContent = naoLidas > 9 ? '9+' : String(naoLidas);
+        } else {
+            dot.style.display = 'none';
+            dot.textContent = '';
+        }
+    });
 }
+window._atualizarBadgeNotificacoes = atualizarBadgeNotificacoes;
 
 window._marcarNotificacaoLida = function (id) {
     if (!window._firebaseAuthUid || !id) return Promise.resolve();
@@ -1418,6 +1418,9 @@ function aplicarVisibilidadePorPapel() {
     // não vê nem lançamento avulso). Trava aqui na UI, mas quem
     // protege de verdade são as regras do RTDB (ver notas de deploy
     // no final do financeiro/router.js) — a UI é só conveniência.
+    // Configurações como módulo da Início/barra do celular — mesma permissão do item do menu do perfil.
+    const configTile = document.getElementById('goToConfig');
+    if (configTile) configTile.style.display = temPermissao('configuracoes') ? '' : 'none';
     const financeiroCard = document.getElementById('goToFinanceiro');
     if (financeiroCard) financeiroCard.style.display = (window._papelUsuario === 'gestor') ? '' : 'none';
     // CredScan — segurado globalmente por CREDSCAN_LANCADO (topo do
@@ -1457,9 +1460,7 @@ function aplicarVisibilidadePorPapel() {
             itemConcertos.style.display = '';
             if (sideReparos) sideReparos.style.display = '';
             itemConcertos.classList.toggle('locked', !modo);
-            const sub = document.getElementById('goToReparosSub');
             const lock = document.getElementById('goToReparosLock');
-            if (sub) sub.textContent = modo ? (modo === 'propria' ? 'Fluxo: loja mesma conserta' : 'Fluxo: terceirizado') : 'Configure pra liberar essa área';
             if (lock) lock.style.display = modo ? 'none' : 'inline-flex';
         }
     }
@@ -1467,30 +1468,6 @@ function aplicarVisibilidadePorPapel() {
     if (typeof window._vsBarraRender === 'function') window._vsBarraRender();
 }
 window._aplicarVisibilidadePorPapel = aplicarVisibilidadePorPapel;
-
-// ── Contagem de Concertos ativos/atrasados no Hub — mesma regra de
-//    negócio já usada em reparos/lista.js (não duplica cálculo
-//    diferente, só espelha o resultado no subtítulo do card do Hub).
-function atualizarContagemConcertosHub() {
-    const subEl = document.getElementById('goToReparosSub');
-    if (!subEl || !window._lojaId || typeof window._dbGet !== 'function') return;
-    // Só sobrescreve o texto quando o modo já está configurado — antes
-    // disso o subtítulo precisa continuar dizendo "Configure pra
-    // liberar essa área" (ver aplicarVisibilidadePorPapel), não "0 ativos".
-    const modo = (window._reparosConfig || {}).modo || null;
-    if (!modo) return;
-
-    window._dbGet(window._lojaRef('reparos')).then(snap => {
-        const data = snap.val();
-        const ordens = data ? Object.values(data) : [];
-        const ativos = ordens.filter(o => o.status !== 'entregue');
-        const atrasados = ativos.filter(o => o.prazoTs && o.prazoTs < Date.now());
-        subEl.textContent = atrasados.length > 0
-            ? `${ativos.length} ativo${ativos.length !== 1 ? 's' : ''} · ${atrasados.length} atrasado${atrasados.length !== 1 ? 's' : ''}`
-            : `${ativos.length} ativo${ativos.length !== 1 ? 's' : ''}`;
-    }).catch(() => {});
-}
-window._atualizarContagemConcertosHub = atualizarContagemConcertosHub;
 
 // Lista de máquinas visíveis (não ocultadas), com a padrão primeiro.
 // 'rates' é a fonte da verdade de QUAIS máquinas existem; 'maquininhasConfig'
@@ -1591,7 +1568,7 @@ function mostrarTelaLogin() {
     });
     // Menu do usuário (balão com "Sair") e gaveta de notificações: se
     // estavam abertos no momento da saída, ficariam flutuando sobre o login.
-    ['profileSheetOverlay', 'notifDrawerOverlay'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+    ['profileSheetOverlay', 'notifDrawerOverlay', 'vsContaFolha', 'vsBarraFolha', 'vsMetaFolha'].forEach(id => document.getElementById(id)?.classList.remove('active'));
     // Esconde TUDO que possa estar aberto por baixo — sem isso, a seção
     // que estava visível no momento do "Sair" (Início, Vendas, etc.)
     // continuava lá, só coberta pela tela de login por cima; rolar pra
@@ -1880,6 +1857,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileBtn      = document.getElementById('ctwNavProfile');
 
     const openProfileSheet = () => {
+        // Celular: a conta abre numa folha de baixo própria (inicio-mobile.js).
+        if (typeof window._vsAbrirConta === 'function') { window._vsAbrirConta(); return; }
         const nameEl  = document.getElementById('profileSheetName');
         const avatarEl = document.getElementById('profileSheetAvatar');
         const papelEl  = document.getElementById('profileSheetPapel');
@@ -1894,22 +1873,13 @@ document.addEventListener('DOMContentLoaded', () => {
             avatarEl.textContent = iniciais || '👤';
         }
 
+        // Barra lateral (telas largas): o botão de Perfil mora na base da barra à esquerda, e o menu
+        // abre ao LADO dele, alinhado pela base do botão.
         if (profileBtn && profileSheet) {
             const rect = profileBtn.getBoundingClientRect();
-            if (profileBtn.closest('#vsSidebar')) {
-                // Barra lateral (telas largas): o botão de Perfil mora na base da barra à esquerda, e o menu
-                // abre ao LADO dele, alinhado pela base do botão.
-                profileSheet.style.left   = (rect.right + 10) + 'px';
-                profileSheet.style.right  = 'auto';
-                profileSheet.style.bottom = (window.innerHeight - rect.bottom) + 'px';
-            } else {
-                // Celular: o botão de Perfil mora no topo da Início, então o menu abre logo ABAIXO dele.
-                profileSheet.style.left   = 'auto';
-                profileSheet.style.right  = (window.innerWidth - rect.right) + 'px';
-                profileSheet.style.bottom = 'auto';
-                profileSheet.style.top    = (rect.bottom + 10) + 'px';
-                profileSheet.style.transformOrigin = 'top right';
-            }
+            profileSheet.style.left   = (rect.right + 10) + 'px';
+            profileSheet.style.right  = 'auto';
+            profileSheet.style.bottom = (window.innerHeight - rect.bottom) + 'px';
         }
         profileOverlay?.classList.add('active');
     };
@@ -1940,15 +1910,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ── Sair (logout) ────────────────────────────────────────────
+    window._confirmarSair = () => showCustomModal({
+        message: 'Sair da conta?',
+        confirmText: 'Sair',
+        cancelText: 'Cancelar',
+        onConfirm: () => { if (typeof window._fazerLogout === 'function') window._fazerLogout(); },
+        onCancel: () => {}
+    });
     document.getElementById('profileOpenSair')?.addEventListener('click', () => {
         closeProfileSheet();
-        showCustomModal({
-            message: 'Sair da conta?',
-            confirmText: 'Sair',
-            cancelText: 'Cancelar',
-            onConfirm: () => { if (typeof window._fazerLogout === 'function') window._fazerLogout(); },
-            onCancel: () => {}
-        });
+        window._confirmarSair();
     });
 
     // ── Campo focado sempre visível acima do teclado ─────────────
