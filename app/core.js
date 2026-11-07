@@ -328,42 +328,22 @@ window._aplicarCorDestaque = aplicarCorDestaque;
 window._CORES_DESTAQUE = CORES_DESTAQUE;
 
 
-// Preferência pessoal por aparelho — qual seção mostrar assim que o
-// login termina, em vez de sempre cair no hub Início ('main').
-function abrirTelaInicialPreferida() {
+// Ao terminar o login o app sempre abre no hub Início ('main').
+function abrirTelaInicial() {
     // onAuthStateChanged é assíncrono e pode disparar ANTES do
-    // DOMContentLoaded terminar (ex: sessão já persistida, login quase
+    // DOMContentLoaded terminar (sessão já persistida, login quase
     // instantâneo) — nesse caso window._vsNavegarParaHub e a guarda de
-    // saída (vsBase/vsExitGuard) ainda nem foram montados (isso só
-    // acontece dentro do DOMContentLoaded, mais abaixo). Se a tela
-    // preferida abrisse nesse momento, ela navegava sem empilhar nada
-    // direito no histórico — o histórico real (do navegador) e o que o
-    // app espera encontrar ficavam dessincronizados, e o voltar físico
-    // se comportava errado só nesse caminho (login → direto pra tela
-    // preferida), nunca em navegação manual normal.
-    //
-    // Correção: se o DOM ainda não terminou de carregar, adia essa
-    // chamada pro PRÓXIMO DOMContentLoaded — como o listener que monta
-    // vsBase/vsExitGuard/_vsNavegarParaHub já foi registrado antes
-    // (durante o carregamento síncrono do script, bem antes de
-    // qualquer callback assíncrono do Firebase poder disparar), ele
-    // sempre roda primeiro. Isso garante a ordem certa não importa a
-    // velocidade do login.
+    // saída (vsBase/vsExitGuard) ainda não foram montados, e navegar
+    // agora deixaria o histórico do navegador dessincronizado do que o
+    // app espera (voltar físico se comportava errado só nesse caminho).
+    // Se o DOM ainda não terminou, adia pro DOMContentLoaded: o listener
+    // que monta essas peças foi registrado antes e sempre roda primeiro.
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', abrirTelaInicialPreferida, { once: true });
+        document.addEventListener('DOMContentLoaded', abrirTelaInicial, { once: true });
         return;
     }
-    const pref = safeStorage.getItem('vsTelaInicial') || 'main';
-    const mapa = {
-        main:        () => showMainSection('main'),
-        calculator:  () => typeof window.openCalculatorSection === 'function' && window.openCalculatorSection('calculatorHome'),
-        documentos:  () => typeof window.openDocumentosSection === 'function' && window.openDocumentosSection('documentosHome'),
-        estoque:     () => typeof window.openEstoqueSection === 'function' && window.openEstoqueSection('estoqueHome'),
-        venda:       () => typeof window.openVendaSection === 'function' && window.openVendaSection('vendaHome'),
-    };
-    (mapa[pref] || mapa.main)();
+    showMainSection('main');
 }
-window._abrirTelaInicialPreferida = abrirTelaInicialPreferida;
 
 // ── Estado global ───────────────────────────────────────────────
 let rates = {}, areRatesLoaded = false, products = [], fuse = null;
@@ -1601,7 +1581,7 @@ onAuthStateChanged(auth, async user => {
                 loadNotificacoesRecebidas();
                 sessaoCarregada = true;
                 hideLoading();
-                abrirTelaInicialPreferida();
+                abrirTelaInicial();
             })
             .catch(e => {
                 // Usuário autenticado mas sem loja vinculada — não dá

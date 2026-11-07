@@ -5,15 +5,12 @@
 // Único sub-módulo de Configurações liberado pro Funcionário (Fase 0
 // — ver SECOES_LIBERADAS_FUNCIONARIO em configuracoes/router.js).
 //
-// 4 seções, todas preferência PESSOAL por usuário (Gestor e
+// 3 seções, todas preferência PESSOAL por usuário (Gestor e
 // Funcionário têm cada um a própria, sem afetar o outro):
 //   1. Aparência — Modo (Claro/Escuro) + Cor de destaque. Local por
 //      aparelho (safeStorage) — aplica na hora, sem botão Salvar.
-//   2. Comportamento — Tela inicial ao abrir o app. Local por
-//      aparelho também (safeStorage 'vsTelaInicial', lida por
-//      abrirTelaInicial() em core.js).
-//   3. Valor adicional padrão (Calculadora) e
-//   4. Texto do cálculo (Por Aparelho) — esses SIM vão pro Firebase
+//   2. Valor adicional padrão (Calculadora) e
+//   3. Texto do cálculo (Por Aparelho) — esses SIM vão pro Firebase
 //      (usuarios/{uid}/preferencias/…), porque precisam acompanhar
 //      o usuário se ele trocar de aparelho, não só esse dispositivo.
 //      Cada perfil tem os seus.
@@ -25,14 +22,6 @@
 // ================================================================
 (function () {
     'use strict';
-
-    const TELAS_INICIAIS = [
-        { v: 'main',        l: 'Início',      emoji: '🏠' },
-        { v: 'venda',       l: 'Vendas',       emoji: '🛒' },
-        { v: 'estoque',     l: 'Estoque',      emoji: '📦' },
-        { v: 'documentos',  l: 'Documentos',   emoji: '📄' },
-        { v: 'calculator',  l: 'Calculadora',  emoji: '🧮' },
-    ];
 
     const modal = opts => typeof window.showCustomModal === 'function' && window.showCustomModal(opts);
     const el    = id   => document.getElementById(id);
@@ -70,18 +59,6 @@
                         <div class="cz-cores-row" id="cfgCustomCoresRow">
                             <button type="button" class="cz-cor-swatch" data-v="padrao" style="background:linear-gradient(135deg,#5b3df5,#4f8cff);" title="Padrão"></button>
                             ${Object.entries(cores).map(([v, c]) => `<button type="button" class="cz-cor-swatch" data-v="${v}" style="background:${c.hex};" title="${v}"></button>`).join('')}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="cz-sec-title">⚙️ Comportamento</div>
-                <div class="cz-item">
-                    <div class="cz-item-ic" style="background:linear-gradient(135deg,#93c5fd,#4f8cff);">🏁</div>
-                    <div class="cz-item-body">
-                        <div class="cz-item-title">Tela inicial ao abrir</div>
-                        <div class="cz-item-sub">Qual tela aparece assim que você entra no app</div>
-                        <div class="stq-cats" id="cfgCustomTelaInicialPills" style="padding:0;margin-top:10px;">
-                            ${TELAS_INICIAIS.map(t => `<button type="button" class="stq-cat-pill" data-v="${t.v}" style="color:var(--primary);">${t.emoji} ${t.l}</button>`).join('')}
                         </div>
                     </div>
                 </div>
@@ -127,10 +104,6 @@
             const atual = window._configCustomizacoes && window._configCustomizacoes.valorAdicionalPadrao;
             valorAdicionalInput.value = (atual != null) ? atual : '';
         }
-        const telaAtual = (window.safeStorage && window.safeStorage.getItem('vsTelaInicial')) || 'main';
-        document.querySelectorAll('#cfgCustomTelaInicialPills .stq-cat-pill').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.v === telaAtual);
-        });
         const temaAtual = (window.safeStorage && window.safeStorage.getItem('vsTema')) || 'escuro';
         document.querySelectorAll('#cfgCustomAparenciaPills .stq-cat-pill').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.v === temaAtual);
@@ -171,13 +144,6 @@
             btn.addEventListener('click', () => {
                 if (typeof window._aplicarTema === 'function') window._aplicarTema(btn.dataset.v);
                 document.querySelectorAll('#cfgCustomAparenciaPills .stq-cat-pill').forEach(b => b.classList.toggle('active', b === btn));
-            });
-        });
-
-        document.querySelectorAll('#cfgCustomTelaInicialPills .stq-cat-pill').forEach(btn => {
-            btn.addEventListener('click', () => {
-                window.safeStorage && window.safeStorage.setItem('vsTelaInicial', btn.dataset.v);
-                document.querySelectorAll('#cfgCustomTelaInicialPills .stq-cat-pill').forEach(b => b.classList.toggle('active', b === btn));
             });
         });
 
