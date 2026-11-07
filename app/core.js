@@ -2012,3 +2012,37 @@ document.addEventListener('DOMContentLoaded', () => {
         window._vsNavRestoring = false;
     });
 });
+
+// ── Aviso de conexão (só no celular) ─────────────────────────────
+// Faixa discreta no topo quando o aparelho fica sem internet, e um aviso
+// curto quando volta. O Firebase guarda as alterações feitas offline só
+// enquanto o app continua aberto, por isso o texto pede pra não fechar.
+(function () {
+    if (document.documentElement.getAttribute('data-shell') !== 'mobile') return;
+    let barra = null;
+    let timerSumir = null;
+    function barraConexao() {
+        if (!barra) {
+            barra = document.createElement('div');
+            barra.id = 'vsConexaoBar';
+            barra.setAttribute('role', 'status');
+            barra.setAttribute('aria-live', 'polite');
+            document.body.appendChild(barra);
+        }
+        return barra;
+    }
+    function mostrar(offline) {
+        const el = barraConexao();
+        clearTimeout(timerSumir);
+        el.className = offline ? 'vs-conexao-off' : 'vs-conexao-on';
+        el.textContent = offline
+            ? 'Sem internet. Não feche o app: as alterações são salvas quando a conexão voltar.'
+            : 'Conexão restabelecida.';
+        void el.offsetWidth;
+        el.classList.add('visivel');
+        if (!offline) timerSumir = setTimeout(() => el.classList.remove('visivel'), 2500);
+    }
+    window.addEventListener('offline', () => mostrar(true));
+    window.addEventListener('online', () => mostrar(false));
+    if (!navigator.onLine) mostrar(true);
+})();

@@ -3144,3 +3144,21 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
     padding-top: calc(24px + env(safe-area-inset-top, 0px)) !important;
     padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
 }
+
+/* ── Aviso de conexão (ver core.js) ─────────────────────────────
+   Fica logo abaixo da faixa da status bar e acima do conteúdo; some
+   deslizando pra cima. Fundo do cartão + texto/linha colorido (legível nos dois temas). */
+#vsConexaoBar {
+    position: fixed; left: 0; right: 0;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 1045;
+    padding: 8px 16px;
+    font-size: .74rem; font-weight: 600; line-height: 1.35; text-align: center;
+    background: var(--surface-raised);
+    transform: translateY(-110%);
+    transition: transform .25s ease;
+    pointer-events: none;
+}
+#vsConexaoBar.visivel { transform: translateY(0); }
+#vsConexaoBar.vs-conexao-off { color: var(--danger);  border-bottom: 2px solid var(--danger); }
+#vsConexaoBar.vs-conexao-on  { color: var(--success); border-bottom: 2px solid var(--success); }
