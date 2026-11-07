@@ -312,6 +312,12 @@
         f.classList.add('active');
     };
 
+    // Sem isto a falha ficava muda e a Início parecia "zerada"; agora o rótulo diz o que houve.
+    function avisarFalhaEntradas(msg) {
+        const r = el('vsIniRotulo');
+        if (r) r.textContent = msg;
+    }
+
     // ── Atualização ────────────────────────────────────────────
     let seq = 0;
     window._vsInicioAtualizar = function () {
@@ -331,13 +337,33 @@
         // Pendentes de qualquer dia (a janela acima deixaria as antigas de fora; o funcionário já recebe todas as dele).
         const consultaPend = todas ? window._dbQuery(window._lojaRef('vendas'), window._dbOrderByChild('status'), window._dbEqualTo('pendente')) : null;
 
-        Promise.all([window._dbGet(consulta), consultaPend ? window._dbGet(consultaPend) : Promise.resolve(null)]).then(([snap, snapPend]) => {
-            if (!ativa()) return;
-            const mapa = Object.assign({}, snapPend && snapPend.val(), snap.val());
-            const vendas = Object.values(mapa);
-            desenharDia(vendas, vendas.filter(v => v && v.status === 'pendente').length);
-            desenharRosca(vendas);
-        }).catch(e => console.error('Erro ao carregar a Início:', e));
+        // Duas leituras independentes: a lista pesada de pendentes (consulta por status, de qualquer dia)
+        // nunca segura nem derruba o dia e a rosca, que só dependem da janela do mês.
+        let janela = null, pendentes = {};
+        const desenhar = () => {
+            if (!ativa() || !janela) return;
+            const vendas = Object.values(Object.assign({}, pendentes, janela)).filter(Boolean);
+            try {
+                desenharDia(vendas, vendas.filter(v => v.status === 'pendente').length);
+                desenharRosca(vendas);
+            } catch (e) {
+                console.error('[Início] erro ao desenhar as entradas:', e);
+                avisarFalhaEntradas('Erro ao montar as entradas');
+            }
+        };
+        window._dbGet(consulta).then(snap => {
+            janela = snap.val() || {};
+            desenhar();
+        }).catch(e => {
+            console.error('[Início] leitura das vendas recusada:', e && e.code, e);
+            if (ativa()) avisarFalhaEntradas('Não foi possível carregar as entradas');
+        });
+        if (consultaPend) {
+            window._dbGet(consultaPend).then(snap => {
+                pendentes = snap.val() || {};
+                desenhar();
+            }).catch(e => console.error('[Início] leitura das pendentes recusada:', e && e.code, e));
+        }
 
         if (concertosVisivel()) {
             if (!(window._reparosConfig || {}).modo) desenharConcertos([]);
