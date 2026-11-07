@@ -102,7 +102,7 @@
                     Produtos arquivados somem da lista de venda e do estoque, mas continuam aparecendo no <b>Histórico de Vendas</b> e nos <b>Relatórios</b> de vendas já feitas — evita a lista crescer pra sempre sem perder o histórico.
                 </div>
                 <button type="button" class="cfgA-row" id="cpVerArquivadosBtn" style="border-top:1px solid var(--border);">
-                    <div class="cfgA-name" style="color:#5b3df5;">📦 ${arquivadosCount} produto${arquivadosCount === 1 ? '' : 's'} arquivado${arquivadosCount === 1 ? '' : 's'}</div>
+                    <div class="cfgA-name" style="color:var(--acento-hero);">📦 ${arquivadosCount} produto${arquivadosCount === 1 ? '' : 's'} arquivado${arquivadosCount === 1 ? '' : 's'}</div>
                     <span class="cfgA-chev">›</span>
                 </button>
             </div>

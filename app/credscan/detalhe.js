@@ -300,7 +300,7 @@
                     wrap.querySelectorAll('.cs-chip-entrada').forEach((btn, i) => {
                         const ativo = i === idx;
                         btn.style.border = ativo ? '1.5px solid var(--acento-hero)' : '1px solid rgba(var(--overlay-rgb),.15)';
-                        btn.style.background = ativo ? 'rgba(91,61,245,.15)' : 'transparent';
+                        btn.style.background = ativo ? 'rgba(var(--acento-hero-rgb),.15)' : 'transparent';
                         btn.textContent = ativo ? R$(valorEntrada) : opcoes[i].pct + '%';
                     });
                 }

@@ -957,8 +957,8 @@
     function realcarOrigemEscolhida() {
         document.querySelectorAll('#stqCompraInicialWrap .stq-origem-opcao').forEach(l => {
             const marcada = !!l.querySelector('input')?.checked;
-            l.style.borderColor = marcada ? '#5b3df5' : 'rgba(148,163,184,.35)';
-            l.style.background = marcada ? 'rgba(91,61,245,.08)' : 'transparent';
+            l.style.borderColor = marcada ? 'var(--acento-hero)' : 'rgba(148,163,184,.35)';
+            l.style.background = marcada ? 'rgba(var(--acento-hero-rgb),.08)' : 'transparent';
         });
     }
     function atualizarCompraInicial() {

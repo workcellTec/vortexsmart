@@ -260,72 +260,78 @@ const safeStorage = {
 };
 window.safeStorage = safeStorage;
 
-// ── Tema (Claro/Escuro) ───────────────────────────────────────────
-// Aplica o quanto antes (antes até do DOMContentLoaded) pra não
-// "piscar" o tema errado por uma fração de segundo. Documentos/PDFs
-// e fotos enviadas (Firebase Storage) não leem essas classes — são
-// gerados à parte, com cor própria — então não são afetados por essa troca.
-function aplicarTema(tema) {
-    document.body.classList.toggle('tema-claro', tema === 'claro');
-    safeStorage.setItem('vsTema', tema);
-    // Barra de notificação do Android/status bar do PWA — segue a cor de
-    // fundo de cada tema (mesmo valor de --bg), pra não ficar claro no
-    // topo com o app inteiro escuro por baixo, ou vice-versa.
-    const metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.setAttribute('content', tema === 'claro' ? '#eef1f7' : '#07101f');
-}
-// Seletor de tema removido da UI (Configurações > Customizações) —
-// PDV Desktop trava no escuro, sem opção de troca, pra evitar bugs
-// visuais de contraste entre os dois temas. Ignora qualquer valor
-// salvo em localStorage de uma versão anterior (quem já tinha
-// trocado pra claro antes dessa trava não fica preso lá).
-safeStorage.setItem('vsTema', 'escuro');
-aplicarTema('escuro');
-window._aplicarTema = aplicarTema;
+// ── Tema (Claro/Escuro) e Cor de destaque ─────────────────────────
+// CELULAR: as duas escolhas ficam salvas neste aparelho (safeStorage) e valem
+// já na primeira pintura (script no <head> do index.html aplica a classe).
+// Padrão: escuro + azul. PC / programa instalado: travado em escuro + padrão,
+// sem opção de troca (evita bugs de contraste no PDV) — ignora qualquer valor
+// salvo por versões antigas.
+// Documentos/PDFs e fotos enviadas (Firebase Storage) não leem essas classes —
+// usam cor própria (storeCorBarra) — então não são afetados por essa troca.
+const EH_CELULAR = document.documentElement.getAttribute('data-shell') === 'mobile';
+const TEMA_BG = { escuro: '#141517', claro: '#EEEFF1' };
 
-// ── Cor de destaque ───────────────────────────────────────────────
-// Preferência PESSOAL por aparelho (safeStorage, igual o tema) — muda
-// o --primary/--primary-rgb (botões, ícones) E também o Hero "Vendas
-// Hoje" + sino de notificação (--acento-hero/--acento-hero-2/-rgb).
-// NÃO afeta a cor dos documentos gerados (contrato/recibo/garantia)
-// nem das fotos — esses usam storeCorBarra, configuração PRÓPRIA da
-// loja, separada de propósito (ver configuracoes/config-documentos.js).
-// 'padrao' = não sobrescreve nada, deixa o --primary de cada tema
-// (claro/escuro) e o roxo de marca original do Hero valerem, exatamente
-// como sempre foi — quem nunca mexe nessa opção não vê nada diferente.
-// hex2/rgb2: segunda cor do gradiente do Hero/sino (tom mais claro da
-// mesma cor, reaproveitando tons que já existem em outros lugares do
-// app, pra não inventar paleta nova).
-const CORES_DESTAQUE = {
+// Cada cor tem um tom por tema, escolhido pra manter contraste com o texto branco dos botões.
+const CORES_DESTAQUE = EH_CELULAR ? {
+    azul:    { escuro: '#2979FF', claro: '#2563EB' },
+    verde:   { escuro: '#16A34A', claro: '#15803D' },
+    rosa:    { escuro: '#DB2777', claro: '#BE185D' },
+    laranja: { escuro: '#EA580C', claro: '#C2410C' },
+} : {
     roxo:     { hex: '#5b3df5', rgb: '91,61,245',   hex2: '#4f8cff' },
     verde:    { hex: '#16a34a', rgb: '22,163,74',   hex2: '#4ade80' },
     laranja:  { hex: '#f97316', rgb: '249,115,22',  hex2: '#fbbf24' },
     rosa:     { hex: '#db2777', rgb: '219,39,119',  hex2: '#f472b6' },
     vermelho: { hex: '#dc2626', rgb: '220,38,38',   hex2: '#f87171' },
 };
+const COR_PADRAO = EH_CELULAR ? 'azul' : 'padrao';
+
+function hexParaRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+
 function aplicarCorDestaque(cor) {
+    if (!CORES_DESTAQUE[cor]) cor = COR_PADRAO;
     const preset = CORES_DESTAQUE[cor];
-    if (preset) {
-        document.body.style.setProperty('--primary', preset.hex);
-        document.body.style.setProperty('--primary-rgb', preset.rgb);
-        document.body.style.setProperty('--acento-hero', preset.hex);
-        document.body.style.setProperty('--acento-hero-2', preset.hex2);
-        document.body.style.setProperty('--acento-hero-rgb', preset.rgb);
+    const props = ['--primary', '--primary-rgb', '--acento-hero', '--acento-hero-2', '--acento-hero-rgb'];
+    if (EH_CELULAR) {
+        const hex = preset[document.body.classList.contains('tema-claro') ? 'claro' : 'escuro'];
+        const rgb = hexParaRgb(hex);
+        // Identidade sólida: o antigo "roxo do Hero" (--acento-hero) agora é a própria cor de destaque.
+        [hex, rgb, hex, hex, rgb].forEach((v, i) => document.body.style.setProperty(props[i], v));
+    } else if (preset) {
+        [preset.hex, preset.rgb, preset.hex, preset.hex2, preset.rgb].forEach((v, i) => document.body.style.setProperty(props[i], v));
     } else {
-        document.body.style.removeProperty('--primary');
-        document.body.style.removeProperty('--primary-rgb');
-        document.body.style.removeProperty('--acento-hero');
-        document.body.style.removeProperty('--acento-hero-2');
-        document.body.style.removeProperty('--acento-hero-rgb');
+        props.forEach(p => document.body.style.removeProperty(p));
     }
     safeStorage.setItem('vsCorDestaque', cor);
 }
-// Seletor de cor de destaque removido da UI — trava em "padrão"
-// (mesma cor de marca original), mesmo raciocínio do tema acima.
-safeStorage.setItem('vsCorDestaque', 'padrao');
-aplicarCorDestaque('padrao');
+
+function aplicarTema(tema) {
+    if (tema !== 'claro') tema = 'escuro';
+    document.body.classList.toggle('tema-claro', tema === 'claro');
+    document.documentElement.classList.toggle('tema-claro', tema === 'claro');
+    safeStorage.setItem('vsTema', tema);
+    // Barra de status/notificação do PWA segue a cor de fundo de cada tema.
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', EH_CELULAR ? TEMA_BG[tema] : '#07101f');
+    // O tom do destaque muda com o tema (contraste) — reaplica a cor escolhida.
+    if (EH_CELULAR) aplicarCorDestaque(safeStorage.getItem('vsCorDestaque'));
+}
+
+if (EH_CELULAR) {
+    aplicarTema(safeStorage.getItem('vsTema'));
+    aplicarCorDestaque(safeStorage.getItem('vsCorDestaque'));
+} else {
+    safeStorage.setItem('vsCorDestaque', 'padrao');
+    aplicarTema('escuro');
+    aplicarCorDestaque('padrao');
+}
+window._aplicarTema = aplicarTema;
 window._aplicarCorDestaque = aplicarCorDestaque;
 window._CORES_DESTAQUE = CORES_DESTAQUE;
+window._COR_PADRAO = COR_PADRAO;
 
 
 // Ao terminar o login o app sempre abre no hub Início ('main').

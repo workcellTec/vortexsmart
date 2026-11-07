@@ -404,7 +404,7 @@
                 ${entradas.length ? entradas.map(([nome, valor]) => `
                     <div class="pulse-wf-row">
                         <div class="pulse-wf-label">${esc(nome)}</div>
-                        <div class="pulse-wf-bar-wrap"><div class="pulse-wf-bar" style="width:${Math.max(4, Math.round(valor/max*100))}%;background:#5b3df5;"></div></div>
+                        <div class="pulse-wf-bar-wrap"><div class="pulse-wf-bar" style="width:${Math.max(4, Math.round(valor/max*100))}%;background:var(--acento-hero);"></div></div>
                         <div class="pulse-wf-value">${fmt(valor)}</div>
                     </div>
                 `).join('') : `<div class="stq-hist-sub text-center py-2">Sem despesas nesse mês ainda.</div>`}

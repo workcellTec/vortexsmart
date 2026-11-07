@@ -18,7 +18,7 @@
 // Depende de (via window.*):
 //   showCustomModal, _usuarioPrefRef, _dbUpdate, _dbGet,
 //   _configCustomizacoes, _aplicarTema, _aplicarCorDestaque,
-//   _CORES_DESTAQUE, safeStorage
+//   _CORES_DESTAQUE, _COR_PADRAO, safeStorage
 // ================================================================
 (function () {
     'use strict';
@@ -32,6 +32,7 @@
         const wrap = el('configuracoesCustomizacoes');
         if (!wrap) return;
         const cores = window._CORES_DESTAQUE || {};
+        const corPadrao = window._COR_PADRAO || 'padrao';
         wrap.innerHTML = `
             <div class="section-header">
                 <button type="button" class="btn-back" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
@@ -57,8 +58,8 @@
                         <div class="cz-item-title">Cor de destaque</div>
                         <div class="cz-item-sub">Só muda o visual do app — não altera documentos nem fotos</div>
                         <div class="cz-cores-row" id="cfgCustomCoresRow">
-                            <button type="button" class="cz-cor-swatch" data-v="padrao" style="background:linear-gradient(135deg,#5b3df5,#4f8cff);" title="Padrão"></button>
-                            ${Object.entries(cores).map(([v, c]) => `<button type="button" class="cz-cor-swatch" data-v="${v}" style="background:${c.hex};" title="${v}"></button>`).join('')}
+                            ${corPadrao === 'padrao' ? '<button type="button" class="cz-cor-swatch" data-v="padrao" style="background:linear-gradient(135deg,#5b3df5,#4f8cff);" title="Padrão"></button>' : ''}
+                            ${Object.entries(cores).map(([v, c]) => `<button type="button" class="cz-cor-swatch" data-v="${v}" style="background:${c.hex || c.escuro};" title="${v}"></button>`).join('')}
                         </div>
                     </div>
                 </div>
@@ -108,7 +109,7 @@
         document.querySelectorAll('#cfgCustomAparenciaPills .stq-cat-pill').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.v === temaAtual);
         });
-        const corAtual = (window.safeStorage && window.safeStorage.getItem('vsCorDestaque')) || 'padrao';
+        const corAtual = (window.safeStorage && window.safeStorage.getItem('vsCorDestaque')) || window._COR_PADRAO || 'padrao';
         document.querySelectorAll('#cfgCustomCoresRow .cz-cor-swatch').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.v === corAtual);
         });
