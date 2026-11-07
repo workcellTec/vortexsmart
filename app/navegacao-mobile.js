@@ -17,8 +17,10 @@
 // abrem direto na primeira aba, com a faixa de abas fixa no topo; tocar numa aba ou deslizar
 // pro lado troca a tela SEM empilhar histórico (o voltar sai do módulo).
 //
-// Botão do meio: "Vender" em todo lugar; dentro da lista de Concertos vira "Novo concerto"
-// (quem tem a permissão de cadastrar OS) — ver atualizarCentro().
+// Botão do meio ADAPTATIVO: "Vender" por padrão; em cada tela que tem um "criar" vira esse criar
+// (Novo concerto, Novo produto, Novo lançamento, Novo contrato…) — tabela CONTEXTOS, mais abaixo.
+// Ele só dispara o botão de criar que a própria tela já tem, então permissão e regra de cada
+// módulo continuam sendo as do módulo.
 //
 // Expõe via window.*: _vsBarraRender, _vsBarraAtiva, _vsBarraCentro, _vsBarraSincronizar, _vsAbas
 // Depende de (via window.*): _usuarioPrefRef, _dbUpdate, _firebaseAuthUid, _nomeUsuario,
@@ -142,25 +144,116 @@
         atualizarCentro();
     };
 
-    // ── Botão do meio: Vender, ou Novo concerto na lista de Concertos ──
-    const emConcertos = () => {
-        const lista = el('reparosLista');
-        return secaoAtual === 'reparos' && !!lista && lista.style.display !== 'none'
-            && (typeof window._temPermissao !== 'function' || window._temPermissao('reparos_criar'));
+    // ── Botão do meio: Vender, ou o "criar" da tela em que o usuário está ──
+    // "aberto": a tela está mesmo à vista (o container do módulo some quando se sai dele).
+    const aberto = id => { const n = el(id); return !!n && n.getClientRects().length > 0; };
+    const podeEm = chave => typeof window._temPermissao !== 'function' || window._temPermissao(chave);
+    const clicarEm = id => () => el(id)?.click();
+    // Botões de criar que o código compartilhado liga/desliga por estilo inline: vale o que está no estilo.
+    const acaoLigada = (id, icone) => {
+        const b = el(id);
+        return !!b && b.style.display !== 'none' && !b.disabled && !!b.querySelector('.' + icone);
     };
+
+    // Receita × Despesa: o botão "+" do Financeiro precisa saber qual das duas.
+    function lancar(tipo) {
+        const id = tipo === 'receita' ? 'finBtnReceita' : 'finBtnDespesa';
+        if (!el(id) || !aberto('financeiroLancamentos')) window.openFinanceiroSection?.('financeiroLancamentos', null, true);
+        el(id)?.click();
+    }
+    function abrirFolhaLancamento() {
+        let f = el('vsFinFolha');
+        if (!f) {
+            f = document.createElement('div');
+            f.id = 'vsFinFolha';
+            f.className = 'vs-folha-overlay';
+            f.innerHTML = `
+                <div class="vs-folha" role="dialog" aria-label="Novo lançamento">
+                    <div class="vs-folha-alca"></div>
+                    <div class="vs-folha-titulo">Novo lançamento</div>
+                    <button type="button" class="vs-linha ganho" data-tipo="receita"><span class="vs-linha-ic">${iconeSvg('cashplus', 21)}</span><span class="vs-linha-nome">Receita<small>Dinheiro que entrou</small></span></button>
+                    <button type="button" class="vs-linha perigo" data-tipo="despesa"><span class="vs-linha-ic">${iconeSvg('cashminus', 21)}</span><span class="vs-linha-nome">Despesa<small>Dinheiro que saiu</small></span></button>
+                </div>`;
+            document.body.appendChild(f);
+            f.addEventListener('click', e => {
+                const b = e.target.closest('[data-tipo]');
+                if (b) { f.classList.remove('active'); lancar(b.dataset.tipo); }
+                else if (e.target === f) f.classList.remove('active');
+            });
+        }
+        void f.offsetWidth;
+        f.classList.add('active');
+    }
+
+    const docs = (secao, viewHist, tabNovo, rotulo, curto) => ({
+        acao: 'doc-' + secao, rotulo, curto, icone: 'docplus',
+        ativo: () => aberto(viewHist) && !!el(tabNovo), executar: clicarEm(tabNovo),
+    });
+    // A primeira que estiver ativa vence; sem nenhuma, vale o Vender.
+    const CONTEXTOS = [
+        { acao: 'concerto', rotulo: 'Novo concerto', icone: 'toolplus',
+          ativo: () => aberto('reparosLista') && podeEm('reparos_criar'),
+          executar: () => window.openReparosSection?.('reparosForm') },
+        { acao: 'produto', rotulo: 'Novo produto', icone: 'boxplus',
+          ativo: () => aberto('estoqueProdutos') && !!el('stqNewBtn'), executar: clicarEm('stqNewBtn') },
+        { acao: 'lancamento', rotulo: 'Novo lançamento', curto: 'Lançamento', icone: 'cashplus',
+          ativo: () => (aberto('financeiroLancamentos') && !!el('finBtnReceita')) || aberto('financeiroGraficos'),
+          executar: abrirFolhaLancamento },
+        { acao: 'conta-fixa', rotulo: 'Nova conta fixa', curto: 'Conta fixa', icone: 'cashplus',
+          ativo: () => aberto('financeiroRecorrentes') && !!el('finRecNovoBtn'), executar: clicarEm('finRecNovoBtn') },
+        { acao: 'reposicao', rotulo: 'Novo item', icone: 'cartplus',
+          ativo: () => aberto('reposicaoLista') && !!el('repoNovoBtn'), executar: clicarEm('repoNovoBtn') },
+        { acao: 'credscan', rotulo: 'Nova análise', icone: 'shieldplus',
+          ativo: () => aberto('credscanLista') && !!el('csNovoBtn'), executar: clicarEm('csNovoBtn') },
+        docs('contrato', 'ctViewHistorico', 'ctTabNovo', 'Novo contrato'),
+        docs('garantia', 'bkViewHist', 'bkTabNovo', 'Nova garantia'),
+        docs('recibo', 'rcViewHistorico', 'rcTabNovo', 'Novo recibo'),
+        docs('orcamento', 'orViewHist', 'orTabNovo', 'Novo orçamento', 'Orçamento'),
+        { acao: 'cliente', rotulo: 'Novo cliente', icone: 'userplus',
+          ativo: () => aberto('configuracoesClientes') && acaoLigada('ccHeaderActionBtn', 'bi-person-plus-fill'),
+          executar: clicarEm('ccHeaderActionBtn') },
+        { acao: 'usuario', rotulo: 'Novo usuário', icone: 'userplus',
+          ativo: () => aberto('configuracoesUsuarios') && acaoLigada('cuHeaderActionBtn', 'bi-person-plus-fill'),
+          executar: clicarEm('cuHeaderActionBtn') },
+    ];
+    const VENDER = {
+        acao: 'venda', rotulo: 'Vender', icone: 'bag',
+        executar: () => window.openVendaSection?.('lancarVenda'),
+    };
+    const centroAtual = () => CONTEXTOS.find(c => c.ativo()) || VENDER;
+
     function atualizarCentro() {
         const b = el('ctwNavVender');
         if (!b) return;
-        const novo = emConcertos();
-        b.dataset.acao = novo ? 'concerto' : 'venda';
-        const rotulo = novo ? 'Novo concerto' : 'Vender';
-        b.title = rotulo;
-        b.setAttribute('aria-label', rotulo);
-        b.querySelector('.ctw-nav-label').textContent = rotulo;
-        b.querySelector('.ctw-nav-vender-ic use').setAttribute('href', novo ? '#vsi-toolplus' : '#vsi-bag');
+        const c = centroAtual();
+        // Telas estreitas (≤ 360px) não comportam rótulo de 14+ letras entre os vizinhos: usa a forma curta.
+        const texto = c.curto && window.innerWidth <= 360 ? c.curto : c.rotulo;
+        const chave = c.acao + '|' + texto;
+        if (b.dataset.chave === chave) return;   // só mexe quando muda (o observador abaixo roda a cada alteração de tela)
+        b.dataset.chave = chave;
+        b.dataset.acao = c.acao;
+        b.title = c.rotulo;
+        b.setAttribute('aria-label', c.rotulo);
+        const rot = b.querySelector('.ctw-nav-label');
+        rot.textContent = texto;
+        rot.dataset.tam = texto.length >= 14 ? 'gg' : texto.length >= 12 ? 'g' : '';
+        b.querySelector('.ctw-nav-vender-ic use').setAttribute('href', '#vsi-' + c.icone);
     }
-    window._vsBarraCentro = atualizarCentro;   // o router de Concertos chama depois de trocar de sub-tela
+    window._vsBarraCentro = atualizarCentro;   // routers chamam depois de trocar de sub-tela
 
+    // As telas trocam de lista ↔ formulário e de aba por estilo/HTML: o botão acompanha sem cada módulo ter que avisar.
+    let centroAgendado = false;
+    function observarCentro() {
+        const obs = new MutationObserver(() => {
+            if (centroAgendado) return;
+            centroAgendado = true;
+            requestAnimationFrame(() => { centroAgendado = false; atualizarCentro(); });
+        });
+        MODULOS.forEach(m => {
+            const alvo = el(m.secao + 'Container');
+            if (alvo) obs.observe(alvo, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class', 'disabled'] });
+        });
+    }
 
     // ── Abas dos módulos ───────────────────────────────────────
     const ehGestor = () => window._papelUsuario === 'gestor';
@@ -193,7 +286,7 @@
             ],
         },
         calculadora: {
-            titulo: 'Calculadora', cont: 'calculatorContainer', hubs: ['calculatorHome'],
+            titulo: 'Calculadora', cont: 'calculatorContainer', hubs: ['calculatorHome'], padrao: 'calcularPorAparelho',
             abrir: sub => window.openCalculatorSection(sub, true),
             itens: [
                 { sub: 'fecharVenda', nome: 'Remover taxa' },
@@ -237,7 +330,8 @@
             const cfg = ABAS[mod];
             if (!cfg || (sub && !cfg.hubs.includes(sub))) return sub;
             const livres = itensPermitidos(mod);
-            return livres.length ? livres[0].sub : sub;
+            const alvo = livres.find(i => i.sub === cfg.padrao) || livres[0];
+            return alvo ? alvo.sub : sub;
         },
         // Chamado pelos routers depois de mostrar a tela: desenha/atualiza a faixa de abas.
         atualizar(mod, sub) {
@@ -353,15 +447,10 @@
     }).observe(document.body, { childList: true, subtree: true, characterData: true });
     trocarEmojis();
 
-    // ── Vender ─────────────────────────────────────────────────
-    function ligarVender() {
-        el('ctwNavVender')?.addEventListener('click', () => {
-            if (emConcertos()) {
-                if (typeof window.openReparosSection === 'function') window.openReparosSection('reparosForm');
-            } else if (typeof window.openVendaSection === 'function') {
-                window.openVendaSection('lancarVenda');
-            }
-        });
+    // ── Botão do meio ──────────────────────────────────────────
+    function ligarCentro() {
+        // Recalcula na hora do toque: a ação é a da tela que está à vista agora, mesmo que o observador ainda não tenha rodado.
+        el('ctwNavVender')?.addEventListener('click', () => centroAtual().executar());
     }
 
     // ── Folha "Editar barra" ───────────────────────────────────
@@ -415,7 +504,9 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-editar-barra]').forEach(b => b.addEventListener('click', abrirFolha));
-        ligarVender();
+        ligarCentro();
+        observarCentro();
         render();
+        atualizarCentro();
     });
 })();

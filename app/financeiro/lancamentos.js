@@ -268,7 +268,6 @@
                     <div class="fl-th"><span></span><span>Descrição</span><span>Categoria</span><span>Data</span><span>Valor</span></div>
                     <div id="finList"></div>
                 </div>
-                <button type="button" class="fl-fab" id="finBtnNovo" aria-label="Novo lançamento"><i class="bi bi-plus-lg"></i></button>
             </div>
         `;
 
@@ -281,7 +280,6 @@
 
         el('finBtnReceita').addEventListener('click', () => abrirForm('receita'));
         el('finBtnDespesa').addEventListener('click', () => abrirForm('despesa'));
-        el('finBtnNovo').addEventListener('click', () => abrirForm('despesa'));
         el('finBtnFiltros').addEventListener('click', abrirFiltrosAvancados);
         el('finBusca').addEventListener('input', () => {
             termoBusca = el('finBusca').value.trim().toLowerCase();

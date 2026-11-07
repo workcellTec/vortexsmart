@@ -151,7 +151,7 @@ button, [role="button"] { -webkit-user-select: none; user-select: none; -webkit-
 /* Transição entre telas (ver pedirTransicao em core.js): botões flutuantes
    somem enquanto a tela desliza, senão pulam de lugar (o transform do
    container vira o referencial deles). */
-.vs-transicao .fl-fab, .vs-transicao .apr-copy-fab { visibility: hidden; }
+.vs-transicao .apr-copy-fab { visibility: hidden; }
 
 /* Faixa sólida sob a status bar translúcida do iPhone (entalhe/Dynamic
    Island): o conteúdo rola por trás dela sem encostar na hora. A cor é
@@ -1142,7 +1142,13 @@ code { overflow-wrap: anywhere; }
 }
 .ctw-nav-vender:active .ctw-nav-vender-ic { transform: scale(.94); }
 .ctw-nav-vender .ctw-nav-label { font-weight: 800; color: var(--text-strong); overflow: visible; text-overflow: clip; }   /* "Novo concerto" é mais largo que a coluna; os vizinhos têm folga */
-.ctw-nav-vender[data-acao="concerto"] .ctw-nav-label { font-size: 10px; letter-spacing: -0.01em; }
+/* O botão do meio da barra faz o "criar" da tela (navegacao-mobile.js, CONTEXTOS). Os botões de criar do
+   próprio módulo continuam existindo (é neles que o clique da barra cai), só não aparecem em duplicidade. */
+#stqNewBtn, #repoNovoBtn, #csNovoBtn, #finRecNovoBtn,
+#ccHeaderActionBtn:has(.bi-person-plus-fill),
+#cuHeaderActionBtn:not(:disabled) { display: none !important; }
+.ctw-nav-vender .ctw-nav-label[data-tam="g"] { font-size: 10px; letter-spacing: -0.01em; }
+.ctw-nav-vender .ctw-nav-label[data-tam="gg"] { font-size: 9.5px; letter-spacing: -0.02em; }
 
 /* ── Início: topo (avatar · saudação · sino) ──────────────── */
 .vs-ini-topo { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 22px; text-align: left; }
@@ -1259,6 +1265,7 @@ code { overflow-wrap: anywhere; }
 .vs-linha-badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--primary); color: var(--on-primary); font-size: 11px; font-weight: 800; }
 .vs-linha.perigo .vs-linha-ic { background: var(--danger-soft); color: var(--danger); }
 .vs-linha.perigo .vs-linha-nome { color: var(--danger); }
+.vs-linha.ganho .vs-linha-ic { background: color-mix(in srgb, var(--success) 16%, var(--surface)); color: var(--success); }
 button.vs-linha { width: 100%; background: none; border-top: 0; border-left: 0; border-right: 0; font-family: inherit; text-align: left; }
 .vs-sw { position: relative; width: 46px; height: 28px; flex-shrink: 0; }
 .vs-sw input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
@@ -2792,14 +2799,6 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 .fl-row .v { font-size: .92rem; }
 .fl-rw.p .fl-row .ic { background: rgba(251,191,36,.14); }
 .fl-rw.p .fl-row .v { color: #fbbf24; }
-
-/* Botão + flutuante (lança receita ou despesa), acima da barra de baixo */
-.fl-fab {
-    display: grid; place-items: center; position: fixed; right: 18px; bottom: calc(104px + env(safe-area-inset-bottom, 0px));
-    width: 56px; height: 56px; border: 0; border-radius: 50%; z-index: 1050; cursor: pointer;
-    background: var(--primary); color: #fff; font-size: 1.5rem;
-}
-.fl-fab:active { transform: scale(.94); }
 
 /* ══════════════════════════════════════════════════════════════
    NOVA VENDA no celular — a tela usa a mesma marcação do PC (venda/lancar.js),

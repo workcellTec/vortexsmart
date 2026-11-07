@@ -3320,7 +3320,6 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 .fl-rep-dia { align-items: center; gap: 10px; margin-top: 10px; font-size: .82rem; color: var(--text-secondary); }
 .fl-rep-dia input { width: 84px; margin: 0; text-align: center; }
 .fl-rep-nota { margin: 8px 0 0; font-size: .74rem; color: #fbbf24; }
-.fl-fab { display: none; }
 @media (max-width: 1240px) {
     .fl-card.k { grid-column: span 6; }
     .fl-card.luc { grid-column: span 6; order: 4; min-height: 132px; }
