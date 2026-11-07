@@ -1269,6 +1269,7 @@ Garantia: ${item.diasGarantia || 0} dias`;
             evitarCorteDePagina(printArea, PRINT_PAGE_H_PX);
 
             onProgress?.(35, 'Renderizando documento...');
+            await window._vsLib('html2canvas', 'jspdf');
             const canvas = await html2canvas(printArea, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
 
             onProgress?.(65, 'Montando PDF...');

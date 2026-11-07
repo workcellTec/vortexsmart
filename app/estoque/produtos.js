@@ -1016,12 +1016,23 @@
     // ── Desenha o código de barras (SVG) no preview do formulário —
     //    some se o campo estiver vazio ou se a lib não conseguir
     //    desenhar aquele texto (ex: caracteres não suportados). ──
+    let _barcodePendente = '';
     function renderBarcodePreview(codigo) {
         const wrap = el('stqBarcodePreviewWrap');
         const svg  = el('stqBarcodePreview');
         if (!wrap || !svg) return;
         const valor = (codigo || '').trim();
-        if (!valor || typeof window.JsBarcode !== 'function') {
+        if (valor && typeof window.JsBarcode !== 'function') {
+            // JsBarcode carrega sob demanda (window._vsLib): desenha assim que chegar,
+            // se o campo ainda tiver o mesmo código (a pessoa pode ter continuado digitando).
+            _barcodePendente = valor;
+            window._vsLib('jsbarcode')
+                .then(() => { if (_barcodePendente === valor) renderBarcodePreview(valor); })
+                .catch(() => { /* sem a biblioteca só não há prévia; o código continua sendo salvo */ });
+            wrap.classList.add('hidden');
+            return;
+        }
+        if (!valor) {
             wrap.classList.add('hidden');
             return;
         }

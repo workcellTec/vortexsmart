@@ -18,7 +18,7 @@
 // Depende de (via window.*):
 //   showCustomModal, escapeHtml, products (populado pelo core.js),
 //   _lojaRef, _dbUpdate, _dbPush, _dbGet, _dbRemove,
-//   jspdf (global, via CDN)
+//   jspdf (global, carregado sob demanda via window._vsLib)
 // ================================================================
 (function () {
     'use strict';
@@ -402,8 +402,11 @@
 
     // ── Geração de PDF (reutilizável: finalizar agora OU reabrir do histórico) ──
     function gerarPDF(itensParaPDF, dataFinalizacao) {
+        // jsPDF carrega sob demanda (ver window._vsLib em core.js): na primeira vez, baixa e repete a chamada.
         if (typeof window.jspdf === 'undefined') {
-            window.showCustomModal({ message: 'Erro: biblioteca de PDF não carregada.' });
+            window._vsLib('jspdf')
+                .then(() => gerarPDF(itensParaPDF, dataFinalizacao))
+                .catch(() => window.showCustomModal({ message: 'Erro: biblioteca de PDF não carregada. Confira a conexão e tente de novo.' }));
             return;
         }
         const { jsPDF } = window.jspdf;

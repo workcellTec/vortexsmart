@@ -129,7 +129,7 @@
         window._calcExportarImagem({ badge: { texto: 'Orçamento Personalizado' }, linhas: ultimasLinhas, arquivoSufixo: 'orcamento' });
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    window._vsQuandoDomPronto(() => {
         renderMachineChip2();
         el('machine2Chip')?.addEventListener('click', abrirModalMaquina2);
         el('machine2ModalBackdrop')?.addEventListener('click', e => { if (e.target.id === 'machine2ModalBackdrop') fecharModalMaquina2(); });

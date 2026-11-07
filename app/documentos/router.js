@@ -36,7 +36,7 @@
     window.openDocumentosSection = openDocumentosSection;
 
     // ── Listeners dos cards do Documentos Home ───────────────────
-    document.addEventListener('DOMContentLoaded', () => {
+    window._vsQuandoDomPronto(() => {
         el('openContrato2')?.addEventListener('click', () => openDocumentosSection('documentosContrato'));
         el('openGarantia2')?.addEventListener('click', () => openDocumentosSection('documentosGarantia'));
         el('openRecibo2')?.addEventListener('click', () => openDocumentosSection('documentosRecibo'));

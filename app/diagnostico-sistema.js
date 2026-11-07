@@ -16,7 +16,7 @@
     // Conferência das telas: cada botão do menu só funciona se o arquivo que define
     // a função existir (se o arquivo faltar, o clique não faz NADA e não dá erro).
     const ABRIDORES = ['openVendaSection', 'openEstoqueSection', 'openFinanceiroSection', 'openDocumentosSection', 'openReparosSection', 'openReposicaoSection', 'openConfiguracoesSection', 'openCalculatorSection'];
-    const BIBLIOTECAS = [['Fuse (busca)', () => typeof window.Fuse], ['bootstrap', () => typeof window.bootstrap], ['html2canvas', () => typeof window.html2canvas], ['jsPDF', () => typeof window.jspdf], ['JsBarcode', () => typeof window.JsBarcode]];
+    const BIBLIOTECAS = [['Fuse (busca)', () => typeof window.Fuse, false], ['html2canvas', () => typeof window.html2canvas, true], ['jsPDF', () => typeof window.jspdf, true], ['JsBarcode', () => typeof window.JsBarcode, true]];
     const PASTAS_DA_LOJA = ['clientes', 'products', 'rates', 'maquininhasConfig', 'formasPagamentoConfig', 'vendas'];
     const CHAVES_IMPRESSORA = { recibo: 'vsmart_impressora_termica_escolhida', etiqueta: 'vsmart_impressora_etiqueta_escolhida' };
 
@@ -73,7 +73,7 @@
             L.push('Arquivos que NÃO carregaram: ' + (naoCarregaram.length ? naoCarregaram.join(', ') : 'nenhum'));
             if (naoCarregaram.length) alertas.push('Arquivos que não carregaram: ' + naoCarregaram.join(', '));
             L.push('Scripts na página: ' + document.scripts.length);
-            L.push('Bibliotecas: ' + BIBLIOTECAS.map(([n, f]) => n + '=' + (f() === 'undefined' ? 'NÃO' : 'ok')).join(' | '));
+            L.push('Bibliotecas: ' + BIBLIOTECAS.map(([n, f, sobDemanda]) => n + '=' + (f() !== 'undefined' ? 'ok' : (sobDemanda ? 'sob demanda' : 'NÃO'))).join(' | '));
         });
 
         await secao('3) Sessão', async () => {

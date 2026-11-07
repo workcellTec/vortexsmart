@@ -38,7 +38,7 @@
         if (typeof window.updateCalcularPorAparelhoUI === 'function') window.updateCalcularPorAparelhoUI();
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
+    window._vsQuandoDomPronto(() => {
         // Navegação a partir da Calculadora Home
         document.getElementById('openFecharVenda2')?.addEventListener('click', () => window.openCalculatorSection?.('fecharVenda'));
         document.getElementById('openRepassarValores')?.addEventListener('click', () => window.openCalculatorSection?.('repassarValores'));

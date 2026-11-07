@@ -71,7 +71,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_VERSION = 'vortexsmart-v11';
+const CACHE_VERSION = 'vortexsmart-v12';
 
 const APP_SHELL = [
   './',
@@ -80,6 +80,8 @@ const APP_SHELL = [
   './style.mobile.css',
   './manifest.json',
   './lib/jsbarcode.min.js',
+  './lib/bootstrap-icons.subset.css',
+  './lib/bootstrap-icons.subset.woff2',
   './acesso-loja.js',
   './core.js',
   './diagnostico-sistema.js',
@@ -142,12 +144,11 @@ const APP_SHELL = [
   './icons/apple-touch-icon.png'
 ];
 
-// Bibliotecas externas que o app usa (todas com versão fixa no endereço).
+// Bibliotecas externas que o app usa (todas com versão fixa no endereço);
+// html2canvas e jsPDF só carregam quando alguém usa, mas já ficam guardadas aqui pra funcionar offline.
 // Baixadas já na instalação, uma a uma e sem travar: se alguma falhar, o
 // restante continua e a falha é tratada na 1ª vez que ela for pedida.
 const CDN_PRECACHE = [
-  'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
-  'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js',
   'https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js',
   'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',

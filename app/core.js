@@ -343,6 +343,7 @@ function abrirTelaInicial() {
         return;
     }
     showMainSection('main');
+    precarregarModulosOciosos();
 }
 
 // ── Estado global ───────────────────────────────────────────────
@@ -737,6 +738,138 @@ function appInacessivel() {
     const login = document.getElementById('loginScreen');
     return (!!login && login.style.display === 'flex') || !!document.getElementById('acessoSuspensoScreen');
 }
+// ── Carga sob demanda ─────────────────────────────────────────────
+// Bibliotecas pesadas (PDF, captura de tela, código de barras) e módulos
+// pouco usados (Calculadoras, Documentos, CredScan) não são lidos no boot:
+// entram na primeira vez que alguém precisa, ou sozinhos logo depois do
+// app abrir, em momentos ociosos (precarregarModulosOciosos). Assim a tela
+// inicial aparece mais rápido e quase nunca dá pra perceber a espera.
+//   window._vsLib('jspdf', 'html2canvas') → Promise (bibliotecas)
+//   carregarModulo('documentos')           → Promise (módulos)
+// Módulos que falharam no meio (sem internet, por exemplo) podem ser
+// pedidos de novo: só os arquivos que faltam são baixados outra vez.
+const _VS_LIBS = {
+    html2canvas: { arquivos: ['https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'], pronto: () => typeof window.html2canvas === 'function' },
+    jspdf:       { arquivos: ['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'],     pronto: () => !!(window.jspdf && window.jspdf.jsPDF) },
+    jsbarcode:   { arquivos: ['lib/jsbarcode.min.js'],                                                    pronto: () => typeof window.JsBarcode === 'function' }
+};
+const _VS_MODULOS = {
+    calculadoras: {
+        arquivos: ['calculadoras/router.js', 'calculadoras/export-imagem.js', 'calculadoras/repassar-valores.js', 'calculadoras/emprestimo.js', 'calculadoras/por-aparelho.js', 'calculadoras/fechar-venda.js'],
+        // As taxas podem ter chegado antes do módulo existir: refaz agora o que os avisos de "taxas carregadas" teriam feito.
+        aposCarregar: () => {
+            if (!window._areRatesLoaded) return;
+            if (typeof window._fvOnRatesLoaded === 'function') window._fvOnRatesLoaded();
+            if (typeof window._calcOnRatesLoaded === 'function') window._calcOnRatesLoaded();
+        }
+    },
+    documentos: { arquivos: ['documentos/router.js', 'documentos/bookip.js', 'documentos/contrato.js', 'documentos/recibo.js', 'documentos/orcamento.js'] },
+    credscan:   { arquivos: ['credscan/motor.js', 'credscan/router.js', 'credscan/lista.js', 'credscan/detalhe.js'] }
+};
+const _vsCargas = {};
+const _vsArquivosCarregados = new Set();
+function _vsCarregarArquivos(chave, arquivos) {
+    if (_vsCargas[chave]) return _vsCargas[chave];
+    const promessa = new Promise((resolve, reject) => {
+        const faltam = arquivos.filter(src => !_vsArquivosCarregados.has(src));
+        if (!faltam.length) { resolve(); return; }
+        let restantes = faltam.length;
+        const falhas = [];
+        const terminou = () => {
+            if (--restantes > 0) return;
+            if (falhas.length) reject(new Error('Falha ao carregar: ' + falhas.join(', ')));
+            else resolve();
+        };
+        faltam.forEach(src => {
+            const s = document.createElement('script');
+            s.src = src;
+            // Scripts criados por código são assíncronos por padrão; false mantém a ORDEM de execução da lista.
+            s.async = false;
+            s.onload = () => { _vsArquivosCarregados.add(src); terminou(); };
+            s.onerror = () => { falhas.push(src); s.remove(); terminou(); };
+            document.head.appendChild(s);
+        });
+    });
+    _vsCargas[chave] = promessa;
+    promessa.catch(() => { delete _vsCargas[chave]; });
+    return promessa;
+}
+window._vsLib = function (...nomes) {
+    return Promise.all(nomes.map(nome => {
+        const lib = _VS_LIBS[nome];
+        if (!lib) return Promise.reject(new Error('Biblioteca desconhecida: ' + nome));
+        if (lib.pronto()) return Promise.resolve();
+        return _vsCarregarArquivos('lib:' + nome, lib.arquivos);
+    })).then(() => undefined);
+};
+function carregarModulo(nome) {
+    const modulo = _VS_MODULOS[nome];
+    return _vsCarregarArquivos('mod:' + nome, modulo.arquivos).then(() => {
+        if (!modulo.iniciado) {
+            modulo.iniciado = true;
+            if (typeof modulo.aposCarregar === 'function') modulo.aposCarregar();
+        }
+    });
+}
+// Os módulos sob demanda registravam suas telas em DOMContentLoaded, que já
+// passou quando eles chegam: roda na hora se o documento já está pronto.
+window._vsQuandoDomPronto = function (fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once: true });
+    else fn();
+};
+// Roda fn depois que o módulo carregou, preservando o "estou voltando pelo
+// botão do navegador" (window._vsNavRestoring): essa marca só vale durante
+// a chamada síncrona do voltar, e sem restaurá-la o módulo empilharia uma
+// entrada nova no histórico em vez de voltar.
+function _vsComModulo(nome, fn) {
+    const restaurando = window._vsNavRestoring;
+    return carregarModulo(nome).then(() => {
+        const anterior = window._vsNavRestoring;
+        window._vsNavRestoring = restaurando;
+        try { return fn(); } finally { window._vsNavRestoring = anterior; }
+    });
+}
+function _vsAvisarFalhaModulo(erro) {
+    console.error('[modulo] falha ao carregar sob demanda:', erro);
+    if (typeof window.showCustomModal === 'function') window.showCustomModal({ message: 'Não foi possível abrir esta tela agora. Confira a conexão e tente de novo.' });
+}
+// Até o módulo carregar, a função "de entrada" é um atalho que carrega o
+// módulo e chama a função de verdade (que o módulo coloca no lugar do atalho).
+// propaga=true: quem chama trata o erro (a função devolve valor/Promise).
+function _vsAtalhosDoModulo(nome, funcoes, propaga) {
+    funcoes.forEach(nomeFn => {
+        const atalho = function (...args) {
+            return _vsComModulo(nome, () => {
+                const real = window[nomeFn];
+                if (typeof real !== 'function' || real === atalho) throw new Error(nomeFn + ' não foi definida pelo módulo ' + nome);
+                return real.apply(window, args);
+            }).catch(erro => {
+                if (propaga) throw erro;
+                _vsAvisarFalhaModulo(erro);
+            });
+        };
+        window[nomeFn] = atalho;
+    });
+}
+_vsAtalhosDoModulo('documentos', ['openDocumentosSection', '_reciboAbrirEdicaoComDados', '_reciboCompartilharComDados'], false);
+_vsAtalhosDoModulo('documentos', ['_reciboGerarAutomatico'], true);
+_vsAtalhosDoModulo('credscan', ['openCredscanSection'], false);
+
+let _vsPrecargaAgendada = false;
+function precarregarModulosOciosos() {
+    if (_vsPrecargaAgendada) return;
+    _vsPrecargaAgendada = true;
+    if (navigator.connection && navigator.connection.saveData) return;
+    const ordem = ['calculadoras', 'documentos', 'credscan'];
+    const quandoOcioso = cb => (window.requestIdleCallback ? window.requestIdleCallback(cb, { timeout: 8000 }) : setTimeout(cb, 3000));
+    const proximo = () => {
+        const nome = ordem.shift();
+        if (!nome) return;
+        carregarModulo(nome).catch(() => { /* sem rede agora: carrega na hora que alguém abrir a tela */ }).then(() => quandoOcioso(proximo));
+    };
+    setTimeout(() => quandoOcioso(proximo), 2500);
+}
+
 // ── Transição entre telas (só no celular) ────────────────────────
 // Dá a sensação de "empurrar" a tela: entrar numa tela desliza e
 // aparece vindo da direita, voltar vem da esquerda, e trocar de aba
@@ -832,6 +965,12 @@ window.openCalculatorSection = openCalculatorSection;
 
 // ── openCalculatorSection ────────────────────────────────────────
 function openCalculatorSection(sectionId) {
+    // Calculadoras carregam sob demanda (ver carregarModulo): se ainda não
+    // chegaram, carrega e repete a mesma chamada em seguida.
+    if (!_VS_MODULOS.calculadoras.iniciado) {
+        _vsComModulo('calculadoras', () => openCalculatorSection(sectionId)).catch(_vsAvisarFalhaModulo);
+        return;
+    }
     showMainSection('calculator');
     // Ver window._vsNavegarParaHub (definido mais abaixo, nos listeners
     // globais deste mesmo arquivo) pro raciocínio completo.

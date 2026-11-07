@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-07.3';
+        window._VS_VERSAO = '2026-11-07.4';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -68,7 +68,8 @@
     <style>
         html[data-shell="pc"] [data-shell-only="mobile"], html[data-shell="mobile"] [data-shell-only="pc"] { display: none !important; }
     </style>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="preload" href="lib/bootstrap-icons.subset.woff2" as="font" type="font/woff2" crossorigin/>
+    <link rel="stylesheet" href="lib/bootstrap-icons.subset.css"/>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" crossorigin="anonymous"/>
@@ -1282,26 +1283,13 @@
         });
     })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+<!-- Sob demanda (ver carregarModulo / _vsLib em core.js): html2canvas, jsPDF, JsBarcode e os
+     módulos Calculadoras, Documentos e CredScan — não são lidos no boot. -->
 <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-<script src="lib/jsbarcode.min.js" defer></script>
 <script src="acesso-loja.js" defer></script>
 <script type="module" src="core.js" defer></script>
 <script src="diagnostico-sistema.js" defer></script>
 <script src="atualizacao.js" defer></script>
-<script src="calculadoras/router.js" defer></script>
-<script src="calculadoras/export-imagem.js" defer></script>
-<script src="calculadoras/repassar-valores.js" defer></script>
-<script src="calculadoras/emprestimo.js" defer></script>
-<script src="calculadoras/por-aparelho.js" defer></script>
-<script src="calculadoras/fechar-venda.js" defer></script>
-<script src="documentos/router.js" defer></script>
-<script src="documentos/bookip.js" defer></script>
-<script src="documentos/contrato.js" defer></script>
-<script src="documentos/recibo.js" defer></script>
-<script src="documentos/orcamento.js" defer></script>
 <script src="estoque/router.js" defer></script>
 <script src="estoque/produtos.js" defer></script>
 <script src="estoque/conferencia.js" defer></script>
@@ -1326,10 +1314,6 @@
 <script src="reparos/finalizar-entrega.js" defer></script>
 <script src="reposicao/router.js" defer></script>
 <script src="reposicao/lista.js" defer></script>
-<script src="credscan/motor.js" defer></script>
-<script src="credscan/router.js" defer></script>
-<script src="credscan/lista.js" defer></script>
-<script src="credscan/detalhe.js" defer></script>
 <script src="configuracoes/router.js" defer></script>
 <script src="configuracoes/config-documentos.js" defer></script>
 <script src="configuracoes/config-backup.js" defer></script>
@@ -1355,7 +1339,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v11';
+  const SW_VERSION = 'v12';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;

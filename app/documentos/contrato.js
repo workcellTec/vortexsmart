@@ -706,6 +706,7 @@
 
     async function gerarPdfContrato(item) {
         const cfg = CT.storeConfig || await getStoreConfig();
+        await window._vsLib('jspdf');
         return gerarPdfContratoTexto(item, cfg);
     }
 

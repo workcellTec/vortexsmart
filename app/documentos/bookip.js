@@ -1496,6 +1496,7 @@ Garantia: ${item.diasGarantia || 0} dias`;
             evitarCorteDePagina(printArea, PRINT_PAGE_H_PX);
 
             onProgress?.(35, 'Renderizando documento...');
+            await window._vsLib('html2canvas', 'jspdf');
             const canvas = await html2canvas(printArea, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
 
             // Recorte da página 1 em alta resolução (o próprio canvas usado
@@ -1516,7 +1517,6 @@ Garantia: ${item.diasGarantia || 0} dias`;
             }
 
             onProgress?.(65, 'Montando PDF...');
-            if (!window.jspdf) throw new Error('jsPDF não foi carregado. Verifique se o script está incluído no HTML.');
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
             const pageWidth  = pdf.internal.pageSize.getWidth();

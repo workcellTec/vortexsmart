@@ -442,6 +442,7 @@
         document.body.insertAdjacentHTML('beforeend', html);
         const node = document.getElementById('vsReciboExport');
         try {
+            await window._vsLib('html2canvas');
             return await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
         } finally {
             node.remove();

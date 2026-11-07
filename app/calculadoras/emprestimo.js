@@ -150,7 +150,7 @@
     }
     function closeLucroModal() { el('lucroModalOverlay')?.classList.remove('active'); }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    window._vsQuandoDomPronto(() => {
         renderMachineChip4();
         el('machine4Chip')?.addEventListener('click', abrirModalMaquina4);
         el('machine4ModalBackdrop')?.addEventListener('click', e => { if (e.target.id === 'machine4ModalBackdrop') fecharModalMaquina4(); });

@@ -351,7 +351,7 @@
     };
     window.updateCalcularPorAparelhoUI = updateCalcularPorAparelhoUI;
 
-    document.addEventListener('DOMContentLoaded', () => {
+    window._vsQuandoDomPronto(() => {
         renderMachineChip3();
         el('machine3Chip')?.addEventListener('click', abrirModalMaquina3);
         el('machine3ModalBackdrop')?.addEventListener('click', e => { if (e.target.id === 'machine3ModalBackdrop') fecharModalMaquina3(); });
