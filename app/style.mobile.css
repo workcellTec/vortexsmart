@@ -102,7 +102,8 @@ body {
     overscroll-behavior-y: none;
     overflow-x: hidden;
     position: relative;
-    padding-bottom: 90px;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
     transition: background-color var(--transition);
     /* Remove o "flash" retangular padrão do navegador ao tocar em
        qualquer elemento — antes só existia em 5 classes específicas,
@@ -111,6 +112,19 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 * { -webkit-tap-highlight-color: transparent; }
+
+/* Faixa sólida sob a status bar translúcida do iPhone (entalhe/Dynamic
+   Island): o conteúdo rola por trás dela sem encostar na hora. A cor é
+   sempre escura porque a status bar do iOS PWA tem texto branco fixo
+   (não muda com o tema). Em aparelhos sem entalhe a altura é 0. */
+html::before {
+    content: "";
+    position: fixed; top: 0; left: 0; right: 0;
+    height: env(safe-area-inset-top, 0px);
+    background: var(--bg);
+    z-index: 1040;
+    pointer-events: none;
+}
 
 /* Esconde a barrinha de rolagem nativa (WebKit/Chrome e Firefox) em
    TODO elemento rolável do app — ela continua rolando normal, só o
@@ -763,6 +777,7 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
     background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(6px);
     display: flex; align-items: center; justify-content: center;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
     z-index: 1300;
     opacity: 0; visibility: hidden;
     transition: opacity var(--transition), visibility var(--transition);
@@ -793,7 +808,7 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
 /* ── Toast (Dynamic Island) ─────────────────────────────────── */
 #toastNotification {
     position: fixed;
-    top: 12px;
+    top: calc(12px + env(safe-area-inset-top, 0px));
     left: 50%;
     transform: translateX(-50%) scale(0.85);
     background: rgba(10, 10, 15, 0.96);
@@ -1911,7 +1926,7 @@ body.tema-claro .section-header { background: transparent; box-shadow: none; bor
 .stq-cor-add-row input { flex:1; }
 
 /* Modal "Header Colorido" — usado por Novo/Editar Produto e Adicionar (reposição) */
-.stq-modal-backdrop { position:fixed; inset:0; height:100dvh; background:rgba(3,2,10,.72); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; z-index:1200; opacity:0; pointer-events:none; transition:opacity .2s; padding:20px; }
+.stq-modal-backdrop { position:fixed; inset:0; height:100dvh; background:rgba(3,2,10,.72); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; z-index:1200; opacity:0; pointer-events:none; transition:opacity .2s; padding:max(20px, env(safe-area-inset-top, 0px)) 20px max(20px, env(safe-area-inset-bottom, 0px)); }
 .stq-modal-backdrop.show { opacity:1; pointer-events:auto; }
 .stq-modal-card { width:100%; max-width:380px; max-height:82dvh; overflow:hidden; background:var(--modal-card-bg); border-radius:22px; box-shadow:0 20px 50px rgba(0,0,0,.5); display:flex; flex-direction:column; transform:scale(.94); transition:transform .2s; font-family:'Space Grotesk', sans-serif; }
 
@@ -2006,7 +2021,7 @@ body.tema-claro .section-header { background: transparent; box-shadow: none; bor
 .apr-machine-chip > i { color:var(--primary); flex-shrink:0; }
 
 /* Modal centralizado (NUNCA sobe de baixo — atrapalha a navbar fixa) */
-.apr-modal-backdrop { position:fixed; inset:0; background:rgba(3,6,15,.7); backdrop-filter:blur(2px); z-index:1200; display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .2s; }
+.apr-modal-backdrop { position:fixed; inset:0; background:rgba(3,6,15,.7); backdrop-filter:blur(2px); z-index:1200; display:flex; align-items:center; justify-content:center; padding:max(20px, env(safe-area-inset-top, 0px)) 20px max(20px, env(safe-area-inset-bottom, 0px)); opacity:0; pointer-events:none; transition:opacity .2s; }
 .apr-modal-backdrop.show { opacity:1; pointer-events:auto; }
 .apr-modal-card { width:100%; max-width:340px; background:var(--surface-raised); border:1px solid var(--border); border-radius:20px; padding:18px; transform:scale(.92); transition:transform .2s; box-shadow:var(--shadow); }
 .apr-modal-backdrop.show .apr-modal-card { transform:scale(1); }
@@ -2411,11 +2426,11 @@ body.vs-scroll-locked { overflow: hidden !important; touch-action: none; height:
 .notif-drawer-overlay.active .notif-drawer { transform: translateX(0); }
 .notif-drawer-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 20px 18px 14px; flex-shrink: 0; border-bottom: 1px solid var(--border);
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 18px 14px; flex-shrink: 0; border-bottom: 1px solid var(--border);
 }
 .notif-drawer-titulo { font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 1.05rem; color: var(--text-strong); }
 .notif-drawer-fechar { width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(var(--overlay-rgb),.08); color: var(--text-secondary); font-size: .95rem; flex-shrink: 0; }
-.notif-drawer-lista { flex: 1; overflow-y: auto; padding: 6px 18px 20px; -webkit-overflow-scrolling: touch; }
+.notif-drawer-lista { flex: 1; overflow-y: auto; padding: 6px 18px calc(20px + env(safe-area-inset-bottom, 0px)); -webkit-overflow-scrolling: touch; }
 .notif-drawer-limpar-tudo {
     display: block; width: 100%; text-align: center; padding: 9px; margin: 10px 0 4px;
     border-radius: 12px; border: none; background: rgba(var(--overlay-rgb),.06);
@@ -2722,7 +2737,7 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 @keyframes rep-pop { 0% { transform:scale(.5); opacity:0; } 100% { transform:scale(1); opacity:1; } }
 
 /* Lightbox simples pra ver foto em tamanho grande */
-.rep-lightbox-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.9); z-index:2000; display:none; align-items:center; justify-content:center; padding:20px; }
+.rep-lightbox-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.9); z-index:2000; display:none; align-items:center; justify-content:center; padding:max(20px, env(safe-area-inset-top, 0px)) 20px max(20px, env(safe-area-inset-bottom, 0px)); }
 .rep-lightbox-backdrop.show { display:flex; }
 .rep-lightbox-backdrop img { max-width:100%; max-height:90vh; border-radius:10px; }
 
@@ -3120,3 +3135,12 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 .vs-nv-carrinho-count { font-size: .75rem; color: var(--text-secondary); }
 .vs-nv-carrinho-card .venda-add-item-btn { margin-top: 12px; }
 .vs-nv-resumo-card #vendaResumoItens, .vs-nv-resumo-card > .form-label { display: none; }
+
+/* ── Áreas seguras: telas que trazem estilo inline ──────────────
+   #loginScreen usa min-height:100vh e #acessoSuspensoScreen é fixa em
+   top:0; o body já desconta o entalhe, então aqui só compensamos. */
+#loginScreen { min-height: calc(100dvh - env(safe-area-inset-top, 0px)) !important; }
+#acessoSuspensoScreen {
+    padding-top: calc(24px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+}
