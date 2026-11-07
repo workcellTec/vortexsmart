@@ -140,6 +140,8 @@
 
     let mounted = false;
     let todasOS = [];
+    let carregado = false;   // já chegou o primeiro retrato da lista (antes disso "vazio" seria mentira)
+    let erroCarga = false;
     let filtroAtivo = 'ativos';
     let expandedId = null;
     // Setado quando a tela abre vinda de uma notificação (ver
@@ -213,16 +215,33 @@
     }
 
     // ── Carregamento dos dados ──────────────────────────────────
-    let listenerAttached = false;
+    // Uma única assinatura da lista inteira, compartilhada com a Início (_reparosAguardar):
+    // começa assim que o modo dos Concertos é conhecido, então quando a pessoa abre a tela
+    // os dados já chegaram (ou estão chegando) e a Início não baixa tudo de novo a cada visita.
+    let assinatura = null;
     function carregarOS() {
-        if (listenerAttached) return;
-        listenerAttached = true;
-        window._dbOnValue(window._lojaRef('reparos'), snap => {
-            const dados = snap.val() || {};
-            todasOS = Object.keys(dados).map(id => ({ id, ...dados[id] }));
-            renderLista();
+        if (assinatura) return assinatura;
+        erroCarga = false;
+        assinatura = new Promise((ok, falha) => {
+            window._dbOnValue(window._lojaRef('reparos'), snap => {
+                const dados = snap.val() || {};
+                todasOS = Object.keys(dados).map(id => ({ id, ...dados[id] }));
+                carregado = true;
+                ok(todasOS);
+                if (mounted) renderLista();
+            }, err => {
+                console.error('[Concertos] leitura da lista recusada:', err && err.code, err);
+                erroCarga = true;
+                assinatura = null;   // a próxima abertura tenta de novo
+                falha(err);
+                if (mounted) renderLista();
+            });
         });
+        assinatura.catch(() => {});   // quem não trata o erro não gera "unhandled rejection"
+        return assinatura;
     }
+    window._reparosPreCarregar = carregarOS;
+    window._reparosAguardar = carregarOS;
 
     // ── Prazo: calculado em cima do status, não é um status em si ──
     function prazoInfo(os) {
@@ -259,7 +278,7 @@
         if (kpisEl) {
             kpisEl.innerHTML = kpis.map(c => `
                 <button type="button" class="rep-kpi" data-filtro="${c.k}" style="--c:${c.c}" aria-pressed="${filtroAtivo === c.k}">
-                    <b>${todasOS.filter(o => passaFiltro(o, c.k)).length}</b><span>${c.l}</span>
+                    <b>${carregado ? todasOS.filter(o => passaFiltro(o, c.k)).length : '–'}</b><span>${c.l}</span>
                 </button>`).join('');
         }
         const chips = [
@@ -315,6 +334,13 @@
         renderFiltrosEFlowLabel();
         const listEl = el('repList');
         if (!listEl) return;
+
+        if (MOB && !carregado) {   // ainda baixando (ou falhou): nunca mostrar "Nenhum concerto"
+            listEl.innerHTML = erroCarga
+                ? `<div class="rep-vazio"><b>Não foi possível carregar</b>Confira a conexão e abra Concertos de novo.</div>`
+                : [0, 1, 2].map(() => `<div class="rep-card rep-sk" aria-hidden="true"><div class="rep-card-top"><div class="rep-card-foto"></div><div class="rep-card-info"><span class="rep-sk-l"></span><span class="rep-sk-l curto"></span></div></div></div>`).join('');
+            return;
+        }
 
         let itens = todasOS.filter(o => passaFiltro(o, filtroAtivo));
 

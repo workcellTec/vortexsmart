@@ -1204,6 +1204,8 @@ function loadReparosConfig() {
     onValue(window._lojaRef('configuracoes/reparos'), snap => {
         reparosConfig = snap.val() || {};
         window._reparosConfig = reparosConfig;
+        // Começa a baixar as OS já, em segundo plano: quando a pessoa abrir Concertos elas estão lá.
+        if (reparosConfig.modo && typeof window._reparosPreCarregar === 'function') window._reparosPreCarregar();
         aplicarVisibilidadePorPapel();
         if (currentMainSectionId === 'main' && typeof window._vsInicioAtualizar === 'function') window._vsInicioAtualizar();
         if (typeof window._reparosOnConfigLoaded === 'function') window._reparosOnConfigLoaded();

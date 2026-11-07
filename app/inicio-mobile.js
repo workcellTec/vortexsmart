@@ -367,8 +367,8 @@
 
         if (concertosVisivel()) {
             if (!(window._reparosConfig || {}).modo) desenharConcertos([]);
-            else window._dbGet(window._lojaRef('reparos')).then(snap => {
-                if (ativa()) desenharConcertos(Object.values(snap.val() || {}));
+            else window._reparosAguardar().then(ordens => {
+                if (ativa()) desenharConcertos(ordens);
             }).catch(() => {});
         }
 
