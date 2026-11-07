@@ -380,7 +380,43 @@
         }).catch(() => {});
     };
 
+    // ── Encaixe na altura ──────────────────────────────────────
+    // A Início tem a altura da área útil (CSS). Testa os degraus de compactação (.vs-fit-1…4, cumulativos) do mais folgado ao mais
+    // apertado e fica no primeiro em que "Seus módulos" não precisa rolar; se nem o último couber, só essa área rola.
+    // Mede de verdade (e não por faixa de altura) pra valer com qualquer tela, fonte do sistema, áreas seguras e
+    // quantidade de módulos na grade.
+    let encaixeAgendado = false, observadorEncaixe = null;
+    function encaixarInicio() {
+        const menu = el('mainMenu'), grade = el('vsGradeModulos');
+        if (!menu || !grade || menu.getClientRects().length === 0) return;
+        let degrau = 0;
+        for (; degrau <= 4; degrau++) {
+            menu.classList.remove('vs-fit-1', 'vs-fit-2', 'vs-fit-3', 'vs-fit-4');
+            for (let d = 1; d <= degrau; d++) menu.classList.add('vs-fit-' + d);
+            if (grade.scrollHeight <= grade.clientHeight + 1 && menu.scrollHeight <= menu.clientHeight + 1) break;
+        }
+        observadorEncaixe?.takeRecords();   // as trocas de classe feitas aqui não podem disparar outro encaixe
+    }
+    function agendarEncaixe() {
+        if (encaixeAgendado) return;
+        encaixeAgendado = true;
+        requestAnimationFrame(() => { encaixeAgendado = false; encaixarInicio(); });
+    }
+    function ligarEncaixe() {
+        const menu = el('mainMenu');
+        if (!menu) return;
+        window.addEventListener('resize', agendarEncaixe);
+        window.addEventListener('orientationchange', agendarEncaixe);
+        window.visualViewport?.addEventListener('resize', agendarEncaixe);
+        // Valores chegando (legenda da rosca, subtítulos), módulos entrando/saindo da barra e a própria Início aparecendo.
+        observadorEncaixe = new MutationObserver(agendarEncaixe);
+        observadorEncaixe.observe(menu, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style'] });
+        document.fonts?.ready.then(agendarEncaixe);
+        agendarEncaixe();
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
+        ligarEncaixe();
         el('vsIniMeta')?.addEventListener('click', abrirFolhaMeta);
         el('vsIniConcertos')?.addEventListener('click', () => el('goToReparos')?.click());
         el('goToConfig')?.addEventListener('click', () => {

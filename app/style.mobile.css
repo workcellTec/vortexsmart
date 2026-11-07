@@ -199,10 +199,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar {
     padding-top: 0;
     align-items: stretch;
 }
+/* A Início tem a altura exata da área útil (o corpo reserva 96px + áreas seguras pra barra de baixo), então nunca
+   empurra nada pra fora da tela: o que não cabe na altura é compactado por degraus (.vs-fit-1…4, inicio-mobile.js)
+   e, no último caso, só "Seus módulos" rola. */
 #mainMenu {
     padding: 6px 0 0;
     justify-content: flex-start;
+    min-height: 0;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - 96px - env(safe-area-inset-bottom, 0px));
 }
+#mainMenu > :not(.vs-grade) { flex-shrink: 0; }
 #mainMenu h2 {
     font-size: 1.5rem;
     font-weight: 700;
@@ -1217,7 +1223,7 @@ code { overflow-wrap: anywhere; }
 .vs-grade-cab { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 24px 22px 10px; }
 .vs-grade-titulo { font-size: 17px; font-weight: 700; color: var(--text-strong); }
 .vs-grade-editar { background: none; border: none; padding: 0; font-family: inherit; font-size: 13px; font-weight: 700; color: var(--primary); cursor: pointer; }
-.vs-grade { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0 22px; }
+.vs-grade { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); align-content: start; gap: 10px; padding: 0 22px 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .vs-grade-item {
     box-sizing: border-box; position: relative; min-width: 0;
     display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
@@ -1235,6 +1241,58 @@ code { overflow-wrap: anywhere; }
 .vs-grade-sub:empty { display: none; }
 .vs-grade-lock { position: absolute; top: 10px; right: 10px; margin: 0 !important; }
 .vs-grade-item.locked .vs-grade-ic { opacity: .55; }
+
+/* ── Início: encaixe na altura do celular ─────────────────────
+   O inicio-mobile.js testa 0 → 4 e fica no primeiro degrau em que "Seus módulos" não precisa rolar. Os degraus são
+   cumulativos (o 3 leva também as regras do 1 e do 2).
+   1: respiros e rosca um pouco menores
+   2: módulos mais baixos (sem subtítulo), rosca 84px
+   3: rosca 64px, valor do dia menor, módulos em 4 colunas só com ícone e nome
+   4: sem rosca (a legenda já traz os percentuais) nem a linha de apoio da Meta */
+#mainMenu.vs-fit-1 .vs-ini-dia { padding-top: 16px; }
+#mainMenu.vs-fit-1 .vs-ini-cards { padding-top: 14px; }
+#mainMenu.vs-fit-1 .vs-ini-pgto .vs-ini-card-rot { margin-bottom: 6px; }
+#mainMenu.vs-fit-1 .vs-ini-rosca { width: 88px; height: 88px; }
+#mainMenu.vs-fit-1 .vs-ini-rosca svg { width: 88px; height: 88px; }
+#mainMenu.vs-fit-1 .vs-ini-leg { margin-top: 5px; }
+#mainMenu.vs-fit-1 .vs-grade-cab { padding-top: 16px; padding-bottom: 8px; }
+#mainMenu.vs-fit-1 .vs-grade-item { gap: 6px; padding: 10px 12px; }
+#mainMenu.vs-fit-2 .vs-ini-dia { padding-top: 12px; }
+#mainMenu.vs-fit-2 .vs-ini-rosca { width: 84px; height: 84px; }
+#mainMenu.vs-fit-2 .vs-ini-rosca svg { width: 84px; height: 84px; }
+#mainMenu.vs-fit-2 .vs-ini-conc-n { font-size: 26px; }
+#mainMenu.vs-fit-2 .vs-grade-item { gap: 6px; padding: 10px 10px; border-radius: 18px; }
+#mainMenu.vs-fit-2 .vs-grade-txt { margin-right: -9px; }
+#mainMenu.vs-fit-2 .vs-grade-nome { font-size: 12.5px; letter-spacing: -0.03em; }
+#mainMenu.vs-fit-2 .vs-grade-ic { width: 34px; height: 34px; border-radius: 12px; }
+#mainMenu.vs-fit-2 .vs-grade-sub { display: none; }
+#mainMenu.vs-fit-2 .vs-grade-lock { top: 6px; right: 6px; }
+
+#mainMenu.vs-fit-3 .vs-ini-topo { min-height: 40px; }
+#mainMenu.vs-fit-3 .vs-ini-dia { padding-top: 8px; }
+#mainMenu.vs-fit-3 .vs-ini-dia-valor { font-size: clamp(28px, 9vw, 36px); }
+#mainMenu.vs-fit-3 .vs-ini-cards { padding-top: 10px; }
+#mainMenu.vs-fit-3 .vs-ini-card { padding: 10px 12px; border-radius: 20px; }
+#mainMenu.vs-fit-3 .vs-ini-pgto .vs-ini-card-rot { margin-bottom: 4px; }
+#mainMenu.vs-fit-3 .vs-ini-rosca { width: 64px; height: 64px; }
+#mainMenu.vs-fit-3 .vs-ini-rosca svg { width: 64px; height: 64px; }
+#mainMenu.vs-fit-3 .vs-ini-rosca-centro span:first-child { font-size: 11px; }
+#mainMenu.vs-fit-3 .vs-ini-rosca-centro span:last-child { display: none; }
+#mainMenu.vs-fit-3 .vs-ini-legenda { margin-top: 4px; }
+#mainMenu.vs-fit-3 .vs-ini-leg { margin-top: 3px; font-size: 11px; }
+#mainMenu.vs-fit-3 .vs-ini-col { gap: 8px; }
+#mainMenu.vs-fit-3 .vs-ini-meta, #mainMenu.vs-fit-3 .vs-ini-conc { padding: 10px 12px; }
+#mainMenu.vs-fit-3 .vs-ini-conc-n { font-size: 22px; }
+#mainMenu.vs-fit-3 .vs-grade-cab { padding-top: 10px; padding-bottom: 6px; }
+#mainMenu.vs-fit-3 .vs-grade { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+#mainMenu.vs-fit-3 .vs-grade-item { align-items: center; gap: 4px; padding: 8px 4px; border-radius: 16px; text-align: center; }
+#mainMenu.vs-fit-3 .vs-grade-ic { width: 32px; height: 32px; border-radius: 11px; }
+#mainMenu.vs-fit-3 .vs-grade-txt { margin-right: 0; }
+#mainMenu.vs-fit-3 .vs-grade-nome { font-size: 11px; letter-spacing: -0.03em; }
+
+#mainMenu.vs-fit-4 .vs-ini-rosca { display: none; }
+#mainMenu.vs-fit-4 .vs-ini-meta-txt { display: none; }
+#mainMenu.vs-fit-4 .vs-ini-meta-topo { align-items: center; }
 
 /* ── Folha de baixo (Editar barra, Meta do mês) ───────────── */
 .vs-folha-overlay {
