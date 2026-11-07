@@ -3,7 +3,7 @@
 // Registra: window._finPainelDinheiro(cfg)  (+ ._calcular, a conta pura)
 //
 // O ÚNICO lugar que mostra "quanto entrou, quanto saiu e quanto virou produto".
-// Lançamentos, Resumo do período e Gráficos só chamam este painel — antes cada
+// Movimentações e Gráficos só chamam este painel — antes cada
 // tela tinha a sua versão, com palavras diferentes pro mesmo número.
 //
 // Fechado, são 5 blocos encaixados numa grade de 12 colunas e nada mais:

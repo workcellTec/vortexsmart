@@ -2806,50 +2806,6 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 .repo-foto-preview img { width:100%; height:100%; object-fit:cover; display:block; }
 .repo-foto-preview button { position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%; border:none; background:rgba(0,0,0,.6); color:#fff; font-size:.65rem; display:flex; align-items:center; justify-content:center; padding:0; margin:0; }
 
-/* ── Painel do dinheiro (Financeiro → Lançamentos/Resumo/Gráficos) ──
-   financeiro/painel-dinheiro.js desenha dentro de #finResumoPeriodo/#finResumoPainel/#finGrafPainel.
-   Tela estreita (celular) sempre: 1 cartão por linha (aqui não há janela larga de PC). */
-.fin-pd { width: 100%; margin: 0 0 16px; }
-.fl-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
-.fl-card { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 20px 22px; color: inherit; text-align: left; font: inherit; }
-.fl-card::before { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 90% at 0% 0%, var(--g, transparent) 0%, transparent 60%); opacity: .14; pointer-events: none; }
-button.fl-card { display: flex; flex-direction: column; justify-content: flex-start; width: 100%; cursor: pointer; transition: border-color .15s, transform .15s; }
-button.fl-card:hover { border-color: rgba(var(--overlay-rgb), .2); transform: translateY(-1px); }
-button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inset; }
-.fl-card.k, .fl-card.luc, .fl-card.hero { grid-column: span 12; min-height: 132px; }
-.fl-card.hero { grid-template-columns: 1fr; gap: 20px; display: grid; }
-.fl-card.hero::before { opacity: .2; }
-.fl-top { position: relative; display: flex; align-items: center; gap: 12px; }
-.fl-ic { width: 38px; height: 38px; flex-shrink: 0; border-radius: 12px; display: grid; place-items: center; background: rgba(var(--overlay-rgb), .08); background: color-mix(in srgb, var(--g) 18%, transparent); color: var(--g); }
-.fl-lab { flex: 1; font-size: .84rem; font-weight: 600; color: var(--text-secondary); }
-.fl-card.hero .fl-lab { color: var(--text-strong); }
-.fl-chev { color: var(--text-muted); font-size: .8rem; }
-.fl-val { position: relative; display: block; margin-top: 16px; font: 800 2rem/1.1 'Space Grotesk', sans-serif; letter-spacing: -.02em; color: var(--text-strong); white-space: nowrap; }
-.fl-card.luc .fl-val { font-size: 2rem; }
-.fl-card.hero .fl-val { margin-top: 12px; font-size: clamp(2rem, 3.2vw, 2.9rem); }
-.fl-cap { position: relative; display: block; margin-top: 4px; font-size: .74rem; color: var(--text-muted); }
-.fl-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 10px; border-radius: 99px; font-size: .7rem; font-weight: 700; color: var(--g); background: rgba(var(--overlay-rgb), .08); background: color-mix(in srgb, var(--g) 14%, transparent); }
-.fl-hero-r { position: relative; min-width: 0; }
-.fl-hero-r h4 { margin: 0 0 10px; font-size: .76rem; font-weight: 600; color: var(--text-secondary); }
-.fl-bar2 { display: flex; height: 16px; gap: 3px; border-radius: 99px; overflow: hidden; background: rgba(var(--overlay-rgb), .06); }
-.fl-bar2 i { display: block; height: 100%; min-width: 3px; }
-.fl-leg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
-.fl-leg div { font-size: .72rem; color: var(--text-secondary); }
-.fl-leg b { display: block; margin-top: 2px; font: 700 .9rem 'Space Grotesk', sans-serif; color: var(--text-strong); }
-.fl-leg span { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; }
-.fl-aviso { padding: 26px 18px; text-align: center; font-size: .82rem; color: var(--text-secondary); border: 1px dashed var(--border); border-radius: 20px; }
-
-.fl-detail { grid-column: span 12; order: 9; padding: 18px 22px; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--g); border-radius: 18px; font-size: .84rem; animation: fadeUp .2s ease; }
-.fl-detail h5 { display: flex; flex-direction: column; gap: 2px; margin: 0 0 6px; font: 700 .95rem 'Space Grotesk', sans-serif; color: var(--text-strong); }
-.fl-detail h5 small { font: 500 .78rem 'Poppins', sans-serif; color: var(--text-secondary); text-align: left; }
-.fl-rows { display: grid; grid-template-columns: 1fr; column-gap: 48px; }
-.fl-rows.uma { max-width: 560px; }
-.fl-r { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
-.fl-r b { color: var(--text-strong); font-weight: 600; white-space: nowrap; }
-.fl-r.forte { border-bottom: 0; }
-.fl-r.forte span, .fl-r.forte b { color: var(--text-strong); font-weight: 700; }
-.fl-p { margin: 8px 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-secondary); }
-.fl-p b { color: var(--text-strong); }
 .fin-pd-mes { margin: 0 0 12px; text-align: center; font: 800 .95rem 'Space Grotesk', sans-serif; }
 
 
@@ -3010,6 +2966,33 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 .fl-vazio h4 { margin: 0; font: 700 .98rem 'Space Grotesk', sans-serif; color: var(--text-strong); }
 .fl-vazio p { margin: 6px 0 0; font-size: .78rem; color: var(--text-secondary); }
 .fl-vazio .acoes { display: flex; justify-content: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+/* Financeiro — abas (Movimentações | Gráficos), Contas fixas do mês e "Repete todo mês".
+   Marcação em financeiro/router.js e financeiro/lancamentos.js. Igual nos dois CSS; o celular ajusta no bloco "FINANCEIRO no celular". */
+.fl-abas { display: inline-flex; gap: 2px; padding: 4px; margin: 0 0 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 13px; }
+.fl-abas button { height: 38px; padding: 0 22px; border: 0; background: none; border-radius: 9px; font: 600 .84rem 'Poppins', sans-serif; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+.fl-abas button.on { background: rgba(var(--primary-rgb), .2); color: #fff; box-shadow: inset 0 0 0 1px rgba(var(--primary-rgb), .55); }
+.vs-fin-largura > .fl-abas { margin: 0 0 18px 4px; }
+.fl-fx { margin: 0 0 18px; }
+.fl-fx-h { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.fl-fx-h h3 { margin: 0; font: 800 1.05rem 'Space Grotesk', sans-serif; color: var(--text-strong); }
+.fl-fx-h .n { padding: 3px 10px; border-radius: 99px; background: rgba(var(--overlay-rgb), .06); font-size: .72rem; color: var(--text-secondary); }
+.fl-fx-h .n.pend { background: rgba(251,191,36,.14); color: #fbbf24; font-weight: 700; }
+.fl-fx-h .grow { flex: 1; }
+.fl-fx-g { height: 34px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font: 600 .76rem 'Poppins', sans-serif; cursor: pointer; }
+.fl-fx-l { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.fl-fx-c { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow: hidden; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+.fl-fx-c .t { font-weight: 600; font-size: .88rem; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-fx-c .s { font-size: .76rem; color: var(--text-secondary); }
+.fl-fx-c.venceu .s { color: #fbbf24; }
+.fl-fx-c .st { margin-top: 8px; font-size: .78rem; font-weight: 700; color: #4ade80; }
+.fl-fx-b { margin-top: 8px; height: 34px; border-radius: 10px; border: 1px solid rgba(var(--primary-rgb), .6); background: rgba(var(--primary-rgb), .14); color: #9cc0ff; font: 600 .78rem 'Poppins', sans-serif; cursor: pointer; }
+.fl-fx-vazio { margin: 0; padding: 14px 16px; border: 1px dashed var(--border); border-radius: 14px; font-size: .78rem; line-height: 1.5; color: var(--text-secondary); }
+.fl-rep { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; padding: 12px 14px; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px; }
+.fl-rep .tx b { display: block; font-size: .86rem; color: var(--text-strong); }
+.fl-rep .tx small { display: block; margin-top: 2px; font-size: .72rem; line-height: 1.4; color: var(--text-secondary); }
+.fl-rep-dia { align-items: center; gap: 10px; margin-top: 10px; font-size: .82rem; color: var(--text-secondary); }
+.fl-rep-dia input { width: 84px; margin: 0; text-align: center; }
+.fl-rep-nota { margin: 8px 0 0; font-size: .74rem; color: #fbbf24; }
 @media (max-width: 1240px) {
     .fl-card.k { grid-column: span 6; }
     .fl-card.luc { grid-column: span 6; order: 4; min-height: 132px; }
@@ -3039,10 +3022,82 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
     .fl-exp { padding: 0 14px 14px; }
 }
 
-/* Hub do Financeiro (financeiro/router.js, compartilhado): o título e a descrição vêm dentro de
-   .txt-v2. No celular o cartão mostra só ícone, título e etiqueta — a descrição é do PC. */
-.txt-v2 { display: contents; }
-.desc-v2 { display: none; }
+/* ══════════════════════════════════════════════════════════════
+   FINANCEIRO no celular — aparência de app (mockup aprovado).
+   A marcação é a mesma do PC (financeiro/*.js); aqui o mesmo conteúdo fica compacto:
+   abas no topo, painel do dinheiro (sobrou em destaque + 3 números), contas fixas
+   rolando de lado, lista de uma linha por movimento e botão + flutuante.
+   ══════════════════════════════════════════════════════════════ */
+.vs-fin-largura { padding-bottom: 100px; }   /* a barra de baixo é flutuante: não cobre o fim da tela */
+.fl { display: flex; flex-direction: column; padding: 10px 14px 30px; }
+.fl .section-header { margin-bottom: 10px; }
+.fl .section-header h3 { font-size: 1.35rem; }
+.fl .section-header p { display: none; }
+.fl-abas, .vs-fin-largura > .fl-abas { display: grid; grid-template-columns: 1fr 1fr; width: auto; margin: 0 0 12px; }
+.vs-fin-largura > .fl-abas { margin: 0 14px 12px; }
+.fl-abas button { height: 40px; padding: 0; font-size: .86rem; }
+.fl-bar { display: block; margin-bottom: 12px; }
+.fl-bar-l { flex-direction: column; align-items: stretch; gap: 8px; }
+.fl-bar > .fl-btn { display: none; }
+.fl-seg, .fl-seg.s { width: 100%; height: 42px; }
+.fl-seg button { flex: 1 1 auto; justify-content: center; padding: 0 6px; font-size: .76rem; }
+.fl-step { width: 100%; height: 42px; justify-content: space-between; }
+.fl-step b { flex: 1; min-width: 0; }
+.fl-step.datas { flex-wrap: wrap; height: auto; padding: 8px 12px; }
+
+/* Painel do dinheiro: Sobrou no caixa em cima, os 3 números embaixo, Lucro por último */
+.fin-pd { margin: 0 0 12px; }
+.fl-grid { gap: 10px; }
+.fl-card.hero { order: 1; grid-column: span 12; min-height: 0; padding: 14px 16px; gap: 12px; }
+.fl-card.k { order: 2; grid-column: span 4; min-height: 0; padding: 11px 10px; }
+.fl-card.luc { order: 3; grid-column: span 12; min-height: 0; padding: 12px 16px; }
+.fl-card.hero .fl-ic, .fl-card.hero .fl-chip, .fl-hero-r h4,
+.fl-card.k .fl-ic, .fl-card.k .fl-chev, .fl-card.k .fl-cap { display: none; }
+.fl-card.hero .fl-lab { font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; }
+.fl-card.hero .fl-val { margin-top: 4px; font-size: 1.9rem; }
+.fl-bar2 { height: 8px; }
+.fl-leg { margin-top: 8px; gap: 6px; }
+.fl-leg div { font-size: .66rem; }
+.fl-leg b { font-size: .8rem; }
+.fl-card.k .fl-lab { font-size: .7rem; }
+.fl-card.k .fl-val { margin-top: 4px; font-size: .88rem; }
+.fl-card.luc .fl-top { gap: 10px; }
+.fl-card.luc .fl-ic { width: 32px; height: 32px; border-radius: 10px; }
+.fl-card.luc .fl-val { margin-top: 6px; font-size: 1.3rem; }
+.fl-detail { padding: 14px 16px; }
+
+/* Contas fixas do mês: cartões que rolam de lado */
+.fl-fx { margin: 0 0 12px; }
+.fl-fx-h { gap: 8px; }
+.fl-fx-h h3 .mes { display: none; }
+.fl-fx-h h3 { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .88rem; }
+.fl-fx-h .n { flex-shrink: 0; font-size: .66rem; }
+.fl-fx-g { flex-shrink: 0; height: 32px; padding: 0 10px; }
+.fl-fx-l { display: flex; gap: 8px; margin: 0 -14px; padding: 0 14px 4px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding: 0 14px; }
+.fl-fx-c { flex: 0 0 150px; padding: 11px 12px; border-radius: 14px; scroll-snap-align: start; }
+.fl-fx-c.ok { opacity: .85; }
+
+/* Lista de uma linha por movimento */
+.fl-list { border-radius: 16px; }
+.fl-lh { gap: 8px; padding: 12px 14px; }
+.fl-lh h3 { order: 1; font-size: .95rem; }
+.fl-lh .n { order: 2; }
+.fl-fil { order: 3; margin-left: auto; width: 36px; height: 36px; }
+.fl-seg.s { order: 4; height: 40px; }
+.fl-search { order: 5; height: 38px; }
+.fl-row { grid-template-columns: 36px 1fr auto; padding: 10px 14px; min-height: 0; }
+.fl-row .ic { width: 36px; height: 36px; }
+.fl-row .v { font-size: .92rem; }
+.fl-rw.p .fl-row .ic { background: rgba(251,191,36,.14); }
+.fl-rw.p .fl-row .v { color: #fbbf24; }
+
+/* Botão + flutuante (lança receita ou despesa), acima da barra de baixo */
+.fl-fab {
+    display: grid; place-items: center; position: fixed; right: 18px; bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    width: 56px; height: 56px; border: 0; border-radius: 50%; z-index: 1050; cursor: pointer;
+    background: var(--primary); color: #fff; font-size: 1.5rem; box-shadow: 0 8px 24px rgba(var(--primary-rgb), .45);
+}
+.fl-fab:active { transform: scale(.94); }
 
 /* ══════════════════════════════════════════════════════════════
    NOVA VENDA no celular — a tela usa a mesma marcação do PC (venda/lancar.js),

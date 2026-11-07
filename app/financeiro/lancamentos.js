@@ -1,11 +1,15 @@
 // ================================================================
-// financeiro/lancamentos.js — VortexSmart · Financeiro → Lançamentos
+// financeiro/lancamentos.js — VortexSmart · Financeiro → Movimentações
 // Registra: window._renderFinanceiroLancamentos()
 //
 // Combina VER + LANÇAR na mesma tela (Opção B, aprovada) — categoria,
 // valor e data é rápido demais pra merecer uma tela própria só pra
 // isso, mesmo raciocínio que o Estoque já usa com "Adicionar Produto"
 // direto na lista.
+//
+// Aqui também moram, sem módulo próprio: o seletor Dia/Semana/Mês/Personalizado
+// (que era o "Resumo do período"), as Contas fixas do mês (as antigas
+// "Recorrentes") e a opção "Repete todo mês" do formulário de despesa.
 //
 // Fonte dos dados: financeiro/lancamentos/{id} — automáticos (venda:
 // cada pagamento avulso/parcela paga, regime de caixa; reposição: cada
@@ -33,7 +37,7 @@
     let mounted = false;
     let tela = 'lista'; // 'lista' | 'form'
     let tipoForm = 'despesa';
-    let filtroTipo = 'todos';       // 'todos' | 'receita' | 'despesa'
+    let filtroTipo = 'todos';       // 'todos' | 'receita' | 'despesa' (contas, sem o que virou produto) | 'produto'
     let filtroOrigem = 'todas';     // 'todas' | 'automatica' | 'manual'
     let filtroCategorias = [];      // ids selecionados (vazio = todas)
     let termoBusca = '';
@@ -51,6 +55,11 @@
     let periodoRef = new Date(); periodoRef.setHours(0, 0, 0, 0);
     let personalDe = '', personalAte = '';
     const NOMES_MES_LONGO = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    // yyyy-mm-dd no fuso do computador: toISOString() é UTC, e depois das 21h no Brasil já seria "amanhã"
+    // (um lançamento feito à noite, no último dia do mês, cairia no mês seguinte).
+    const dataLocal = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const nomeNorm = t => String(t == null ? '' : t).trim().toLowerCase();
+    const ehProduto = i => i.tipo === 'despesa' && i.categoria === 'produto';
 
     function faixaDoPeriodoAtual() {
         if (periodoTipo === 'dia') {
@@ -235,8 +244,9 @@
             <div class="fl">
                 <div class="section-header">
                     <button type="button" class="btn-back" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
-                    <div><h3>Lançamentos</h3><p>Tudo o que entrou e saiu, do jeito mais simples</p></div>
+                    <div><h3>Financeiro</h3><p>Tudo o que entrou e saiu, do jeito mais simples</p></div>
                 </div>
+                ${window._finAbasHtml ? window._finAbasHtml('financeiroLancamentos') : ''}
 
                 <div class="fl-bar">
                     <div class="fl-bar-l" id="finPeriodoNav"></div>
@@ -246,6 +256,7 @@
                 </div>
 
                 <div id="finResumoPeriodo"></div>
+                <div id="finFixas" class="fl-fx"></div>
 
                 <div class="fl-card fl-list">
                     <div class="fl-lh">
@@ -257,17 +268,20 @@
                     <div class="fl-th"><span></span><span>Descrição</span><span>Categoria</span><span>Data</span><span>Valor</span></div>
                     <div id="finList"></div>
                 </div>
+                <button type="button" class="fl-fab" id="finBtnNovo" aria-label="Novo lançamento"><i class="bi bi-plus-lg"></i></button>
             </div>
         `;
 
+        if (window._finLigarAbas) window._finLigarAbas(wrap, 'financeiroLancamentos');
         renderPeriodoNav();
         renderResumoPeriodo();
+        renderFixas();
         renderFiltroChips();
         renderListaItens();
 
-        el('finLancBody').querySelector('.btn-back').addEventListener('click', () => window.openFinanceiroSection('financeiroHome'));
         el('finBtnReceita').addEventListener('click', () => abrirForm('receita'));
         el('finBtnDespesa').addEventListener('click', () => abrirForm('despesa'));
+        el('finBtnNovo').addEventListener('click', () => abrirForm('despesa'));
         el('finBtnFiltros').addEventListener('click', abrirFiltrosAvancados);
         el('finBusca').addEventListener('input', () => {
             termoBusca = el('finBusca').value.trim().toLowerCase();
@@ -291,27 +305,30 @@
             ${corpo}
         `;
         wrap.querySelectorAll('[data-periodo]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                periodoTipo = btn.dataset.periodo;
-                limiteExibicao = LIMITE_PAGINA;
-                renderPeriodoNav();
-                renderResumoPeriodo();
-                renderListaItens();
-            });
+            btn.addEventListener('click', () => { periodoTipo = btn.dataset.periodo; redesenharPeriodo(true); });
         });
 
         if (periodoTipo === 'personalizado') {
-            const aplicar = () => { limiteExibicao = LIMITE_PAGINA; renderResumoPeriodo(); renderListaItens(); };
-            el('finPeriodoDe').addEventListener('change', () => { personalDe = el('finPeriodoDe').value; aplicar(); });
-            el('finPeriodoAte').addEventListener('change', () => { personalAte = el('finPeriodoAte').value; aplicar(); });
+            el('finPeriodoDe').addEventListener('change', () => { personalDe = el('finPeriodoDe').value; redesenharPeriodo(false); });
+            el('finPeriodoAte').addEventListener('change', () => { personalAte = el('finPeriodoAte').value; redesenharPeriodo(false); });
         } else {
-            el('finPeriodoAnt').addEventListener('click', () => { navegarPeriodoAtual(-1); limiteExibicao = LIMITE_PAGINA; renderPeriodoNav(); renderResumoPeriodo(); renderListaItens(); });
-            el('finPeriodoProx').addEventListener('click', () => { navegarPeriodoAtual(1); limiteExibicao = LIMITE_PAGINA; renderPeriodoNav(); renderResumoPeriodo(); renderListaItens(); });
+            el('finPeriodoAnt').addEventListener('click', () => { navegarPeriodoAtual(-1); redesenharPeriodo(true); });
+            el('finPeriodoProx').addEventListener('click', () => { navegarPeriodoAtual(1); redesenharPeriodo(true); });
         }
     }
 
+    // Mudou o período: painel, contas fixas (são do mês em exibição) e lista acompanham.
+    // refazerNav=false nos campos De/Até, pra não tirar o foco do campo que a pessoa está usando.
+    function redesenharPeriodo(refazerNav) {
+        limiteExibicao = LIMITE_PAGINA;
+        if (refazerNav) renderPeriodoNav();
+        renderResumoPeriodo();
+        renderFixas();
+        renderListaItens();
+    }
+
     // ── Painel do dinheiro (Entrou / Contas / Virou produto / Sobrou / Lucro) ──
-    // O mesmo painel das telas Resumo e Gráficos (financeiro/painel-dinheiro.js), que
+    // O mesmo painel da tela Gráficos (financeiro/painel-dinheiro.js), que
     // também faz a leitura assíncrona das vendas. SEMPRE acompanha o período
     // (Dia/Semana/Mês/Personalizado), nunca os filtros de tipo/origem/categoria/busca da
     // lista abaixo — senão o número mudaria conforme a pessoa filtra a lista.
@@ -329,9 +346,71 @@
         painelDinheiro.desenhar();
     }
 
+    // ── Contas fixas do mês (o que antes era o módulo "Recorrentes") ──
+    // financeiro/recorrentes/{id} = { nome, categoria, categoriaNome, valor, diaDoMes, ativa, criadoEm }.
+    // Mostra as contas fixas ATIVAS do mês em exibição. "Pago" = já existe, nesse mês, um lançamento
+    // manual de despesa com o MESMO nome da conta fixa (não há campo próprio no banco pra isso; o
+    // "Lançar agora" já preenche a descrição com o nome, então o par fecha sozinho). Nada lança sozinho.
+    function mesDasFixas() {
+        const ref = periodoTipo === 'personalizado' && personalDe ? new Date(personalDe + 'T12:00:00') : periodoRef;
+        return new Date(ref.getFullYear(), ref.getMonth(), 1);
+    }
+
+    function contasFixasDoMes() {
+        const inicio = mesDasFixas();
+        const fim = new Date(inicio.getFullYear(), inicio.getMonth() + 1, 1);
+        const pagas = new Set(todosLancamentos()
+            .filter(l => l.tipo === 'despesa' && l.origem !== 'automatica' && (l.criadoEm || 0) >= inicio.getTime() && (l.criadoEm || 0) < fim.getTime())
+            .map(l => nomeNorm(l.descricao)));
+        const hoje = new Date();
+        const primeiroDoMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1).getTime();
+        const ehMesAtual = inicio.getTime() === primeiroDoMesAtual;
+        const ultimoDia = new Date(inicio.getFullYear(), inicio.getMonth() + 1, 0).getDate();
+        return Object.entries(window._financeiroRecorrentes || {})
+            .map(([id, r]) => ({ id, ...r }))
+            .filter(r => r.ativa)
+            .sort((a, b) => (a.diaDoMes || 0) - (b.diaDoMes || 0))
+            .map(r => {
+                const dia = Math.min(r.diaDoMes || 1, ultimoDia);
+                const paga = pagas.has(nomeNorm(r.nome));
+                const venceu = !paga && (inicio.getTime() < primeiroDoMesAtual || (ehMesAtual && dia < hoje.getDate()));
+                return { ...r, dia, paga, venceu, data: ehMesAtual ? hoje : new Date(inicio.getFullYear(), inicio.getMonth(), dia) };
+            });
+    }
+
+    function renderFixas() {
+        const alvo = el('finFixas');
+        if (!alvo) return;
+        const fixas = contasFixasDoMes();
+        const aPagar = fixas.filter(f => !f.paga).length;
+        const cartoes = fixas.map(f => `
+            <div class="fl-fx-c${f.paga ? ' ok' : ''}${f.venceu ? ' venceu' : ''}">
+                <div class="t">${esc(f.nome)}</div>
+                <div class="s">dia ${f.dia} · ${fmt(f.valor)}${f.venceu ? ' · venceu' : ''}</div>
+                ${f.paga ? '<div class="st">Pago</div>' : `<button type="button" class="fl-fx-b" data-lancar-fixa="${f.id}">Lançar agora</button>`}
+            </div>`).join('');
+        alvo.innerHTML = `
+            <div class="fl-fx-h">
+                <h3>Contas fixas<span class="mes"> de ${NOMES_MES_LONGO[mesDasFixas().getMonth()]}</span></h3>
+                ${fixas.length ? `<span class="n${aPagar ? ' pend' : ''}">${aPagar ? `${aPagar} a pagar` : 'Tudo pago'}</span>` : ''}
+                <div class="grow"></div>
+                <button type="button" class="fl-fx-g" id="finFixasGerenciar">${fixas.length ? 'Gerenciar' : 'Cadastrar'}</button>
+            </div>
+            ${fixas.length
+                ? `<div class="fl-fx-l">${cartoes}</div>`
+                : '<p class="fl-fx-vazio">Aluguel, internet, salário… Ao lançar uma despesa, ligue <b>Repete todo mês</b> e ela aparece aqui todo mês, pra você confirmar.</p>'}
+        `;
+        el('finFixasGerenciar').addEventListener('click', () => window.openFinanceiroSection('financeiroRecorrentes'));
+        alvo.querySelectorAll('[data-lancar-fixa]').forEach(btn => btn.addEventListener('click', () => {
+            const f = fixas.find(x => x.id === btn.dataset.lancarFixa);
+            if (!f) return;
+            abrirForm('despesa', null, { fixaId: f.id, categoria: f.categoria, valor: f.valor, descricao: f.nome, data: dataLocal(f.data) });
+        }));
+    }
+
     function renderFiltroChips() {
         const chips = [
-            { v: 'todos', l: 'Tudo' }, { v: 'receita', l: 'Receitas' }, { v: 'despesa', l: 'Despesas' }
+            { v: 'todos', l: 'Tudo' }, { v: 'receita', l: 'Receitas' }, { v: 'despesa', l: 'Despesas' }, { v: 'produto', l: 'Produto' }
         ];
         el('finFiltroChips').innerHTML = chips.map(c =>
             `<button type="button" data-f="${c.v}"${filtroTipo === c.v ? ' class="on"' : ''}>${c.l}</button>`
@@ -344,7 +423,10 @@
     function itensFiltrados() {
         return todosLancamentos()
             .filter(dentroDoPeriodoAtual)
-            .filter(i => filtroTipo === 'todos' || i.tipo === filtroTipo)
+            .filter(i => filtroTipo === 'todos'
+                || (filtroTipo === 'receita' && i.tipo === 'receita')
+                || (filtroTipo === 'despesa' && i.tipo === 'despesa' && !ehProduto(i))
+                || (filtroTipo === 'produto' && ehProduto(i)))
             .filter(i => filtroOrigem === 'todas' || i.origem === filtroOrigem)
             .filter(i => !filtroCategorias.length || filtroCategorias.includes(i.categoria))
             .filter(i => !termoBusca || (i.categoriaNome || '').toLowerCase().includes(termoBusca) || (i.origemDescricao || '').toLowerCase().includes(termoBusca))
@@ -418,7 +500,7 @@
         const selo = ehAuto ? '<span class="a">Automático</span>'
             : `<span>${despesa ? (i.categoria === 'produto' ? 'Virou produto' : 'Contas') : 'Outras receitas'}</span>`;
         return `
-            <div class="fl-rw${despesa ? ' d' : ''}${ehParcelaVenda ? ' parc' : ''}${exp ? ' exp' : ''}">
+            <div class="fl-rw${despesa ? ' d' : ''}${ehProduto(i) ? ' p' : ''}${ehParcelaVenda ? ' parc' : ''}${exp ? ' exp' : ''}">
                 <div class="fl-row" data-expandir="${i.id}" role="button" tabindex="0" aria-expanded="${exp ? 'true' : 'false'}">
                     <div class="ic">${categoriaEmoji(i.categoria, i.tipo)}</div>
                     <div class="m">
@@ -522,10 +604,11 @@
     }
 
     // ══════════════════════ TELA: FORM (lançar/editar) ══════════════════════
-    function abrirForm(tipo, editarId) {
+    // preset (opcional, só pra lançamento novo): { fixaId, categoria, valor, descricao, data } — "Lançar agora" das contas fixas.
+    function abrirForm(tipo, editarId, preset) {
         tela = 'form';
         fotoBlob = null;
-        rascunhoForm = null;
+        rascunhoForm = editarId ? null : (preset || null);
         if (editarId) {
             const item = (window._financeiroLancamentos || {})[editarId];
             tipoForm = item?.tipo || 'despesa';
@@ -544,10 +627,9 @@
         const editando = !!window._finEditandoId;
         const item = window._finEditandoItem || {};
         const cats = tipoForm === 'despesa' ? CAT_DESPESA : CAT_RECEITA;
-        // yyyy-mm-dd no fuso do computador: toISOString() é UTC, e depois das 21h no Brasil já seria "amanhã"
-        // (um lançamento feito à noite, no último dia do mês, cairia no mês seguinte).
-        const dataLocal = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const rasc = !editando && rascunhoForm;   // trocou Receita ↔ Despesa: mantém valor, data e descrição
+        const rasc = !editando && rascunhoForm;   // trocou Receita ↔ Despesa (mantém valor, data e descrição) ou veio de uma conta fixa
+        const deContaFixa = !!(rasc && rasc.fixaId);
+        const podeRepetir = tipoForm === 'despesa' && !editando && !deContaFixa;
         const dataVal = (rasc && rasc.data) || dataLocal(item.criadoEm ? new Date(item.criadoEm) : new Date());
 
         wrap.innerHTML = `
@@ -572,6 +654,17 @@
                     <input class="ctx-field-input" type="date" id="finData" value="${dataVal}">
                     <label class="ctx-field-label mt-2">Descrição (opcional)</label>
                     <input class="ctx-field-input" id="finDescricao" placeholder="Ex: Compra de material de limpeza" value="${esc(rasc ? rasc.descricao : (item.descricao || ''))}">
+                    ${deContaFixa ? '<p class="fl-rep-nota">Conta fixa do mês: mantenha o nome na descrição pra ela aparecer como paga.</p>' : ''}
+                    ${podeRepetir ? `
+                    <div class="fl-rep">
+                        <div class="tx"><b>Repete todo mês</b><small>Vira uma conta fixa; você confirma cada mês, nada lança sozinho.</small></div>
+                        <button type="button" class="ctx-switch" id="finRepete" role="switch" aria-checked="false" aria-label="Repete todo mês"></button>
+                    </div>
+                    <div class="fl-rep-dia" id="finRepDiaWrap" style="display:none;">
+                        <label for="finRepDia">Todo dia</label>
+                        <input class="ctx-field-input" type="number" min="1" max="31" id="finRepDia" value="${Number(dataVal.slice(8, 10))}">
+                        <span>do mês</span>
+                    </div>` : ''}
                     <label class="ctx-field-label mt-2"><i class="bi bi-camera-fill"></i> Comprovante (opcional)</label>
                     <div class="row g-2 mb-1">
                         <div class="col-6"><button class="btn btn-secondary w-100" type="button" id="finFotoCamera" style="border-style:dashed;"><i class="bi bi-camera-fill text-success"></i> Tirar foto</button></div>
@@ -585,7 +678,7 @@
             </div>
         `;
 
-        popularCategorias(cats, item.categoria);
+        popularCategorias(cats, (rasc && rasc.categoria) || item.categoria);
 
         el('finFormVoltar').addEventListener('click', () => { tela = 'lista'; renderTudo(); });
         wrap.querySelectorAll('[data-tipo]').forEach(btn => {
@@ -595,6 +688,19 @@
                 renderForm();
             });
         });
+        if (podeRepetir) {
+            const chave = el('finRepete'), diaInput = el('finRepDia');
+            let diaMexido = false;
+            chave.addEventListener('click', () => {
+                const ligou = !chave.classList.contains('on');
+                chave.classList.toggle('on', ligou);
+                chave.setAttribute('aria-checked', ligou ? 'true' : 'false');
+                el('finRepDiaWrap').style.display = ligou ? 'flex' : 'none';
+            });
+            diaInput.addEventListener('input', () => { diaMexido = true; });
+            // O dia da conta fixa acompanha a data do lançamento, até a pessoa mexer nele.
+            el('finData').addEventListener('change', () => { if (!diaMexido && el('finData').value) diaInput.value = Number(el('finData').value.slice(8, 10)); });
+        }
         el('finFotoCamera').addEventListener('click', () => el('finFotoInputCam').click());
         el('finFotoGaleria').addEventListener('click', () => el('finFotoInputGal').click());
         el('finFotoInputCam').addEventListener('change', handleFotoSelect);
@@ -635,13 +741,18 @@
         if (!catBtn) { modal({ message: 'Escolhe uma categoria.' }); return; }
         if (!valor || valor <= 0) { modal({ message: 'Informa um valor válido.' }); return; }
         if (!dataStr) { modal({ message: 'Informa a data.' }); return; }
+        const repete = !!el('finRepete')?.classList.contains('on');
+        const diaFixa = repete ? parseInt(el('finRepDia').value, 10) : null;
+        if (repete && !(diaFixa >= 1 && diaFixa <= 31)) { modal({ message: 'O dia do mês precisa ser entre 1 e 31.' }); return; }
 
         const btn = el('finSalvarBtn');
         const criadoEm = new Date(dataStr + 'T12:00:00').getTime();
         const editando = !!window._finEditandoId;
         const dados = {
             tipo: tipoForm, categoria: catBtn.dataset.cat, categoriaNome: catBtn.dataset.nome,
-            valor, criadoEm, origem: 'manual', descricao: el('finDescricao').value.trim() || null,
+            valor, criadoEm, origem: 'manual',
+            // Conta fixa sem descrição leva o nome da categoria: é o nome que fecha o "Pago" nos meses seguintes.
+            descricao: el('finDescricao').value.trim() || (repete ? catBtn.dataset.nome : null),
         };
         if (!editando) {
             dados.criadoPorUid = window._firebaseAuthUid || null;
@@ -661,6 +772,7 @@
         const finalizarSalvar = fotoUrlFinal => {
             if (fotoUrlFinal) dados.fotoUrl = fotoUrlFinal;
             salvar()
+                .then(() => (repete ? cadastrarContaFixa(dados, diaFixa) : null))
                 .then(() => {
                     window._setBtnLoading && window._setBtnLoading(btn, false);
                     tela = 'lista';
@@ -680,6 +792,19 @@
         } else {
             finalizarSalvar(null);
         }
+    }
+
+    // "Repete todo mês": além do lançamento, grava a conta fixa (mesmo lugar e campos de sempre).
+    // Já existindo uma com o mesmo nome, não duplica. Falhar aqui não desfaz o lançamento, que já foi salvo.
+    function cadastrarContaFixa(dados, dia) {
+        const nome = dados.descricao;
+        if (Object.values(window._financeiroRecorrentes || {}).some(r => nomeNorm(r.nome) === nomeNorm(nome))) return Promise.resolve();
+        return window._dbPush(refFin('recorrentes'), {
+            nome, categoria: dados.categoria, categoriaNome: dados.categoriaNome, valor: dados.valor,
+            diaDoMes: dia, ativa: true, criadoEm: Date.now()
+        }).then(() => {
+            if (typeof window._showSuccessOverlay === 'function') window._showSuccessOverlay(`✅ Conta fixa "${nome}" cadastrada: todo dia ${dia}`);
+        }).catch(e => modal({ message: `O lançamento foi salvo, mas não consegui cadastrar a conta fixa: ${e.message}` }));
     }
 
     // Exposta pro router chamar assim que QUALQUER tela do Financeiro
@@ -705,6 +830,10 @@
     // redesenha se a lista estiver aberta, não interrompe um form em
     // andamento.
     window._finOnLancamentosLoaded = function () {
-        if (mounted && tela === 'lista') { renderResumoPeriodo(); renderListaItens(); }
+        if (mounted && tela === 'lista') { renderResumoPeriodo(); renderFixas(); renderListaItens(); }
+    };
+    // recorrentes.js avisa quando as contas fixas mudam (cadastro, pausa, exclusão, outro aparelho).
+    window._finRedesenharFixas = function () {
+        if (mounted && tela === 'lista') renderFixas();
     };
 })();

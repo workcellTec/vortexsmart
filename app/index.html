@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-06.1';
+        window._VS_VERSAO = '2026-11-06.2';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -181,7 +181,7 @@
         </button>
         <button class="pulse-list-item" id="goToFinanceiro" style="display:none;">
             <div class="pulse-list-ic" style="background:#e6f9f0;color:#0f766e;"><i class="bi bi-graph-up-arrow"></i></div>
-            <div class="pulse-list-txt"><div class="pulse-list-title">Financeiro</div><div class="pulse-list-sub">Lançamentos, recorrentes e gráficos</div></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Financeiro</div><div class="pulse-list-sub">Movimentações e gráficos</div></div>
             <i class="bi bi-chevron-right pulse-list-chev"></i>
         </button>
     </div>
@@ -272,7 +272,7 @@
         </button>
         <button class="pulse-list-item vs-hub-tile" id="goToFinanceiro" style="display:none;">
             <div class="pulse-list-ic vs-hub-tile-ic" style="background:rgba(59,130,246,.14);color:#60a5fa;"><i class="bi bi-graph-up-arrow"></i></div>
-            <div class="pulse-list-txt"><div class="pulse-list-title">Financeiro</div><div class="pulse-list-sub">Lançamentos & recorrentes</div></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Financeiro</div><div class="pulse-list-sub">Movimentações e gráficos</div></div>
             <i class="bi bi-chevron-right pulse-list-chev"></i>
         </button>
         <button class="pulse-list-item vs-hub-tile" id="goToDocumentos">
@@ -613,11 +613,9 @@
      FINANCEIRO CONTAINER
 ══════════════════════════════════════════════════════════ -->
 <div id="financeiroContainer" class="hidden">
-    <div id="financeiroHome" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
     <div id="financeiroLancamentos" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
     <div id="financeiroRecorrentes" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
     <div id="financeiroGraficos" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
-    <div id="financeiroResumo" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
 </div><!-- /financeiroContainer -->
 
 <!-- ══════════════════════════════════════════════════════════
@@ -693,6 +691,11 @@
                 <button type="button" class="cfgA-row" id="openConfigBackup2">
                     <div class="cfgA-icon" style="background:linear-gradient(135deg,#818cf8,#4338ca);">🗄️</div>
                     <div class="cfgA-name">Backup &amp; Dados</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+                <button type="button" class="cfgA-row" id="openConfigAtualizacao2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#60a5fa,#1d4ed8);">🔄</div>
+                    <div class="cfgA-name">Atualização do app<span id="cfgAtualizacaoSub" style="display:block;font-weight:500;font-size:.7rem;opacity:.7;margin-top:2px;"></span></div>
                     <span class="cfgA-chev">›</span>
                 </button>
                 <button data-electron-only type="button" class="cfgA-row" id="openConfigImpressora2">
@@ -1276,6 +1279,7 @@
 <script src="acesso-loja.js" defer></script>
 <script type="module" src="core.js" defer></script>
 <script src="diagnostico-sistema.js" defer></script>
+<script src="atualizacao.js" defer></script>
 <script src="calculadoras/router.js" defer></script>
 <script src="calculadoras/export-imagem.js" defer></script>
 <script src="calculadoras/repassar-valores.js" defer></script>
@@ -1307,7 +1311,6 @@
 <script src="financeiro/lancamentos.js" defer></script>
 <script src="financeiro/recorrentes.js" defer></script>
 <script src="financeiro/graficos.js" defer></script>
-<script src="financeiro/resumo.js" defer></script>
 <script src="reparos/documento.js" defer></script>
 <script src="reparos/finalizar-entrega.js" defer></script>
 <script src="reposicao/router.js" defer></script>
@@ -1341,7 +1344,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v8';
+  const SW_VERSION = 'v10';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;

@@ -16,7 +16,7 @@
 // sistema — ver financeiro/lancamentos.js pra entender como esse node
 // é alimentado (automático + sincronização manual de venda antiga).
 // A única exceção é o Painel do dinheiro do topo (Entrou / Contas / Virou
-// produto / Sobrou / Lucro), que é o mesmo das telas Lançamentos e Resumo
+// produto / Sobrou / Lucro), que é o mesmo da tela Movimentações
 // (financeiro/painel-dinheiro.js) e lê as vendas por conta própria.
 // ================================================================
 (function () {
@@ -130,9 +130,10 @@
         wrap.innerHTML = `
             <div class="section-header">
                 <button type="button" class="btn-back" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
-                <h3>Gráficos</h3>
+                <h3>Financeiro</h3>
                 <div style="width:36px;"></div>
             </div>
+            ${window._finAbasHtml ? window._finAbasHtml('financeiroGraficos') : ''}
             <div class="content-card w-100">
                 <div class="fin-pd-mes">${NOMES_MES_LONGO[mesRef.getMonth()]} ${mesRef.getFullYear()}</div>
                 <div id="finGrafPainel"></div>
@@ -142,7 +143,7 @@
                 <div id="finGrafCategoria"></div>
             </div>
         `;
-        wrap.querySelector('.btn-back').addEventListener('click', () => window.openFinanceiroSection('financeiroHome'));
+        if (window._finLigarAbas) window._finLigarAbas(wrap, 'financeiroGraficos');
 
         renderPainel();
         renderComparativo();
@@ -153,7 +154,7 @@
 
     // ══════════════════════ Painel do dinheiro do mês em exibição ══════════════════════
     // Mesmo painel (Entrou / Contas / Virou produto / Sobrou no caixa / Lucro) das
-    // telas Lançamentos e Resumo, aqui sempre do mês. Ver financeiro/painel-dinheiro.js.
+    // tela Movimentações, aqui sempre do mês. Ver financeiro/painel-dinheiro.js.
     function renderPainel() {
         if (!el('finGrafPainel') || typeof window._finPainelDinheiro !== 'function') return;
         if (!painelDinheiro) painelDinheiro = window._finPainelDinheiro({

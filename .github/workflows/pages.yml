@@ -31,6 +31,12 @@ jobs:
           cp -r app/. _site/
           rm -f _site/admin-criar-loja.html
           touch _site/.nojekyll
+          # Carimba a versão (data + código do envio): é isso que o app compara pra saber que
+          # tem atualização (ver app/atualizacao.js). Sem carimbo o envio falha, em vez de ficar
+          # sem aviso de atualização.
+          VERSAO="$(date -u +%Y-%m-%d).${GITHUB_SHA::7}"
+          sed -i "s/window\._VS_VERSAO = '[^']*'/window._VS_VERSAO = '${VERSAO}'/" _site/index.html
+          grep -q "window._VS_VERSAO = '${VERSAO}'" _site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -137,7 +137,7 @@
             return { label: 'Ver resultado', interna: true, executar: () => window.openCredscanSection && window.openCredscanSection('credscanDetalhe', { itemId: dados.credscanId }) };
         }
         if (n.tipo === 'despesaRecorrente') {
-            return { label: 'Ver Recorrentes', interna: true, executar: () => window.openFinanceiroSection && window.openFinanceiroSection('financeiroRecorrentes', dados.recorrenteId ? { recorrenteId: dados.recorrenteId } : null) };
+            return { label: 'Ver contas fixas', interna: true, executar: () => window.openFinanceiroSection && window.openFinanceiroSection('financeiroRecorrentes', dados.recorrenteId ? { recorrenteId: dados.recorrenteId } : null) };
         }
         return null;
     }

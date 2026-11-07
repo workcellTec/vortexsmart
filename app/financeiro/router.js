@@ -1,13 +1,13 @@
 // ================================================================
 // financeiro/router.js — VortexSmart · Router do módulo Financeiro
 // Expõe via window.*:
-//   openFinanceiroSection(sectionId, contexto?, substituir?)
+//   openFinanceiroSection(sectionId, contexto?, substituir?)  — sem sectionId abre Movimentações
 // Depende de (via window.*):
 //   showMainSection, _vsNavegarParaHub (core.js)
-//   _renderFinanceiroLancamentos (financeiro/lancamentos.js)
-//   _renderFinanceiroRecorrentes (financeiro/recorrentes.js)
-//   _renderFinanceiroGraficos    (financeiro/graficos.js)
-//   _renderFinanceiroResumo      (financeiro/resumo.js)
+//   _renderFinanceiroLancamentos (financeiro/lancamentos.js)  — aba Movimentações
+//   _renderFinanceiroGraficos    (financeiro/graficos.js)     — aba Gráficos
+//   _renderFinanceiroRecorrentes (financeiro/recorrentes.js)  — contas fixas (gerenciar)
+// Expõe também: _finAbasHtml(ativa) / _finLigarAbas(raiz, ativa) — as 2 abas do topo.
 //
 // ⚠️ DEPLOY PENDENTE (só dá pra fazer pelo PC, não pelo Termux):
 //   1. Regra do RTDB — dado mora em financeiro/{lojaId}/... (node RAIZ
@@ -32,8 +32,28 @@
 (function () {
     'use strict';
 
-    const SUBS = ['financeiroHome', 'financeiroLancamentos', 'financeiroRecorrentes', 'financeiroGraficos', 'financeiroResumo'];
+    // O Financeiro tem 2 áreas, lado a lado em abas: Movimentações (lançar, consultar e o painel do
+    // dinheiro, com o seletor Dia/Semana/Mês/Personalizado) e Gráficos. "financeiroRecorrentes" não é
+    // uma área: é a tela de gerenciar as contas fixas, aberta de dentro de Movimentações.
+    const SUBS = ['financeiroLancamentos', 'financeiroGraficos', 'financeiroRecorrentes'];
+    const ABAS = [
+        { id: 'financeiroLancamentos', nome: 'Movimentações' },
+        { id: 'financeiroGraficos', nome: 'Gráficos' }
+    ];
     window._financeiroContexto = null;
+
+    // Abas do topo, desenhadas por cada área (o texto muda de lugar no PC e no celular só pelo CSS).
+    window._finAbasHtml = function (ativa) {
+        return `<div class="fl-abas" role="tablist">${ABAS.map(a =>
+            `<button type="button" role="tab" class="${a.id === ativa ? 'on' : ''}" aria-selected="${a.id === ativa ? 'true' : 'false'}" data-fin-aba="${a.id}">${a.nome}</button>`
+        ).join('')}</div>`;
+    };
+    window._finLigarAbas = function (raiz, ativa) {
+        raiz.querySelectorAll('[data-fin-aba]').forEach(btn => btn.addEventListener('click', () => {
+            // substituir=true: trocar de aba não empilha histórico (o voltar sai do Financeiro).
+            if (btn.dataset.finAba !== ativa) openFinanceiroSection(btn.dataset.finAba, null, true);
+        }));
+    };
 
     function openFinanceiroSection(sectionId, contexto, substituir) {
         // Defesa extra (a UI já esconde o card pro Funcionário, ver
@@ -55,10 +75,12 @@
         // desatualizado até visitar Lançamentos por acaso. A função já
         // se protege contra rodar mais de uma vez por sessão.
         if (typeof window._financeiroSincronizarAntigos === 'function') window._financeiroSincronizarAntigos();
+        // Nome antigo ou desconhecido (menu, Resumo do período) cai em Movimentações.
+        if (!SUBS.includes(sectionId) || !document.getElementById(sectionId)) sectionId = 'financeiroLancamentos';
+        // As duas áreas são o "início" do módulo; a tela de contas fixas é um passo dentro dele.
+        const ehHubDoModulo = sectionId !== 'financeiroRecorrentes';
         // Ver window._vsNavegarParaHub em core.js pro raciocínio completo.
-        const ehHubDoModulo = sectionId === 'financeiroHome' || !sectionId;
         if (window._vsNavegarParaHub) window._vsNavegarParaHub('openFinanceiroSection', [sectionId, contexto], ehHubDoModulo, substituir);
-        if (!sectionId || !document.getElementById(sectionId)) sectionId = 'financeiroHome';
         window._financeiroContexto = contexto || null;
         SUBS.forEach(id => {
             const el = document.getElementById(id);
@@ -67,7 +89,6 @@
         const el = document.getElementById(sectionId);
         if (el) el.style.display = 'flex';
 
-        if (sectionId === 'financeiroHome') renderFinanceiroHome();
         if (sectionId === 'financeiroLancamentos' && typeof window._renderFinanceiroLancamentos === 'function') {
             window._renderFinanceiroLancamentos();
         }
@@ -77,78 +98,10 @@
         if (sectionId === 'financeiroGraficos' && typeof window._renderFinanceiroGraficos === 'function') {
             window._renderFinanceiroGraficos();
         }
-        if (sectionId === 'financeiroResumo' && typeof window._renderFinanceiroResumo === 'function') {
-            window._renderFinanceiroResumo();
-        }
     }
     window.openFinanceiroSection = openFinanceiroSection;
 
-    // Hub do módulo — 4 cards (Lançamentos / Recorrentes / Gráficos / Resumo),
-    // mesmo componente visual (.card-v2) que Vendas e Documentos já
-    // usam nos próprios hubs.
-    let hubMontado = false;
-    function renderFinanceiroHome() {
-        const wrap = document.getElementById('financeiroHome');
-        if (!wrap || hubMontado) return;
-        wrap.className = 'container text-center';
-        wrap.innerHTML = `
-            <div class="hub-back-row"><button type="button" class="btn-back" aria-label="Voltar ao Início"><i class="bi bi-arrow-left"></i></button></div>
-            <h2 class="hub-title">Financeiro,<br/>o que você quer fazer?</h2>
-            <div class="ctw-card-grid">
-                <button class="card-v2" id="openFinLancamentos2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">💰</div>
-                        <div class="txt-v2">
-                            <div class="name-v2">Lançamentos</div>
-                            <div class="desc-v2">Registra e consulta receitas e despesas por período</div>
-                            <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Ver e lançar</div>
-                        </div>
-                    </div>
-                </button>
-                <button class="card-v2" id="openFinRecorrentes2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#fbbf24,#c2410c);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#fbbf24,#c2410c);--shadow:rgba(194,65,12,.4);color:#fff;">🔁</div>
-                        <div class="txt-v2">
-                            <div class="name-v2">Recorrentes</div>
-                            <div class="desc-v2">Contas fixas mensais, como aluguel e assinaturas</div>
-                            <div class="tag-v2" style="--tagbg:#fef3c7;--tagcolor:#c2410c;">Aluguel, etc</div>
-                        </div>
-                    </div>
-                </button>
-                <button class="card-v2" id="openFinGraficos2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#a78bfa,#5b3df5);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#a78bfa,#5b3df5);--shadow:rgba(91,61,245,.4);color:#fff;">📊</div>
-                        <div class="txt-v2">
-                            <div class="name-v2">Gráficos</div>
-                            <div class="desc-v2">Saldo de caixa, fluxo e despesas por categoria</div>
-                            <div class="tag-v2" style="--tagbg:#ede9fe;--tagcolor:#5b3df5;">Caixa e análise</div>
-                        </div>
-                    </div>
-                </button>
-                <button class="card-v2" id="openFinResumo2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#5eead4,#0891b2);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#5eead4,#0891b2);--shadow:rgba(8,145,178,.4);color:#fff;">🧾</div>
-                        <div class="txt-v2">
-                            <div class="name-v2">Resumo do período</div>
-                            <div class="desc-v2">Tudo de um dia, semana ou mês: o que entrou, o que saiu e pra onde foi a grana</div>
-                            <div class="tag-v2" style="--tagbg:#cffafe;--tagcolor:#0891b2;">Visão completa</div>
-                        </div>
-                    </div>
-                </button>
-            </div>
-        `;
-        document.getElementById('openFinLancamentos2')?.addEventListener('click', () => openFinanceiroSection('financeiroLancamentos'));
-        document.getElementById('openFinRecorrentes2')?.addEventListener('click', () => openFinanceiroSection('financeiroRecorrentes'));
-        document.getElementById('openFinGraficos2')?.addEventListener('click', () => openFinanceiroSection('financeiroGraficos'));
-        document.getElementById('openFinResumo2')?.addEventListener('click', () => openFinanceiroSection('financeiroResumo'));
-        hubMontado = true;
-    }
-
     document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('goToFinanceiro')?.addEventListener('click', () => openFinanceiroSection('financeiroHome'));
+        document.getElementById('goToFinanceiro')?.addEventListener('click', () => openFinanceiroSection('financeiroLancamentos'));
     });
 })();

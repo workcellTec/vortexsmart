@@ -3293,6 +3293,34 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 .fl-vazio .acoes { display: flex; justify-content: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
 
 /* janela média: 2 cartões por linha */
+/* Financeiro — abas (Movimentações | Gráficos), Contas fixas do mês e "Repete todo mês".
+   Marcação em financeiro/router.js e financeiro/lancamentos.js. Igual nos dois CSS; o celular ajusta no bloco "FINANCEIRO no celular". */
+.fl-abas { display: inline-flex; gap: 2px; padding: 4px; margin: 0 0 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 13px; }
+.fl-abas button { height: 38px; padding: 0 22px; border: 0; background: none; border-radius: 9px; font: 600 .84rem 'Poppins', sans-serif; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+.fl-abas button.on { background: rgba(var(--primary-rgb), .2); color: #fff; box-shadow: inset 0 0 0 1px rgba(var(--primary-rgb), .55); }
+.vs-fin-largura > .fl-abas { margin: 0 0 18px 4px; }
+.fl-fx { margin: 0 0 18px; }
+.fl-fx-h { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.fl-fx-h h3 { margin: 0; font: 800 1.05rem 'Space Grotesk', sans-serif; color: var(--text-strong); }
+.fl-fx-h .n { padding: 3px 10px; border-radius: 99px; background: rgba(var(--overlay-rgb), .06); font-size: .72rem; color: var(--text-secondary); }
+.fl-fx-h .n.pend { background: rgba(251,191,36,.14); color: #fbbf24; font-weight: 700; }
+.fl-fx-h .grow { flex: 1; }
+.fl-fx-g { height: 34px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font: 600 .76rem 'Poppins', sans-serif; cursor: pointer; }
+.fl-fx-l { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.fl-fx-c { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow: hidden; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+.fl-fx-c .t { font-weight: 600; font-size: .88rem; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-fx-c .s { font-size: .76rem; color: var(--text-secondary); }
+.fl-fx-c.venceu .s { color: #fbbf24; }
+.fl-fx-c .st { margin-top: 8px; font-size: .78rem; font-weight: 700; color: #4ade80; }
+.fl-fx-b { margin-top: 8px; height: 34px; border-radius: 10px; border: 1px solid rgba(var(--primary-rgb), .6); background: rgba(var(--primary-rgb), .14); color: #9cc0ff; font: 600 .78rem 'Poppins', sans-serif; cursor: pointer; }
+.fl-fx-vazio { margin: 0; padding: 14px 16px; border: 1px dashed var(--border); border-radius: 14px; font-size: .78rem; line-height: 1.5; color: var(--text-secondary); }
+.fl-rep { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; padding: 12px 14px; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px; }
+.fl-rep .tx b { display: block; font-size: .86rem; color: var(--text-strong); }
+.fl-rep .tx small { display: block; margin-top: 2px; font-size: .72rem; line-height: 1.4; color: var(--text-secondary); }
+.fl-rep-dia { align-items: center; gap: 10px; margin-top: 10px; font-size: .82rem; color: var(--text-secondary); }
+.fl-rep-dia input { width: 84px; margin: 0; text-align: center; }
+.fl-rep-nota { margin: 8px 0 0; font-size: .74rem; color: #fbbf24; }
+.fl-fab { display: none; }
 @media (max-width: 1240px) {
     .fl-card.k { grid-column: span 6; }
     .fl-card.luc { grid-column: span 6; order: 4; min-height: 132px; }

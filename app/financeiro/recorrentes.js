@@ -1,9 +1,12 @@
 // ================================================================
-// financeiro/recorrentes.js — VortexSmart · Financeiro → Recorrentes
+// financeiro/recorrentes.js — VortexSmart · Financeiro → Contas fixas (gerenciar)
 // Registra: window._renderFinanceiroRecorrentes()
 //
+// Não é uma área do Financeiro: é o "Gerenciar" das Contas fixas do mês, que ficam em
+// Movimentações (financeiro/lancamentos.js — lá também nascem, pela opção "Repete todo
+// mês" do formulário de despesa). Aqui: pausar, editar, excluir e cadastrar à mão.
 // Tela própria (não sanfona) de propósito — precisa aguentar dezenas
-// de recorrentes sem virar bagunça, mesmo raciocínio de busca +
+// de contas fixas sem virar bagunça, mesmo raciocínio de busca +
 // paginação que já resolveu isso nos Concertos.
 //
 // financeiro/recorrentes/{id} = { nome, categoria, categoriaNome,
@@ -66,24 +69,23 @@
         wrap.innerHTML = `
             <div class="section-header">
                 <button type="button" class="btn-back" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
-                <h3>Recorrentes</h3>
+                <h3>Contas fixas</h3>
                 <div style="width:36px;"></div>
             </div>
             <div class="content-card w-100">
-                <div class="stq-hist-sub mb-2" style="font-size:.72rem;">Quando o dia chegar, avisa por notificação — você confirma, nada lança sozinho.</div>
+                <div class="stq-hist-sub mb-2" style="font-size:.72rem;">Elas aparecem em Movimentações, em "Contas fixas do mês": você lança com um toque. Nada lança sozinho.</div>
                 <div class="mb-2" style="position:relative;">
                     <div class="bk-search-dash">
                         <i class="bi bi-search"></i>
-                        <input type="text" id="finRecBusca" placeholder="Buscar recorrente..." autocomplete="off">
+                        <input type="text" id="finRecBusca" placeholder="Buscar conta fixa..." autocomplete="off">
                     </div>
                 </div>
-                <button type="button" class="ctx-add-btn mb-3" id="finRecNovoBtn"><i class="bi bi-plus-lg"></i> Nova Recorrente</button>
+                <button type="button" class="ctx-add-btn mb-3" id="finRecNovoBtn"><i class="bi bi-plus-lg"></i> Nova conta fixa</button>
                 <div id="finRecList"></div>
             </div>
         `;
         renderListaItens();
 
-        wrap.querySelector('.btn-back').addEventListener('click', () => window.openFinanceiroSection('financeiroHome'));
         el('finRecNovoBtn').addEventListener('click', () => abrirForm());
         el('finRecBusca').addEventListener('input', () => {
             termoBusca = el('finRecBusca').value.trim().toLowerCase();
@@ -103,7 +105,7 @@
         const visiveis = todos.slice(0, limiteExibicao);
         const listEl = el('finRecList');
         if (!todos.length) {
-            listEl.innerHTML = `<div class="stq-hist-sub text-center py-3">Nenhuma recorrente cadastrada ainda.</div>`;
+            listEl.innerHTML = `<div class="stq-hist-sub text-center py-3">Nenhuma conta fixa cadastrada ainda.</div>`;
             return;
         }
         listEl.innerHTML = visiveis.map(r => `
@@ -127,7 +129,7 @@
         listEl.querySelectorAll('[data-excluir]').forEach(btn => btn.addEventListener('click', () => {
             const id = btn.dataset.excluir;
             modal({
-                message: 'Excluir essa recorrente? Não apaga lançamentos já confirmados antes, só para os avisos futuros.',
+                message: 'Excluir essa conta fixa? Não apaga lançamentos já feitos; ela só deixa de aparecer em Contas fixas do mês.',
                 confirmText: 'Excluir', cancelText: 'Cancelar',
                 onConfirm: () => window._dbRemove(refFin(`recorrentes/${id}`)).catch(e => modal({ message: `Erro ao excluir: ${e.message}` }))
             });
@@ -148,7 +150,7 @@
         wrap.innerHTML = `
             <div class="section-header">
                 <button type="button" class="btn-icon-circle" id="finRecFormVoltar" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
-                <h3>${editandoId ? 'Editar' : 'Nova'} Recorrente</h3>
+                <h3>${editandoId ? 'Editar' : 'Nova'} conta fixa</h3>
                 <div style="width:36px;"></div>
             </div>
             <div class="content-card w-100">
@@ -186,7 +188,7 @@
         const valor = parseFloat(el('finRecValor').value);
         const dia = parseInt(el('finRecDia').value, 10);
 
-        if (!nome) { modal({ message: 'Dá um nome pra recorrente.' }); return; }
+        if (!nome) { modal({ message: 'Dá um nome pra conta fixa.' }); return; }
         if (!catBtn) { modal({ message: 'Escolhe uma categoria.' }); return; }
         if (!valor || valor <= 0) { modal({ message: 'Informa um valor válido.' }); return; }
         if (!dia || dia < 1 || dia > 31) { modal({ message: 'Dia do mês precisa ser entre 1 e 31.' }); return; }
@@ -236,5 +238,6 @@
     };
     window._finOnRecorrentesLoaded = function () {
         if (mounted && tela === 'lista') renderListaItens();
+        if (typeof window._finRedesenharFixas === 'function') window._finRedesenharFixas();
     };
 })();
