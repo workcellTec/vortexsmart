@@ -127,7 +127,7 @@ body {
     overflow-x: hidden;
     position: relative;
     padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
     transition: background-color var(--transition);
     /* Remove o "flash" retangular padrão do navegador ao tocar em
        qualquer elemento — antes só existia em 5 classes específicas,
@@ -1356,28 +1356,6 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
 .pulse-pendente-row { display:flex; justify-content:space-between; align-items:center; border-radius:11px; padding:9px 12px; margin-bottom:10px; font-size:.78rem; font-weight:700; }
 .pulse-pendente-row .lbl { font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; opacity:.85; }
 
-.pulse-shortcuts { width:100%; display:flex; gap:10px; margin-bottom:14px; }
-.pulse-shortcut {
-    flex:1; background:var(--surface); border:1px solid var(--border); border-radius:16px;
-    padding:14px 8px; display:flex; flex-direction:column; align-items:center; gap:8px;
-    cursor:pointer; box-shadow: 0 4px 14px -8px rgba(0,0,0,.14);
-}
-.pulse-shortcut-ic { width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1rem; }
-.pulse-shortcut span { font-size:.78rem; font-weight:700; color:var(--text-strong); }
-
-.pulse-list { width:100%; display:flex; flex-direction:column; gap:10px; }
-.pulse-list-item {
-    display:flex; align-items:center; gap:14px; text-align:left;
-    background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:18px 16px;
-    cursor:pointer; box-shadow: 0 10px 24px -10px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.06);
-}
-.pulse-list-ic { width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.15rem; flex-shrink:0; }
-.pulse-list-txt { flex:1; min-width:0; }
-.pulse-list-title { font-family:var(--font); font-weight:700; font-size:1rem; color:var(--text-strong); }
-.pulse-list-sub { font-size:.78rem; color:var(--text-secondary); margin-top:3px; }
-.pulse-list-chev { color:var(--text-secondary); opacity:.5; flex-shrink:0; font-size:1.1rem; }
-
-
 /* ── Atalhos rápidos (círculos) — módulo em construção ──────────
    Painel com degradê suave (azul→roxo) unindo os 5 atalhos.
    Uso de justify-content:space-between (sem gap fixo) garante que
@@ -1440,67 +1418,127 @@ body.tema-claro .ctw-card.c-rose   { background: rgba(190,18,60,.1);    border-c
 body.tema-claro .ctw-card.c-rose   .ctw-card-icon { background: rgba(190,18,60,.15); color: #be123c; }
 body.tema-claro .ctw-card.c-rose   .ctw-card-title, body.tema-claro .ctw-card.c-rose .ctw-card-sub { color: #be123c; }
 
-/* ── Bottom Nav — Vortex Pulse (híbrido: vidro flutuante + anel com glow) */
+/* ── Barra inferior ─────────────────────────────────────────
+   Encostada no rodapé (sólida, sem vidro): Início · até 3 atalhos · Vender.
+   5 colunas fixas — Vender fica sempre no meio (ver navegacao-mobile.js). */
 .ctw-bottom-nav {
     position: fixed;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    left: 16px;
-    right: 16px;
+    left: 0; right: 0; bottom: 0;
     z-index: 1060;
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-    border-radius: 26px;
-    padding: 10px 8px;
-    background: rgba(20, 25, 45, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.5);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: end;
+    padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
 }
-body.tema-claro .ctw-bottom-nav {
-    background: rgba(255, 255, 255, 0.6);
-    border-color: rgba(255, 255, 255, 0.75);
-    box-shadow: 0 14px 32px -10px rgba(0,0,0,0.28);
-}
+.ctw-bottom-nav > * { grid-row: 1; }
 .ctw-nav-btn {
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
     background: none; border: none; cursor: pointer;
-    padding: 6px 14px; border-radius: 999px; min-width: 60px;
-    -webkit-tap-highlight-color: transparent;
-    transition: background var(--transition), transform var(--transition);
+    padding: 4px 0; min-width: 0;
+    color: var(--text-muted);
+    transition: color var(--transition);
 }
-.ctw-nav-btn:active { transform: scale(0.88); }
-.ctw-nav-btn.ctw-nav-active { background: rgba(var(--primary-rgb), 0.15); }
-.ctw-nav-icon { font-size: 1.25rem; color: rgba(var(--overlay-rgb),0.45); line-height: 1; transition: color var(--transition), transform var(--transition); }
-.ctw-nav-btn.ctw-nav-active .ctw-nav-icon { color: var(--primary); }
-@media (hover: hover) { .ctw-nav-btn:hover .ctw-nav-icon { color: rgba(var(--overlay-rgb),0.85); transform: translateY(-2px); } }
-.ctw-nav-label { font-size: .56rem; font-weight: 600; letter-spacing: .4px; color: rgba(var(--overlay-rgb),0.35); font-family:var(--font); transition: color var(--transition); }
-.ctw-nav-btn.ctw-nav-active .ctw-nav-label { color: var(--primary); }
+.ctw-nav-btn:active { opacity: .6; }
+.ctw-nav-icon { font-size: 1.3rem; color: inherit; line-height: 1; }
+.ctw-nav-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .62rem; font-weight: 700; color: inherit; }
+.ctw-nav-btn.ctw-nav-active { color: var(--primary); }
 
-/* Botão do meio — anel saltando acima da barra, com respiro sólido
-   (cor do fundo da tela, cria o "furo") */
-.ctw-nav-ring-btn { background:none; border:none; cursor:pointer; padding:0; -webkit-tap-highlight-color: transparent; position:relative; margin-top:-44px; }
-.ctw-nav-ring-btn:active .ctw-nav-ring { transform: scale(0.9); }
-.ctw-nav-ring {
-    position:relative; z-index:1;
-    width: 50px; height: 50px; border-radius: 50%;
-    background: var(--primary);
+/* Vender — botão central elevado. O anel na cor da barra "recorta" a borda de cima. */
+.ctw-nav-vender {
+    position: relative; align-self: stretch;
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+    background: none; border: none; cursor: pointer; padding: 4px 0; min-width: 0; color: var(--primary);
+}
+.ctw-nav-vender:active .ctw-nav-vender-ic { transform: scale(.92); }
+.ctw-nav-vender-ic {
+    position: absolute; top: -30px; left: 50%; margin-left: -28px;
+    width: 56px; height: 56px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 1.2rem;
-    box-shadow:
-        0 0 0 7px var(--bg);
+    background: var(--primary); color: var(--on-primary); font-size: 1.6rem;
+    box-shadow: 0 0 0 6px var(--surface);
     transition: transform var(--transition);
 }
+.ctw-nav-vender .ctw-nav-label { color: var(--primary); }
+
+/* ── Topo da Início: saudação + sino + avatar ─────────────── */
+.vs-topo { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 2px 12px; text-align: left; }
+.vs-topo-saudacao { flex: 1; min-width: 0; }
+.vs-topo-oi { font-size: .74rem; color: var(--text-secondary); }
+.vs-topo-nome { display: block; font-size: 1.05rem; font-weight: 800; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vs-topo-btn {
+    position: relative; width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-strong);
+    font-size: 1.05rem; cursor: pointer;
+}
+.vs-topo-avatar { background: var(--primary-soft); border-color: transparent; color: var(--primary); font-size: .82rem; font-weight: 800; }
 /* Cabeçalho no tema claro: era branco chapado sem profundidade —
    destoava do resto do tema (que usa cards brancos com sombra suave
    flutuando sobre o fundo cinza-azulado, nunca uma cor sólida sem
    relevo nenhum). Sombra leve + borda quase invisível resolve. */
 body.tema-claro .section-header { background: transparent; box-shadow: none; border-bottom: none; }
 .ctw-nav-dot {
-    position: absolute; z-index:2; top: -3px; right: -6px; min-width: 17px; height: 17px;
-    border-radius: 50%; background: #ef4444; border: 2px solid var(--bg);
+    position: absolute; z-index: 2; top: -3px; right: -3px; min-width: 18px; height: 18px;
+    border-radius: 99px; background: var(--danger-solid); border: 2px solid var(--bg);
     display: none; align-items: center; justify-content: center;
-    font-size: .58rem; font-weight: 800; color: #fff; padding: 0 3px;
+    font-size: .6rem; font-weight: 800; color: #fff; padding: 0 4px;
 }
+
+/* ── Grade de módulos da Início (os que ficaram fora da barra) ─ */
+.vs-grade-cab { width: 100%; display: flex; align-items: center; justify-content: space-between; margin: 6px 0 10px; }
+.vs-grade-titulo { font-size: .74rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
+.vs-grade-editar { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 6px 2px; color: var(--primary); font-size: .78rem; font-weight: 700; cursor: pointer; }
+.vs-grade { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.vs-grade-item {
+    position: relative; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 14px 6px 12px; border-radius: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text-strong); font-family: inherit; cursor: pointer;
+}
+.vs-grade-item.vs-na-barra { display: none !important; }
+.vs-grade-ic { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: var(--primary-soft); color: var(--primary); font-size: 1.2rem; }
+.vs-grade-nome { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .76rem; font-weight: 700; }
+.vs-grade-sub { max-width: 100%; max-height: 2.5em; overflow: hidden; font-size: .6rem; line-height: 1.25; color: var(--text-muted); text-align: center; }
+.vs-grade-sub:empty { display: none; }
+.vs-grade-lock { position: absolute; top: 8px; right: 8px; margin: 0 !important; }
+.vs-grade-item.locked .vs-grade-ic { opacity: .55; }
+.vs-grade-vazia { width: 100%; padding: 18px 0; text-align: center; font-size: .8rem; color: var(--text-muted); }
+
+/* ── Folha "Editar barra" ─────────────────────────────────── */
+.vs-folha-overlay {
+    position: fixed; inset: 0; z-index: 1100;
+    display: flex; align-items: flex-end;
+    background: var(--scrim);
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .2s ease, visibility .2s ease;
+}
+.vs-folha-overlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
+.vs-folha {
+    width: 100%; max-height: 86dvh; overflow: hidden;
+    display: flex; flex-direction: column;
+    padding: 10px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface); border-radius: 22px 22px 0 0;
+    transform: translateY(100%); transition: transform .28s cubic-bezier(.32,.72,0,1);
+}
+.vs-folha-overlay.active .vs-folha { transform: translateY(0); }
+.vs-folha-alca { width: 38px; height: 4px; border-radius: 4px; background: var(--border); margin: 0 auto 14px; }
+.vs-folha-titulo { font-size: 1.1rem; font-weight: 800; color: var(--text-strong); }
+.vs-folha-sub { margin: 4px 0 8px; font-size: .78rem; line-height: 1.4; color: var(--text-secondary); }
+#vsBarraLista { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.vs-folha-dica { margin: 10px 0 14px; font-size: .74rem; color: var(--text-muted); }
+.vs-barra-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.vs-barra-item.desativado { opacity: .45; }
+.vs-barra-ic { width: 38px; height: 38px; flex-shrink: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--primary-soft); color: var(--primary); font-size: 1.05rem; }
+.vs-barra-nome { flex: 1; font-size: .92rem; font-weight: 700; color: var(--text-strong); }
+.vs-sw { position: relative; width: 46px; height: 28px; flex-shrink: 0; }
+.vs-sw input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.vs-sw-trilho { position: absolute; inset: 0; border-radius: 28px; background: var(--input-border); transition: background .2s; pointer-events: none; }
+.vs-sw-trilho::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.vs-sw input:checked + .vs-sw-trilho { background: var(--primary); }
+.vs-sw input:checked + .vs-sw-trilho::after { transform: translateX(18px); }
 
 /* ── Loading ────────────────────────────────────────────────── */
 #loadingOverlay.d-none { display: none !important; }
@@ -2530,9 +2568,8 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
    nada de cor nova inventada aqui.
 ================================================================ */
 
-/* ── Hub inicial: item travado até configurar ────────────────── */
-.pulse-list-item.locked { opacity:.7; }
-.pulse-list-item .lockbadge { font-size:.6rem; font-weight:800; color:var(--warning); background:rgba(251,191,36,.12); padding:3px 8px; border-radius:99px; flex-shrink:0; margin-right:4px; }
+/* ── Cadeado de Concertos enquanto o modo não foi configurado ── */
+.lockbadge { font-size:.6rem; font-weight:800; color:var(--warning); background:rgba(251,191,36,.12); padding:3px 8px; border-radius:99px; flex-shrink:0; margin-right:4px; }
 
 /* ── Configurações → Concertos: escolha do modo ──────────────── */
 .rep-modo-toggle { display:flex; flex-direction:column; gap:10px; width:100%; }
@@ -3145,7 +3182,6 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 [style*="linear-gradient("][style*="#dc2626"], [style*="linear-gradient("][style*="#ef4444"] { background: var(--danger-solid) !important; }
 [style*="--grad"] { --grad: var(--primary) !important; }
 .cfgA-icon[style], .cz-item-ic[style] { background: var(--primary-soft) !important; }
-.pulse-shortcut-ic[style], .pulse-list-ic[style], .vs-quick-ic[style] { background: var(--primary-soft) !important; color: var(--primary) !important; }
 #vsAtualizacaoAviso { background: var(--surface-raised) !important; border: 1px solid var(--primary) !important; color: var(--text-strong) !important; font-family: var(--font) !important; box-shadow: var(--shadow) !important; }
 #vsAtualizacaoAviso button { font-family: var(--font) !important; }
 [style*="Space Grotesk"] { font-family: var(--font) !important; }

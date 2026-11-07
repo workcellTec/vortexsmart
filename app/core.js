@@ -956,11 +956,11 @@ function showMainSection(sectionId) {
         target.classList.remove('hidden');
         currentMainSectionId = sectionId;
     }
-    // Navbar: ativa botão Início
+    // Navbar: ativa o botão da seção (Início, ou o atalho do módulo aberto — ver navegacao-mobile.js)
     document.querySelectorAll('.ctw-nav-btn').forEach(b => b.classList.remove('ctw-nav-active'));
+    document.getElementById('ctwNavHome')?.classList.toggle('ctw-nav-active', sectionId === 'main');
+    if (typeof window._vsBarraAtiva === 'function') window._vsBarraAtiva(sectionId);
     if (sectionId === 'main') {
-        const home = document.getElementById('ctwNavHome');
-        if (home) home.classList.add('ctw-nav-active');
         atualizarHeroVendasHoje();
         atualizarContagemConcertosHub();
     }
@@ -1292,6 +1292,7 @@ function loadConfigCustomizacoes() {
     onValue(window._usuarioPrefRef(), snap => {
         configCustomizacoes = snap.val() || {};
         window._configCustomizacoes = configCustomizacoes;
+        if (typeof window._vsBarraSincronizar === 'function') window._vsBarraSincronizar();
     });
 }
 window._loadConfigCustomizacoes = loadConfigCustomizacoes;
@@ -1459,6 +1460,8 @@ function aplicarVisibilidadePorPapel() {
             if (lock) lock.style.display = modo ? 'none' : 'inline-flex';
         }
     }
+    // Barra inferior e grade da Início dependem de quem está visível acima (celular).
+    if (typeof window._vsBarraRender === 'function') window._vsBarraRender();
 }
 window._aplicarVisibilidadePorPapel = aplicarVisibilidadePorPapel;
 
@@ -1897,10 +1900,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 profileSheet.style.right  = 'auto';
                 profileSheet.style.bottom = (window.innerHeight - rect.bottom) + 'px';
             } else {
-                // Barra inferior (celular): o menu abre logo acima do botão, como um FAB.
+                // Celular: o botão de Perfil mora no topo da Início, então o menu abre logo ABAIXO dele.
                 profileSheet.style.left   = 'auto';
                 profileSheet.style.right  = (window.innerWidth - rect.right) + 'px';
-                profileSheet.style.bottom = (window.innerHeight - rect.top + 10) + 'px';
+                profileSheet.style.bottom = 'auto';
+                profileSheet.style.top    = (rect.bottom + 10) + 'px';
+                profileSheet.style.transformOrigin = 'top right';
             }
         }
         profileOverlay?.classList.add('active');

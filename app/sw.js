@@ -71,7 +71,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_VERSION = 'vortexsmart-v13';
+const CACHE_VERSION = 'vortexsmart-v14';
 
 const APP_SHELL = [
   './',
@@ -138,6 +138,7 @@ const APP_SHELL = [
   './configuracoes/config-reparos.js',
   './configuracoes/config-credscan.js',
   './notificacoes-central.js',
+  './navegacao-mobile.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-192.png',

@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-07.6';
+        window._VS_VERSAO = '2026-11-07.7';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -140,9 +140,16 @@
 <div class="container text-center" id="mainMenu" style="display:none;">
     <div data-shell-only="mobile" data-shell-unwrap>
 
-    <!-- Header compacto (mantém a personalização, mas sem tomar o protagonismo do hero) -->
-    <div style="width:100%;text-align:left;padding:14px 4px 10px;">
-        <div style="font-size:.8rem;color:var(--text-secondary);">Bem-vindo(a), <b id="userName" style="color:var(--text-strong);">Usuário</b></div>
+    <!-- Cabeçalho: saudação + sino de notificações + avatar (abre o menu do perfil) -->
+    <div class="vs-topo">
+        <div class="vs-topo-saudacao">
+            <div class="vs-topo-oi">Bem-vindo(a),</div>
+            <b id="userName" class="vs-topo-nome">Usuário</b>
+        </div>
+        <button type="button" class="vs-topo-btn" id="ctwNavNotif" title="Notificações" aria-label="Notificações">
+            <i class="bi bi-bell-fill"></i><span class="ctw-nav-dot" id="ctwNavNotifDot" style="display:none;"></span>
+        </button>
+        <button type="button" class="vs-topo-btn vs-topo-avatar" id="ctwNavProfile" title="Perfil" aria-label="Perfil e configurações"><span id="vsTopoIniciais"><i class="bi bi-person-fill"></i></span></button>
     </div>
 
     <!-- Hero "Vendas Hoje" — estilo Vortex Pulse -->
@@ -168,51 +175,41 @@
         </div>
     </div>
 
-    <!-- Atalhos rápidos (3, estilo Pulse — cartão com ícone quadrado, não círculo) -->
-    <div class="pulse-shortcuts">
-        <button class="pulse-shortcut" id="goToVenda">
-            <div class="pulse-shortcut-ic" style="background:#fbeaea;color:#c33;"><i class="bi bi-cart-check-fill"></i></div>
-            <span>Venda</span>
+    <!-- Módulos que ficaram fora da barra inferior. Os ids (goTo…) são os mesmos de sempre: a visibilidade por papel,
+         os cliques e o cadeado de Concertos continuam vindo do core.js. Quem está na barra ganha .vs-na-barra (navegacao-mobile.js). -->
+    <div class="vs-grade-cab">
+        <span class="vs-grade-titulo">Módulos</span>
+        <button type="button" class="vs-grade-editar" id="vsEditarBarra"><i class="bi bi-sliders"></i> Editar barra</button>
+    </div>
+    <div class="vs-grade" id="vsGradeModulos">
+        <button type="button" class="vs-grade-item" id="goToVenda" data-mod="vendas">
+            <span class="vs-grade-ic"><i class="bi bi-cart-check-fill"></i></span><span class="vs-grade-nome">Vendas</span>
         </button>
-        <button class="pulse-shortcut" id="goToCalculator">
-            <div class="pulse-shortcut-ic" style="background:#eef0ff;color:#5b3df5;"><i class="bi bi-calculator-fill"></i></div>
-            <span>Calculadora</span>
+        <button type="button" class="vs-grade-item" id="goToEstoque" data-mod="estoque">
+            <span class="vs-grade-ic"><i class="bi bi-box-seam-fill"></i></span><span class="vs-grade-nome">Estoque</span>
         </button>
-        <button class="pulse-shortcut" id="goToDocumentos">
-            <div class="pulse-shortcut-ic" style="background:#eafaf0;color:#16a34a;"><i class="bi bi-file-earmark-text-fill"></i></div>
-            <span>Documento</span>
+        <button type="button" class="vs-grade-item" id="goToCalculator" data-mod="calculadora">
+            <span class="vs-grade-ic"><i class="bi bi-calculator-fill"></i></span><span class="vs-grade-nome">Calculadora</span>
+        </button>
+        <button type="button" class="vs-grade-item" id="goToDocumentos" data-mod="documentos">
+            <span class="vs-grade-ic"><i class="bi bi-file-earmark-text-fill"></i></span><span class="vs-grade-nome">Documentos</span>
+        </button>
+        <button type="button" class="vs-grade-item" id="goToReparos" data-mod="reparos">
+            <span class="vs-grade-ic"><i class="bi bi-wrench-adjustable-circle-fill"></i></span><span class="vs-grade-nome">Concertos</span>
+            <span class="vs-grade-sub" id="goToReparosSub"></span>
+            <span class="lockbadge vs-grade-lock" id="goToReparosLock" style="display:none;"><i class="bi bi-lock-fill"></i></span>
+        </button>
+        <button type="button" class="vs-grade-item" id="goToReposicao" data-mod="reposicao">
+            <span class="vs-grade-ic"><i class="bi bi-cart3"></i></span><span class="vs-grade-nome">Reposição</span>
+        </button>
+        <button type="button" class="vs-grade-item" id="goToFinanceiro" data-mod="financeiro" style="display:none;">
+            <span class="vs-grade-ic"><i class="bi bi-graph-up-arrow"></i></span><span class="vs-grade-nome">Financeiro</span>
+        </button>
+        <button type="button" class="vs-grade-item" id="goToCredscan" data-mod="credscan" style="display:none;">
+            <span class="vs-grade-ic"><i class="bi bi-cpu-fill"></i></span><span class="vs-grade-nome">CredScan</span>
         </button>
     </div>
-
-    <!-- Lista principal — sem repetir o que já tem atalho em cima (Venda/Calculadora/Documento) -->
-    <div class="pulse-list">
-        <button class="pulse-list-item" id="goToEstoque">
-            <div class="pulse-list-ic" style="background:#fff4e5;color:#b45309;"><i class="bi bi-box-seam-fill"></i></div>
-            <div class="pulse-list-txt"><div class="pulse-list-title">Estoque</div><div class="pulse-list-sub">Produtos e conferência</div></div>
-            <i class="bi bi-chevron-right pulse-list-chev"></i>
-        </button>
-        <button class="pulse-list-item" id="goToReparos">
-            <div class="pulse-list-ic" style="background:#f3e8ff;color:#7c3aed;"><i class="bi bi-wrench-adjustable-circle-fill"></i></div>
-            <div class="pulse-list-txt"><div class="pulse-list-title">Concertos</div><div class="pulse-list-sub" id="goToReparosSub">Configure pra liberar essa área</div></div>
-            <span class="lockbadge" id="goToReparosLock" style="display:none;"><i class="bi bi-lock-fill"></i></span>
-            <i class="bi bi-chevron-right pulse-list-chev"></i>
-        </button>
-        <button class="pulse-list-item" id="goToReposicao">
-            <div class="pulse-list-ic" style="background:#eafaf5;color:#0d9488;"><i class="bi bi-cart3"></i></div>
-            <div class="pulse-list-txt"><div class="pulse-list-title">Reposição</div><div class="pulse-list-sub">Lista de compras da loja</div></div>
-            <i class="bi bi-chevron-right pulse-list-chev"></i>
-        </button>
-        <button class="pulse-list-item" id="goToCredscan" style="display:none;">
-            <div class="pulse-list-ic" style="background:#f3e8ff;color:#5b3df5;"><i class="bi bi-cpu-fill"></i></div>
-            <div class="pulse-list-txt"><div class="pulse-list-title">CredScan</div><div class="pulse-list-sub">Análise de crédito via IA</div></div>
-            <i class="bi bi-chevron-right pulse-list-chev"></i>
-        </button>
-        <button class="pulse-list-item" id="goToFinanceiro" style="display:none;">
-            <div class="pulse-list-ic" style="background:#e6f9f0;color:#0f766e;"><i class="bi bi-graph-up-arrow"></i></div>
-            <div class="pulse-list-txt"><div class="pulse-list-title">Financeiro</div><div class="pulse-list-sub">Movimentações e gráficos</div></div>
-            <i class="bi bi-chevron-right pulse-list-chev"></i>
-        </button>
-    </div>
+    <div class="vs-grade-vazia" id="vsGradeVazia" style="display:none;">Todos os módulos estão na barra de baixo.</div>
     </div>
     <div data-shell-only="pc" data-shell-unwrap>
 
@@ -1179,16 +1176,13 @@
      NAVBAR
 ══════════════════════════════════════════════════════════ -->
 <nav data-shell-only="mobile" id="ctwBottomNav" class="ctw-bottom-nav" aria-label="Navegação principal" style="display:none;">
-    <button class="ctw-nav-btn ctw-nav-active" id="ctwNavHome" title="Início">
+    <button type="button" class="ctw-nav-btn ctw-nav-active" id="ctwNavHome" title="Início" style="grid-column:1;">
         <span class="ctw-nav-icon"><i class="bi bi-house-fill"></i></span>
         <span class="ctw-nav-label">Início</span>
     </button>
-    <button class="ctw-nav-ring-btn" id="ctwNavNotif" title="Notificações">
-        <span class="ctw-nav-ring"><i class="bi bi-bell-fill"></i><span class="ctw-nav-dot" id="ctwNavNotifDot" style="display:none;"></span></span>
-    </button>
-    <button class="ctw-nav-btn" id="ctwNavProfile" title="Perfil">
-        <span class="ctw-nav-icon"><i class="bi bi-person-fill"></i></span>
-        <span class="ctw-nav-label" id="ctwNavProfileLabel">Perfil</span>
+    <button type="button" class="ctw-nav-vender" id="ctwNavVender" title="Nova venda" aria-label="Nova venda">
+        <span class="ctw-nav-vender-ic"><i class="bi bi-plus-lg"></i></span>
+        <span class="ctw-nav-label">Vender</span>
     </button>
 </nav>
 
@@ -1342,6 +1336,7 @@
 <script src="configuracoes/config-reparos.js" defer></script>
 <script src="configuracoes/config-credscan.js" defer></script>
 <script src="notificacoes-central.js" defer></script>
+<script src="navegacao-mobile.js" defer></script>
 
 <script>
   // Registro do Service Worker — habilita instalação como PWA de verdade
@@ -1355,7 +1350,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v13';
+  const SW_VERSION = 'v14';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;
