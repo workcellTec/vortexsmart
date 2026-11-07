@@ -737,6 +737,53 @@ function appInacessivel() {
     const login = document.getElementById('loginScreen');
     return (!!login && login.style.display === 'flex') || !!document.getElementById('acessoSuspensoScreen');
 }
+// ── Transição entre telas (só no celular) ────────────────────────
+// Dá a sensação de "empurrar" a tela: entrar numa tela desliza e
+// aparece vindo da direita, voltar vem da esquerda, e trocar de aba
+// só faz fade. Quem pede é quem navega (showMainSection, _vsPushNav,
+// _vsReplaceNav e o voltar do navegador); vários pedidos no mesmo
+// quadro viram UMA animação só (vale o mais forte: voltar > entrar >
+// fade). Anima só opacidade e transform (compostos pela GPU, não
+// refazem o layout). Respeita "reduzir movimento" do sistema.
+// Enquanto anima, a classe vs-transicao esconde botões flutuantes
+// (position:fixed) que moram dentro da tela: com transform no
+// container eles se posicionam em relação a ele e "pulariam".
+const _VS_SECOES_PRINCIPAIS = ['mainMenu', 'calculatorContainer', 'documentosContainer', 'estoqueContainer', 'vendaContainer', 'configuracoesContainer', 'reparosContainer', 'reposicaoContainer', 'credscanContainer', 'financeiroContainer'];
+const _VS_PESO_TRANSICAO = { fade: 1, frente: 2, tras: 3 };
+let _vsTransicaoPendente = null;
+let _vsTransicaoAgendada = false;
+let _vsTransicaoAtual = null;
+function _vsAnimarTransicao(direcao) {
+    const el = _VS_SECOES_PRINCIPAIS.map(id => document.getElementById(id))
+        .find(e => e && e.style.display !== 'none' && !e.classList.contains('hidden'));
+    if (!el || typeof el.animate !== 'function') return;
+    if (_vsTransicaoAtual) _vsTransicaoAtual.cancel();
+    const desloc = direcao === 'frente' ? 32 : direcao === 'tras' ? -32 : 0;
+    const quadros = desloc
+        ? [{ opacity: 0, transform: `translate3d(${desloc}px,0,0)` }, { opacity: 1, transform: 'translate3d(0,0,0)' }]
+        : [{ opacity: 0 }, { opacity: 1 }];
+    el.classList.add('vs-transicao');
+    const anim = el.animate(quadros, { duration: desloc ? 240 : 160, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
+    _vsTransicaoAtual = anim;
+    const fim = () => { if (_vsTransicaoAtual === anim) _vsTransicaoAtual = null; el.classList.remove('vs-transicao'); };
+    anim.onfinish = fim;
+    anim.oncancel = fim;
+}
+function pedirTransicao(direcao) {
+    if (document.documentElement.getAttribute('data-shell') !== 'mobile') return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!_vsTransicaoPendente || _VS_PESO_TRANSICAO[direcao] > _VS_PESO_TRANSICAO[_vsTransicaoPendente]) _vsTransicaoPendente = direcao;
+    if (_vsTransicaoAgendada) return;
+    _vsTransicaoAgendada = true;
+    requestAnimationFrame(() => {
+        _vsTransicaoAgendada = false;
+        const d = _vsTransicaoPendente;
+        _vsTransicaoPendente = null;
+        if (d && !appInacessivel()) _vsAnimarTransicao(d);
+    });
+}
+window._vsPedirTransicao = pedirTransicao;
+
 function showMainSection(sectionId) {
     // Rede de segurança contra o flash de transição (usado nas
     // notificações, ver notificacoes-central.js) ficar PRESO cobrindo a
@@ -759,8 +806,7 @@ function showMainSection(sectionId) {
         return;
     }
 
-    const sections = ['mainMenu', 'calculatorContainer', 'documentosContainer', 'estoqueContainer', 'vendaContainer', 'configuracoesContainer', 'reparosContainer', 'reposicaoContainer', 'credscanContainer', 'financeiroContainer'];
-    sections.forEach(id => {
+    _VS_SECOES_PRINCIPAIS.forEach(id => {
         const el = document.getElementById(id);
         if (el) { el.style.display = 'none'; el.classList.add('hidden'); }
     });
@@ -779,6 +825,7 @@ function showMainSection(sectionId) {
         atualizarHeroVendasHoje();
         atualizarContagemConcertosHub();
     }
+    pedirTransicao(window._vsNavRestoring ? 'tras' : 'fade');
 }
 window.showMainSection = showMainSection;
 window.openCalculatorSection = openCalculatorSection;
@@ -1804,6 +1851,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!window._vsNavRestoring) {
             history.pushState({ vsFn: fnName, vsArgs: args }, '');
         }
+        pedirTransicao(window._vsNavRestoring ? 'tras' : 'frente');
     };
 
     // Variante de _vsPushNav pra navegações AUTOMÁTICAS que acontecem
@@ -1820,6 +1868,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!window._vsNavRestoring) {
             history.replaceState({ vsFn: fnName, vsArgs: args }, '');
         }
+        pedirTransicao(window._vsNavRestoring ? 'tras' : 'fade');
     };
 
     // Helper central pros routers de módulo (Vendas, Estoque, Documentos,
@@ -1999,6 +2048,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // "normalmente" até o Início) — trata igual chegar no Início,
         // não é tentativa de sair.
         if (st && st.vsExitGuard) {
+            pedirTransicao('tras');
             if (typeof window.showMainSection === 'function') window.showMainSection('main');
             return;
         }
