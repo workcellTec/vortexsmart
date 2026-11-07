@@ -37,6 +37,8 @@
             }
         }
         if (!sectionId || !document.getElementById(sectionId)) sectionId = 'vendaHome';
+        // Celular: o hub do módulo não existe — abre direto na aba padrão (ver navegacao-mobile.js).
+        if (window._vsAbas) sectionId = window._vsAbas.redirecionar('venda', sectionId);
         window._vendaContexto = contexto || null;
         SUBS.forEach(id => {
             const el = document.getElementById(id);
@@ -44,6 +46,7 @@
         });
         const el = document.getElementById(sectionId);
         if (el) el.style.display = 'flex';
+        if (window._vsAbas) window._vsAbas.atualizar('venda', sectionId);
 
         if (sectionId === 'lancarVenda' && typeof window._renderLancarVenda === 'function') {
             window._renderLancarVenda();

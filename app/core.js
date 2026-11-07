@@ -970,19 +970,21 @@ window.showMainSection = showMainSection;
 window.openCalculatorSection = openCalculatorSection;
 
 // ── openCalculatorSection ────────────────────────────────────────
-function openCalculatorSection(sectionId) {
+function openCalculatorSection(sectionId, substituir) {
     // Calculadoras carregam sob demanda (ver carregarModulo): se ainda não
     // chegaram, carrega e repete a mesma chamada em seguida.
     if (!_VS_MODULOS.calculadoras.iniciado) {
-        _vsComModulo('calculadoras', () => openCalculatorSection(sectionId)).catch(_vsAvisarFalhaModulo);
+        _vsComModulo('calculadoras', () => openCalculatorSection(sectionId, substituir)).catch(_vsAvisarFalhaModulo);
         return;
     }
     showMainSection('calculator');
     // Ver window._vsNavegarParaHub (definido mais abaixo, nos listeners
     // globais deste mesmo arquivo) pro raciocínio completo.
     const ehHubDoModulo = sectionId === 'calculatorHome' || !sectionId;
-    if (window._vsNavegarParaHub) window._vsNavegarParaHub('openCalculatorSection', [sectionId], ehHubDoModulo);
+    if (window._vsNavegarParaHub) window._vsNavegarParaHub('openCalculatorSection', [sectionId], ehHubDoModulo, substituir);
     if (!sectionId || !document.getElementById(sectionId)) sectionId = 'calculatorHome';
+    // Celular: o hub do módulo não existe — abre direto na aba padrão (ver navegacao-mobile.js).
+    if (window._vsAbas) sectionId = window._vsAbas.redirecionar('calculadora', sectionId);
     const subs = ['calculatorHome','fecharVenda','repassarValores','calcularEmprestimo','calcularPorAparelho'];
     subs.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
 
@@ -991,6 +993,7 @@ function openCalculatorSection(sectionId) {
 
     const el = document.getElementById(sectionId);
     if (el) el.style.display = 'flex';
+    if (window._vsAbas) window._vsAbas.atualizar('calculadora', sectionId);
     currentCalculatorSectionId = sectionId;
 
     // Aplica máquina/bandeira padrão e chama init

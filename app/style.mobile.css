@@ -201,7 +201,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar {
     padding-top: 24px;
     justify-content: flex-start;
 }
-#mainMenu h2, #calculatorHome h2 {
+#mainMenu h2 {
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--text-strong);
@@ -430,16 +430,6 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
 @media (hover: hover) { .btn-icon-circle:hover { color: var(--text-strong); background: rgba(var(--overlay-rgb), 0.12); } }
 .btn-back-large { width: 44px; height: 44px; font-size: 1.25rem; }
 
-/* Título dos hubs (Vendas/Estoque/Documentos/Calculadora) — o <h2> não
-   tinha reset de margem-topo, então cada navegador empilhava a margem
-   padrão dele em cima do espaço da seta, dando gaps diferentes tela por
-   tela. Zerando aqui, o espaço vira sempre o mesmo (só o da seta). */
-/* Hubs (Vendas/Estoque/Documentos/Calculadora) — a seta ficava mais alta
-   que nas outras telas (.section-header tem ~16px de respiro antes dela
-   que esse layout não tinha). Só isso: empurra a seta pra baixo pra
-   alinhar com a mesma altura visual das sub-telas — título continua
-   exatamente como estava. */
-.hub-back-row { margin-top: 16px; margin-bottom: 10px; }
 .btn-gear-large { font-size: 1.3rem; }
 
 .btn-menu {
@@ -552,12 +542,6 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
 .mb-2 { margin-bottom: 8px !important; }  .mb-3 { margin-bottom: 12px !important; }
 .mb-4 { margin-bottom: 16px !important; }
 
-/* Título dos hubs (Calculadora/Vendas/Estoque/Documentos) — desde que a
-   seta de voltar foi removida dessas telas, o título ficou colado demais
-   na borda superior. Dá um respiro extra só aqui, sem mexer no .mb-4
-   genérico (usado em várias outras telas que já estão com espaçamento certo). */
-.hub-title { margin-top: 22px; margin-bottom: 16px; }
-.hub-back-row { width: 100%; display: flex; justify-content: flex-start; padding: 14px 14px 0; }
 .pt-2 { padding-top: 8px !important; }    .pt-3 { padding-top: 12px !important; }
 .pb-2 { padding-bottom: 8px !important; }
 .px-2 { padding-left: 8px !important; padding-right: 8px !important; }
@@ -940,80 +924,6 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
 .favorito-btn { background: none; border: none; color: var(--text); padding: 6px 12px; cursor: pointer; font-size: 0.88rem; font-family:var(--font); }
 @media (hover: hover) { .favorito-btn:hover { background: rgba(var(--primary-rgb), 0.15); } }
 
-/* ── Card Grid 2.0 ──────────────────────────────────────────── */
-.ctw-card-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    width: 100%;
-    max-width: 360px;
-    margin: 0 auto;
-}
-.ctw-grid-5 { display: flex; flex-direction: column; gap: 12px; }
-.ctw-grid-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-.ctw-card {
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 8px; padding: 18px 10px 14px;
-    border-radius: 18px; border: 1px solid transparent;
-    cursor: pointer; text-align: center;
-    min-height: 96px; background: none;
-    font-family:var(--font);
-    -webkit-tap-highlight-color: transparent;
-    transition: all 0.2s cubic-bezier(.2,.8,.2,1);
-    position: relative;
-}
-.ctw-card:active { transform: scale(0.93); }
-.ctw-card:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.4); }
-.ctw-card:disabled:active { transform: none; }
-.ctw-card-icon {
-    width: 46px; height: 46px; border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.3rem; flex-shrink: 0;
-    transition: transform 0.2s ease;
-}
-@media (hover: hover) { .ctw-card:hover .ctw-card-icon { transform: scale(1.12) rotate(-4deg); } }
-.ctw-card-title { font-size: .77rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
-.ctw-card-sub { font-size: .61rem; opacity: .6; margin-top: -3px; white-space: nowrap; }
-.ctw-card-soon { position: absolute; top: 6px; right: 6px; font-size: .44rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 2px 6px; border-radius: 20px; background: rgba(var(--overlay-rgb),.08); color: var(--text-muted); }
-
-/* Variantes de cor */
-.ctw-card.c-blue   { background: rgba(41,121,255,.1);   border-color: rgba(41,121,255,.2); }
-.ctw-card.c-blue   .ctw-card-icon { background: rgba(41,121,255,.18); color: #5b9bff; }
-.ctw-card.c-blue   .ctw-card-title, .ctw-card.c-blue .ctw-card-sub { color: #7eb3ff; }
-@media (hover: hover) { .ctw-card.c-blue:hover { background: rgba(41,121,255,.15); border-color: rgba(41,121,255,.38); transform: translateY(-3px); } }
-
-.ctw-card.c-cyan   { background: rgba(0,229,255,.08);   border-color: rgba(0,229,255,.18); }
-.ctw-card.c-cyan   .ctw-card-icon { background: rgba(0,229,255,.15); color: #00e5ff; }
-.ctw-card.c-cyan   .ctw-card-title, .ctw-card.c-cyan .ctw-card-sub { color: #6ee7f7; }
-@media (hover: hover) { .ctw-card.c-cyan:hover { background: rgba(0,229,255,.13); border-color: rgba(0,229,255,.35); transform: translateY(-3px); } }
-
-.ctw-card.c-orange { background: rgba(255,109,0,.09);   border-color: rgba(255,109,0,.2); }
-.ctw-card.c-orange .ctw-card-icon { background: rgba(255,109,0,.15); color: #ff9a50; }
-.ctw-card.c-orange .ctw-card-title, .ctw-card.c-orange .ctw-card-sub { color: #ffb37a; }
-@media (hover: hover) { .ctw-card.c-orange:hover { background: rgba(255,109,0,.14); border-color: rgba(255,109,0,.35); transform: translateY(-3px); } }
-
-.ctw-card.c-purple { background: rgba(var(--primary-rgb),.09);  border-color: rgba(var(--primary-rgb),.2); }
-.ctw-card.c-purple .ctw-card-icon { background: rgba(var(--primary-rgb),.15); color: var(--primary); }
-.ctw-card.c-purple .ctw-card-title, .ctw-card.c-purple .ctw-card-sub { color: #c4a8f8; }
-@media (hover: hover) { .ctw-card.c-purple:hover { background: rgba(var(--primary-rgb),.14); border-color: rgba(var(--primary-rgb),.35); transform: translateY(-3px); } }
-
-.ctw-card.c-green  { background: rgba(16,185,129,.09);  border-color: rgba(16,185,129,.2); }
-.ctw-card.c-green  .ctw-card-icon { background: rgba(16,185,129,.15); color: #4ade9b; }
-.ctw-card.c-green  .ctw-card-title, .ctw-card.c-green .ctw-card-sub { color: #6ee7b7; }
-@media (hover: hover) { .ctw-card.c-green:hover { background: rgba(16,185,129,.14); border-color: rgba(16,185,129,.35); transform: translateY(-3px); } }
-
-.ctw-card.c-teal   { background: rgba(20,184,166,.09);  border-color: rgba(20,184,166,.2); }
-.ctw-card.c-teal   .ctw-card-icon { background: rgba(20,184,166,.15); color: #2dd4bf; }
-.ctw-card.c-teal   .ctw-card-title, .ctw-card.c-teal .ctw-card-sub { color: #5eead4; }
-@media (hover: hover) { .ctw-card.c-teal:hover { background: rgba(20,184,166,.14); border-color: rgba(20,184,166,.35); transform: translateY(-3px); } }
-
-.ctw-card.c-rose   { background: rgba(225,29,72,.09);   border-color: rgba(225,29,72,.2); }
-.ctw-card.c-rose   .ctw-card-icon { background: rgba(225,29,72,.15); color: #fb7185; }
-.ctw-card.c-rose   .ctw-card-title, .ctw-card.c-rose .ctw-card-sub { color: #fca5a5; }
-@media (hover: hover) { .ctw-card.c-rose:hover { background: rgba(225,29,72,.15); border-color: rgba(225,29,72,.38); transform: translateY(-3px); } }
-
 /* ══════════ VORTEX PULSE — Início ══════════
    Identidade sólida: fundo e cards neutros (--bg / --surface), um só
    destaque (--primary, escolhido em Customizações), verde só pra
@@ -1247,25 +1157,6 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
 
 .cb-notice { background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:10px 12px; font-size:.66rem; color:#9a3412; margin-top:14px; line-height:1.5; }
 
-/* ══════════ Hubs — Opção 2 "Bloom" (ícone com gradiente de marca) ══════════
-   Substitui o .ctw-card antigo (ícone em círculo pastel plano) — o card
-   inteiro ganha uma faixinha colorida no topo e o ícone vira um quadrado
-   com o mesmo gradiente da faixa, puxando pra "cara" do resto do app
-   (hero da Início, nav bar) em vez de ficar isolado. */
-.card-v2 {
-    position:relative; background:var(--surface); border:none; border-radius:20px; padding:0;
-    display:flex; flex-direction:column; box-shadow:0 6px 18px -10px rgba(0,0,0,.18);
-    overflow:hidden; text-align:left; cursor:pointer; width:100%;
-}
-.card-v2 .stripe { height:4px; width:100%; background:var(--grad); }
-.card-v2 .body { padding:16px 14px 15px; display:flex; flex-direction:column; gap:11px; }
-.icon-v2 {
-    width:46px; height:46px; border-radius:15px; display:flex; align-items:center; justify-content:center;
-    font-size:1.25rem; background:var(--grad); box-shadow:0 8px 16px -6px var(--shadow);
-}
-.name-v2 { font-family:var(--font); font-weight:800; font-size:.88rem; color:var(--text-strong); }
-.tag-v2 { align-self:flex-start; font-size:.62rem; font-weight:700; padding:3px 9px; border-radius:99px; background:var(--primary-soft); color:var(--primary); margin-top:-6px; }
-
 /* Grid compacto de parcelas — 3 colunas, sem sobrar espaço vazio */
 .ctx-parc-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:12px 14px; }
 .ctx-parc-cell { background:rgba(var(--overlay-rgb),.04); border-radius:11px; padding:8px 6px; text-align:center; }
@@ -1384,39 +1275,6 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
 }
 .stq-shortcut-label { font-size:.62rem; font-weight:600; color:var(--text-secondary); white-space:nowrap; }
 
-
-/* ── Tema Claro: as cores dos cards acima foram calibradas pra
-   fundo escuro (texto pastel claro, tipo #7eb3ff). Em fundo claro
-   isso dá baixíssimo contraste e "estoura"/lava a cor. Aqui troca
-   só o texto/ícone por uma versão mais escura e saturada da mesma
-   cor, e sobe um pouco o alpha do fundo/borda pra não ficar pálido. */
-body.tema-claro .ctw-card.c-blue   { background: rgba(41,121,255,.12);  border-color: rgba(41,121,255,.3); }
-body.tema-claro .ctw-card.c-blue   .ctw-card-icon { background: rgba(41,121,255,.16); color: #1d4ed8; }
-body.tema-claro .ctw-card.c-blue   .ctw-card-title, body.tema-claro .ctw-card.c-blue .ctw-card-sub { color: #1d4ed8; }
-
-body.tema-claro .ctw-card.c-cyan   { background: rgba(8,145,178,.1);    border-color: rgba(8,145,178,.28); }
-body.tema-claro .ctw-card.c-cyan   .ctw-card-icon { background: rgba(8,145,178,.15); color: #0e7490; }
-body.tema-claro .ctw-card.c-cyan   .ctw-card-title, body.tema-claro .ctw-card.c-cyan .ctw-card-sub { color: #0e7490; }
-
-body.tema-claro .ctw-card.c-orange { background: rgba(194,65,12,.1);    border-color: rgba(194,65,12,.28); }
-body.tema-claro .ctw-card.c-orange .ctw-card-icon { background: rgba(194,65,12,.15); color: #c2410c; }
-body.tema-claro .ctw-card.c-orange .ctw-card-title, body.tema-claro .ctw-card.c-orange .ctw-card-sub { color: #c2410c; }
-
-body.tema-claro .ctw-card.c-purple { background: rgba(var(--primary-rgb),.1);   border-color: rgba(var(--primary-rgb),.28); }
-body.tema-claro .ctw-card.c-purple .ctw-card-icon { background: rgba(var(--primary-rgb),.15); color: var(--primary); }
-body.tema-claro .ctw-card.c-purple .ctw-card-title, body.tema-claro .ctw-card.c-purple .ctw-card-sub { color: var(--primary); }
-
-body.tema-claro .ctw-card.c-green  { background: rgba(4,120,87,.1);     border-color: rgba(4,120,87,.28); }
-body.tema-claro .ctw-card.c-green  .ctw-card-icon { background: rgba(4,120,87,.15); color: #047857; }
-body.tema-claro .ctw-card.c-green  .ctw-card-title, body.tema-claro .ctw-card.c-green .ctw-card-sub { color: #047857; }
-
-body.tema-claro .ctw-card.c-teal   { background: rgba(15,118,110,.1);   border-color: rgba(15,118,110,.28); }
-body.tema-claro .ctw-card.c-teal   .ctw-card-icon { background: rgba(15,118,110,.15); color: #0f766e; }
-body.tema-claro .ctw-card.c-teal   .ctw-card-title, body.tema-claro .ctw-card.c-teal .ctw-card-sub { color: #0f766e; }
-
-body.tema-claro .ctw-card.c-rose   { background: rgba(190,18,60,.1);    border-color: rgba(190,18,60,.28); }
-body.tema-claro .ctw-card.c-rose   .ctw-card-icon { background: rgba(190,18,60,.15); color: #be123c; }
-body.tema-claro .ctw-card.c-rose   .ctw-card-title, body.tema-claro .ctw-card.c-rose .ctw-card-sub { color: #be123c; }
 
 /* ── Barra inferior ─────────────────────────────────────────
    Encostada no rodapé (sólida, sem vidro): Início · até 3 atalhos · Vender.
@@ -2501,8 +2359,7 @@ body.vs-scroll-locked { overflow: hidden !important; touch-action: none; height:
 .notif-pilha-fantasma.f1 { top: -3px; opacity: .8; }
 .notif-pilha .notif-card { position: relative; z-index: 2; margin-bottom: 0; }
 
-/* Cor por categoria — MESMOS valores de .ctw-card.c-X (cards do hub),
-   claro/escuro incluso, só reaplicados na forma de .notif-card. */
+/* Cor por categoria — cores dos cards de notificação, claro/escuro incluso. */
 .notif-card.c-blue   { background: rgba(41,121,255,.1);   border-color: rgba(41,121,255,.2); }
 .notif-card.c-blue   .ic { background: rgba(41,121,255,.18); color: #5b9bff; }
 .notif-grupo-count.c-blue { background: rgba(41,121,255,.18); color: #5b9bff; }
@@ -3170,6 +3027,37 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 #vsConexaoBar.vs-conexao-off { color: var(--danger);  border-bottom: 2px solid var(--danger); }
 #vsConexaoBar.vs-conexao-on  { color: var(--success); border-bottom: 2px solid var(--success); }
 
+
+/* ── Abas dos módulos (Vendas, Estoque, Documentos, Calculadora) ──
+   Faixa fixa logo abaixo do notch; a aba ativa fica centralizada. */
+.vs-abas {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40;
+    display: flex; gap: 8px; align-items: center;
+    margin: 0 0 12px; padding: 10px 14px;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+}
+.vs-abas::-webkit-scrollbar { display: none; }
+.vs-abas button {
+    flex: 0 0 auto; height: 38px; padding: 0 18px; border: 1px solid var(--border);
+    border-radius: 19px; background: var(--surface); color: var(--text-secondary);
+    font: 600 .86rem var(--font); white-space: nowrap; cursor: pointer;
+    transition: background-color .18s, color .18s, border-color .18s, transform .12s;
+}
+.vs-abas button:active { transform: scale(.96); }
+.vs-abas button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* Com a faixa de abas à vista, o título e a seta de voltar de cada tela são redundantes
+   (a aba já nomeia a tela; sair do módulo é pela barra de baixo ou pelo gesto de voltar).
+   Sobram só os botões de ação da tela, alinhados à direita. A Movimentação fica de fora:
+   o título dela muda pro nome do produto escolhido. */
+.vs-com-abas .fv-hdr { display: none; }
+.vs-com-abas .section-header:not(:has(#movTitulo)) { background: transparent; padding: 0 14px 6px; }
+.vs-com-abas .section-header:not(:has(#movTitulo)) > .btn-back,
+.vs-com-abas .section-header:not(:has(#movTitulo)) > h3 { display: none; }
+.vs-com-abas .section-header:not(:has(#movTitulo)) > :not(.btn-back):not(h3) { grid-column: 1 / -1; justify-self: end; }
+.vs-com-abas .section-header:not(:has(#movTitulo)):not(:has(button:not(.btn-back))) { display: none; }
 
 /* ══════════ Identidade sólida — cores escritas direto no HTML/JS ══════════
    Parte da tela (ícones de Configurações, atalhos da Início, botões dos

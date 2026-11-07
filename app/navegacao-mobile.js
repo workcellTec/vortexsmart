@@ -13,9 +13,14 @@
 // usuarios/{uid}/preferencias/barraAtalhos (acompanha o usuário em outro aparelho;
 // string "estoque,calculadora" — "" = barra sem atalhos, ausente = padrão).
 //
-// Expõe via window.*: _vsBarraRender, _vsBarraAtiva, _vsBarraSincronizar
+// ABAS DOS MÓDULOS: Vendas, Estoque, Documentos e Calculadora não têm tela-menu no celular —
+// abrem direto na primeira aba, com a faixa de abas fixa no topo; tocar numa aba ou deslizar
+// pro lado troca a tela SEM empilhar histórico (o voltar sai do módulo).
+//
+// Expõe via window.*: _vsBarraRender, _vsBarraAtiva, _vsBarraSincronizar, _vsAbas
 // Depende de (via window.*): _usuarioPrefRef, _dbUpdate, _firebaseAuthUid, _nomeUsuario,
-//   _configCustomizacoes, openVendaSection, safeStorage
+//   _configCustomizacoes, openVendaSection, openEstoqueSection, openDocumentosSection,
+//   openCalculatorSection, _temPermissao, _papelUsuario, _vsPedirTransicao, safeStorage
 // ================================================================
 (function () {
     'use strict';
@@ -141,7 +146,152 @@
             b.classList.toggle('ctw-nav-active', !!POR_ID[b.dataset.mod] && POR_ID[b.dataset.mod].secao === secaoAtual);
         });
     }
-    window._vsBarraAtiva = function (secao) { secaoAtual = secao; marcarAtiva(); };
+    window._vsBarraAtiva = function (secao) {
+        secaoAtual = secao;
+        if (abaAtual && SECAO_DO_MODULO[abaAtual.mod] !== secao) abaAtual = null;
+        marcarAtiva();
+    };
+
+
+    // ── Abas dos módulos ───────────────────────────────────────
+    const ehGestor = () => window._papelUsuario === 'gestor';
+    const ABAS = {
+        venda: {
+            cont: 'vendaContainer', hubs: ['vendaHome'],
+            abrir: sub => window.openVendaSection(sub, null, true),
+            itens: [
+                { sub: 'historicoVendas', nome: 'Histórico' },
+                { sub: 'vendaRelatorios', nome: 'Relatórios', ok: () => typeof window._temPermissao !== 'function' || window._temPermissao('relatorios') },
+            ],
+        },
+        estoque: {
+            cont: 'estoqueContainer', hubs: ['estoqueHome'],
+            abrir: sub => window.openEstoqueSection(sub, undefined, true),
+            itens: [
+                { sub: 'estoqueProdutos', nome: 'Produtos' },
+                { sub: 'estoqueConferencia', nome: 'Conferência' },
+                { sub: 'estoqueMovimentacao', nome: 'Movimentação', ok: ehGestor },
+            ],
+        },
+        documentos: {
+            cont: 'documentosContainer', hubs: ['documentosHome'],
+            abrir: sub => window.openDocumentosSection(sub, undefined, true),
+            itens: [
+                { sub: 'documentosContrato', nome: 'Contrato' },
+                { sub: 'documentosGarantia', nome: 'Garantia' },
+                { sub: 'documentosRecibo', nome: 'Recibo' },
+                { sub: 'documentosOrcamento', nome: 'Orçamento' },
+            ],
+        },
+        calculadora: {
+            cont: 'calculatorContainer', hubs: ['calculatorHome'],
+            abrir: sub => window.openCalculatorSection(sub, true),
+            itens: [
+                { sub: 'fecharVenda', nome: 'Remover taxa' },
+                { sub: 'repassarValores', nome: 'Repassar' },
+                { sub: 'calcularEmprestimo', nome: 'Empréstimo' },
+                { sub: 'calcularPorAparelho', nome: 'Por aparelho' },
+            ],
+        },
+    };
+    const SECAO_DO_MODULO = { venda: 'venda', estoque: 'estoque', documentos: 'documentos', calculadora: 'calculator' };
+    let abaAtual = null; // { mod, sub } da tela que está à vista (null = fora de qualquer aba)
+
+    const itensPermitidos = mod => ABAS[mod].itens.filter(i => !i.ok || i.ok());
+
+    function faixa(mod) {
+        const cfg = ABAS[mod];
+        let f = cfg.faixa;
+        if (f && f.isConnected) return f;
+        const cont = el(cfg.cont);
+        if (!cont) return null;
+        f = document.createElement('div');
+        f.className = 'vs-abas';
+        f.setAttribute('role', 'tablist');
+        f.addEventListener('click', e => {
+            const b = e.target.closest('[data-sub]');
+            if (b && abaAtual && b.dataset.sub !== abaAtual.sub) cfg.abrir(b.dataset.sub);
+        });
+        cont.insertBefore(f, cont.firstChild);
+        cfg.faixa = f;
+        return f;
+    }
+
+    window._vsAbas = {
+        // Hub/menu do módulo não existe no celular: cai na primeira aba liberada.
+        redirecionar(mod, sub) {
+            const cfg = ABAS[mod];
+            if (!cfg || (sub && !cfg.hubs.includes(sub))) return sub;
+            const livres = itensPermitidos(mod);
+            return livres.length ? livres[0].sub : sub;
+        },
+        // Chamado pelos routers depois de mostrar a tela: desenha/atualiza a faixa de abas.
+        atualizar(mod, sub) {
+            const cfg = ABAS[mod];
+            const f = cfg && faixa(mod);
+            if (!f) return;
+            const livres = itensPermitidos(mod);
+            const naFaixa = livres.some(i => i.sub === sub);
+            abaAtual = naFaixa ? { mod, sub } : null;
+            // Tela de fluxo (ex: Nova venda) ou módulo com uma aba só: sem faixa.
+            const comFaixa = naFaixa && livres.length > 1;
+            el(cfg.cont).classList.toggle('vs-com-abas', comFaixa);
+            if (!comFaixa) { f.style.display = 'none'; return; }
+            f.style.display = '';
+            f.innerHTML = '';
+            livres.forEach(i => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.setAttribute('role', 'tab');
+                b.dataset.sub = i.sub;
+                b.textContent = i.nome;
+                const ativa = i.sub === sub;
+                b.className = ativa ? 'on' : '';
+                b.setAttribute('aria-selected', ativa ? 'true' : 'false');
+                f.appendChild(b);
+            });
+            const on = f.querySelector('.on');
+            if (on) f.scrollLeft = on.offsetLeft - (f.clientWidth - on.offsetWidth) / 2;
+        },
+    };
+
+    // ── Deslizar pro lado troca de aba ─────────────────────────
+    const FORA_DO_GESTO = 'input, textarea, select, canvas, [contenteditable="true"], .no-swipe, .vs-abas';
+    function rolaNaHorizontal(n) {
+        for (; n && n !== document.body; n = n.parentElement) {
+            if (n.scrollWidth > n.clientWidth + 2) {
+                const ox = getComputedStyle(n).overflowX;
+                if (ox === 'auto' || ox === 'scroll') return true;
+            }
+        }
+        return false;
+    }
+    function haJanelaAberta() {
+        return Array.from(document.querySelectorAll('.custom-modal-overlay.active, .vs-folha-overlay.active, .ctw-sheet-overlay.active, .stq-modal-backdrop, .apr-modal-backdrop'))
+            .some(n => n.getClientRects().length > 0 && getComputedStyle(n).visibility !== 'hidden');
+    }
+    let toque = null;
+    document.addEventListener('touchstart', e => {
+        toque = null;
+        if (!abaAtual || e.touches.length !== 1) return;
+        const t = e.touches[0];
+        // Borda esquerda é do gesto de voltar do iOS.
+        if (t.clientX < 24) return;
+        if (e.target.closest(FORA_DO_GESTO) || rolaNaHorizontal(e.target) || haJanelaAberta()) return;
+        toque = { x: t.clientX, y: t.clientY, t: Date.now(), mod: abaAtual.mod, sub: abaAtual.sub };
+    }, { passive: true });
+    document.addEventListener('touchend', e => {
+        const ini = toque; toque = null;
+        if (!ini || !abaAtual || abaAtual.mod !== ini.mod || abaAtual.sub !== ini.sub) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - ini.x, dy = t.clientY - ini.y;
+        if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || Date.now() - ini.t > 700) return;
+        const livres = itensPermitidos(ini.mod);
+        const i = livres.findIndex(x => x.sub === ini.sub) + (dx < 0 ? 1 : -1);
+        if (i < 0 || i >= livres.length) return;
+        if (typeof window._vsPedirTransicao === 'function') window._vsPedirTransicao(dx < 0 ? 'frente' : 'tras');
+        ABAS[ini.mod].abrir(livres[i].sub);
+    }, { passive: true });
 
     // ── Vender ─────────────────────────────────────────────────
     function ligarVender() {

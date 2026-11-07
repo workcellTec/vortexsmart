@@ -14,16 +14,19 @@
 
     const DOC_SUBS = ['documentosHome', 'documentosContrato', 'documentosGarantia', 'documentosRecibo', 'documentosOrcamento'];
 
-    function openDocumentosSection(sectionId) {
+    function openDocumentosSection(sectionId, contexto, substituir) {
         if (typeof window.showMainSection === 'function') window.showMainSection('documentos');
         // Ver window._vsNavegarParaHub em core.js pro raciocínio completo.
         const ehHubDoModulo = sectionId === 'documentosHome' || !sectionId;
-        if (window._vsNavegarParaHub) window._vsNavegarParaHub('openDocumentosSection', [sectionId], ehHubDoModulo);
+        if (window._vsNavegarParaHub) window._vsNavegarParaHub('openDocumentosSection', [sectionId], ehHubDoModulo, substituir);
         if (!sectionId || !el(sectionId)) sectionId = 'documentosHome';
+        // Celular: o hub do módulo não existe — abre direto na aba padrão (ver navegacao-mobile.js).
+        if (window._vsAbas) sectionId = window._vsAbas.redirecionar('documentos', sectionId);
         DOC_SUBS.forEach(id => { const s = el(id); if (s) s.style.display = 'none'; });
 
         const target = el(sectionId);
         if (target) target.style.display = 'flex';
+        if (window._vsAbas) window._vsAbas.atualizar('documentos', sectionId);
 
         const initMap = {
             documentosContrato:  () => typeof window._initContrato  === 'function' && window._initContrato(),

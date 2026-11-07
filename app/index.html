@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-07.7';
+        window._VS_VERSAO = '2026-11-07.8';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -325,46 +325,6 @@
             <button type="button" class="btn-back" aria-label="Voltar ao Início"><i class="bi bi-arrow-left"></i></button>
         </div>
         <h2 class="hub-title">Documentos &amp; Garantias,<br/>do que você precisa?</h2>
-        <div data-shell-only="mobile" data-shell-unwrap>
-        <div class="ctw-card-grid ctw-grid-5">
-            <div class="ctw-grid-row2">
-                <button class="card-v2" id="openContrato2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#93c5fd,#4f8cff);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#93c5fd,#4f8cff);--shadow:rgba(79,140,255,.4);color:#fff;">📄</div>
-                        <div class="name-v2">Contrato</div>
-                        <div class="tag-v2" style="--tagbg:#dbeafe;--tagcolor:#4f8cff;">/ Boleto</div>
-                    </div>
-                </button>
-                <button class="card-v2" id="openGarantia2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#5eead4,#0f766e);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#5eead4,#0f766e);--shadow:rgba(15,118,110,.4);color:#fff;">📓</div>
-                        <div class="name-v2">Garantia</div>
-                        <div class="tag-v2" style="--tagbg:#d6f3ef;--tagcolor:#0f766e;">Bookip</div>
-                    </div>
-                </button>
-            </div>
-            <div class="ctw-grid-row2">
-                <button class="card-v2" id="openRecibo2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">🧾</div>
-                        <div class="name-v2">Recibo</div>
-                        <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Simples</div>
-                    </div>
-                </button>
-                <button class="card-v2" id="openOrcamento2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#a78bfa,#5b3df5);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#a78bfa,#5b3df5);--shadow:rgba(91,61,245,.4);color:#fff;">📋</div>
-                        <div class="name-v2">Orçamento</div>
-                        <div class="tag-v2" style="--tagbg:#ede9fe;--tagcolor:#5b3df5;">PDF</div>
-                    </div>
-                </button>
-            </div>
-        </div>
-        </div>
         <div data-shell-only="pc" data-shell-unwrap>
         <div class="ctw-card-grid">
             <button class="card-v2" id="openContrato2">
@@ -440,34 +400,6 @@
             <button type="button" class="btn-back" aria-label="Voltar ao Início"><i class="bi bi-arrow-left"></i></button>
         </div>
         <h2 class="hub-title">Estoque,<br/>o que você quer fazer?</h2>
-        <div data-shell-only="mobile" data-shell-unwrap>
-        <div class="ctw-card-grid">
-            <button class="card-v2" id="openEstoqueProdutos2">
-                <div class="stripe" style="--grad:linear-gradient(90deg,#fb923c,#c2410c);"></div>
-                <div class="body">
-                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#fb923c,#c2410c);--shadow:rgba(194,65,12,.4);color:#fff;">📦</div>
-                    <div class="name-v2">Produtos</div>
-                    <div class="tag-v2" style="--tagbg:#fde3d0;--tagcolor:#c2410c;">Cadastro</div>
-                </div>
-            </button>
-            <button class="card-v2" id="openEstoqueConferencia2">
-                <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
-                <div class="body">
-                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">📋</div>
-                    <div class="name-v2">Conferência</div>
-                    <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Contagem</div>
-                </div>
-            </button>
-            <button class="card-v2" id="openEstoqueMovimentacao2" style="display:none;">
-                <div class="stripe" style="--grad:linear-gradient(90deg,#818cf8,#4f46e5);"></div>
-                <div class="body">
-                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#818cf8,#4f46e5);--shadow:rgba(79,70,229,.4);color:#fff;">🧭</div>
-                    <div class="name-v2">Movimentação</div>
-                    <div class="tag-v2" style="--tagbg:#e0e7ff;--tagcolor:#4f46e5;">Gestor</div>
-                </div>
-            </button>
-        </div>
-        </div>
         <div data-shell-only="pc" data-shell-unwrap>
         <div class="ctw-card-grid">
             <button class="card-v2" id="openEstoqueProdutos2">
@@ -529,34 +461,6 @@
             <button type="button" class="btn-back" aria-label="Voltar ao Início"><i class="bi bi-arrow-left"></i></button>
         </div>
         <h2 class="hub-title">Vendas,<br/>o que você quer fazer?</h2>
-        <div data-shell-only="mobile" data-shell-unwrap>
-        <div class="ctw-card-grid">
-            <button class="card-v2" id="openLancarVenda2">
-                <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
-                <div class="body">
-                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">🛒</div>
-                    <div class="name-v2">Nova</div>
-                    <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Venda</div>
-                </div>
-            </button>
-            <button class="card-v2" id="openHistoricoVendas2">
-                <div class="stripe" style="--grad:linear-gradient(90deg,#93c5fd,#4f8cff);"></div>
-                <div class="body">
-                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#93c5fd,#4f8cff);--shadow:rgba(79,140,255,.4);color:#fff;">🕒</div>
-                    <div class="name-v2">Histórico</div>
-                    <div class="tag-v2" style="--tagbg:#dbeafe;--tagcolor:#4f8cff;">Vendas</div>
-                </div>
-            </button>
-            <button class="card-v2" id="openRelatoriosVendas2">
-                <div class="stripe" style="--grad:linear-gradient(90deg,#a78bfa,#5b3df5);"></div>
-                <div class="body">
-                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#a78bfa,#5b3df5);--shadow:rgba(91,61,245,.4);color:#fff;">📊</div>
-                    <div class="name-v2">Relatórios</div>
-                    <div class="tag-v2" style="--tagbg:#ede9fe;--tagcolor:#5b3df5;">Período</div>
-                </div>
-            </button>
-        </div>
-        </div>
         <div data-shell-only="pc" data-shell-unwrap>
         <div class="ctw-card-grid">
             <button class="card-v2" id="openLancarVenda2">
@@ -767,46 +671,6 @@
             <button type="button" class="btn-back" aria-label="Voltar ao Início"><i class="bi bi-arrow-left"></i></button>
         </div>
         <h2 class="hub-title">Calculadora de Taxas,<br/>O que você quer fazer?</h2>
-        <div data-shell-only="mobile" data-shell-unwrap>
-        <div class="ctw-card-grid ctw-grid-5">
-            <div class="ctw-grid-row2">
-                <button class="card-v2" id="openFecharVenda2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">💵</div>
-                        <div class="name-v2">Remover</div>
-                        <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Taxa</div>
-                    </div>
-                </button>
-                <button class="card-v2" id="openRepassarValores2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#93c5fd,#4f8cff);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#93c5fd,#4f8cff);--shadow:rgba(79,140,255,.4);color:#fff;">🔁</div>
-                        <div class="name-v2">Repassar</div>
-                        <div class="tag-v2" style="--tagbg:#dbeafe;--tagcolor:#4f8cff;">Valores</div>
-                    </div>
-                </button>
-            </div>
-            <div class="ctw-grid-row2">
-                <button class="card-v2" id="openCalcularEmprestimo2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#fb923c,#c2410c);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#fb923c,#c2410c);--shadow:rgba(194,65,12,.4);color:#fff;">🏦</div>
-                        <div class="name-v2">Calcular</div>
-                        <div class="tag-v2" style="--tagbg:#fde3d0;--tagcolor:#c2410c;">Empréstimo</div>
-                    </div>
-                </button>
-                <button class="card-v2" id="openCalcularPorAparelho2">
-                    <div class="stripe" style="--grad:linear-gradient(90deg,#a78bfa,#5b3df5);"></div>
-                    <div class="body">
-                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#a78bfa,#5b3df5);--shadow:rgba(91,61,245,.4);color:#fff;">📱</div>
-                        <div class="name-v2">Por</div>
-                        <div class="tag-v2" style="--tagbg:#ede9fe;--tagcolor:#5b3df5;">Aparelho</div>
-                    </div>
-                </button>
-            </div>
-        </div>
-        </div>
         <div data-shell-only="pc" data-shell-unwrap>
         <div class="ctw-card-grid">
             <button class="card-v2" id="openFecharVenda2">
@@ -1350,7 +1214,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v14';
+  const SW_VERSION = 'v15';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;

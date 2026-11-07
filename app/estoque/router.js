@@ -29,12 +29,15 @@
         const ehHubDoModulo = sectionId === 'estoqueHome' || !sectionId;
         if (window._vsNavegarParaHub) window._vsNavegarParaHub('openEstoqueSection', [sectionId], ehHubDoModulo, substituir);
         if (!sectionId || !document.getElementById(sectionId)) sectionId = 'estoqueHome';
+        // Celular: o hub do módulo não existe — abre direto na aba padrão (ver navegacao-mobile.js).
+        if (window._vsAbas) sectionId = window._vsAbas.redirecionar('estoque', sectionId);
         SUBS.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
         });
         const el = document.getElementById(sectionId);
         if (el) el.style.display = 'flex';
+        if (window._vsAbas) window._vsAbas.atualizar('estoque', sectionId);
 
         if (sectionId === 'estoqueProdutos' && typeof window._renderEstoqueProdutos === 'function') {
             window._renderEstoqueProdutos();
