@@ -142,7 +142,10 @@
         });
     }
 
+    let listenerAtivo = false;
     function ligarListener() {
+        if (listenerAtivo) return;
+        listenerAtivo = true;
         window._dbOnValue(window._lojaRef('credscan/itens'), snap => {
             const val = snap.val() || {};
             itens = Object.keys(val).map(id => ({ id, ...val[id] }));

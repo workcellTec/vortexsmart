@@ -154,6 +154,9 @@
     let mounted = false;
     let expandedId = null;
     let filtroCategoria = null;
+    const ESTOQUE_PAGINA = 40;       // cards desenhados por vez na lista (o resto vem em "Ver mais")
+    let limiteExibicao = ESTOQUE_PAGINA;
+    let assinaturaFiltro = '';       // busca+categoria da última renderização — mudou, volta pra primeira página
     let fornecedoresCache = [];
     let catTela = null;  // 'lista' | 'form' enquanto o modal de Categorias está aberto
     let catForm = null;  // rascunho do formulário de categoria
@@ -2318,6 +2321,9 @@
         if (termos.length) produtos = produtos.filter(p => { const nome = normalizarTexto(p.nome); return termos.every(t => nome.includes(t)); });
         if (filtroCategoria) produtos = produtos.filter(p => detectarCategoria(p.nome) === filtroCategoria);
 
+        const assinatura = termos.join(' ') + '|' + (filtroCategoria || '');
+        if (assinatura !== assinaturaFiltro) { assinaturaFiltro = assinatura; limiteExibicao = ESTOQUE_PAGINA; }
+
         if (!produtos.length) {
             listEl.innerHTML = `
                 <div class="stq-empty">
@@ -2329,11 +2335,20 @@
             return;
         }
 
-        listEl.innerHTML = produtos.map(renderCard).join('');
+        // Produto com painel aberto nunca some atrás do "Ver mais".
+        const idxAberto = expandedId ? produtos.findIndex(p => p.id === expandedId) : -1;
+        if (idxAberto >= limiteExibicao) limiteExibicao = idxAberto + 1;
+
+        const visiveis = produtos.slice(0, limiteExibicao);
+        const restantes = produtos.length - visiveis.length;
+        const porId = new Map(visiveis.map(p => [p.id, p]));
+        listEl.innerHTML = visiveis.map(renderCard).join('') + (restantes > 0
+            ? `<button type="button" class="stq-ver-mais-btn" id="stqVerMais"><i class="bi bi-chevron-down"></i> Ver mais ${Math.min(ESTOQUE_PAGINA, restantes)} (${restantes} restantes)</button>`
+            : '');
+        el('stqVerMais')?.addEventListener('click', () => { limiteExibicao += ESTOQUE_PAGINA; renderLista(); });
 
         listEl.querySelectorAll('.stq-card-wrap').forEach(wrapEl => {
-            const id = wrapEl.dataset.id;
-            const produto = produtos.find(p => p.id === id);
+            const produto = porId.get(wrapEl.dataset.id);
             if (!produto) return;
 
             wrapEl.querySelector('.stq-card-main').addEventListener('click', () => toggleExpand(produto, wrapEl));
@@ -2359,6 +2374,7 @@
     function renderEstoqueProdutos() {
         ensureSkeleton();
         fecharModal();
+        limiteExibicao = ESTOQUE_PAGINA;
         renderCategoriaChips();   // refaz também o botão "Categorias" (só Gestor)
         renderLista();
     }
