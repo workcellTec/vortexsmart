@@ -155,7 +155,6 @@
         el('machine4Chip')?.addEventListener('click', abrirModalMaquina4);
         el('machine4ModalBackdrop')?.addEventListener('click', e => { if (e.target.id === 'machine4ModalBackdrop') fecharModalMaquina4(); });
         el('machine4')?.addEventListener('change', updateCalcularEmprestimoUI);
-        el('brand4')?.addEventListener('change', updateCalcularEmprestimoUI);
         el('flagDisplayButton4')?.addEventListener('click', () => window.openFlagSelector?.('4'));
         el('emprestimoValue')?.addEventListener('input', calculateEmprestimo);
         el('openLucroModalBtn')?.addEventListener('click', openLucroModal);

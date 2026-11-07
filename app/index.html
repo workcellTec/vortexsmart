@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-07.16';
+        window._VS_VERSAO = '2026-11-07.17';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -832,11 +832,7 @@
                 </div>
             </div>
             <div class="hidden" id="brand2Container">
-                <select id="brand2" onchange="updateRepassarValoresUI()">
-                    <option value="visa">Visa</option><option value="mastercard">Mastercard</option>
-                    <option value="hiper">Hiper</option><option value="hipercard">Hipercard</option>
-                    <option value="elo">Elo</option><option value="amex">Amex</option>
-                </select>
+                <input type="hidden" id="brand2">
             </div>
             <div class="mb-3 max-width-400-margin-1rem">
                 <label class="form-label" for="repassarValue"><i class="bi bi-calculator"></i> Valor Desejado (líquido)</label>
@@ -909,11 +905,7 @@
                 </div>
             </div>
             <div class="hidden" id="brand4Container">
-                <select id="brand4" onchange="updateCalcularEmprestimoUI()">
-                    <option value="visa">Visa</option><option value="mastercard">Mastercard</option>
-                    <option value="hiper">Hiper</option><option value="hipercard">Hipercard</option>
-                    <option value="elo">Elo</option><option value="amex">Amex</option>
-                </select>
+                <input type="hidden" id="brand4">
             </div>
             <div class="w-100 d-flex flex-column align-items-center" id="resultCalcularEmprestimo"></div>
             <div class="text-center mt-3 w-100" id="exportEmprestimoContainer" style="display:none;">
@@ -990,11 +982,7 @@
                     </div>
                 </div>
                 <div class="hidden" id="brand3Container">
-                    <select id="brand3" onchange="updateCalcularPorAparelhoUI()">
-                        <option value="visa">Visa</option><option value="mastercard">Mastercard</option>
-                        <option value="hiper">Hiper</option><option value="hipercard">Hipercard</option>
-                        <option value="elo">Elo</option><option value="amex">Amex</option>
-                    </select>
+                    <input type="hidden" id="brand3">
                 </div>
                 <div class="w-100 d-flex flex-column align-items-center" id="resultCalcularPorAparelho"></div>
                 <div class="text-center mt-3 w-100" id="exportAparelhoContainer" style="display:none;">
@@ -1292,7 +1280,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v23';
+  const SW_VERSION = 'v24';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;

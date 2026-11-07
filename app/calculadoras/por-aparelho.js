@@ -356,7 +356,6 @@
         el('machine3Chip')?.addEventListener('click', abrirModalMaquina3);
         el('machine3ModalBackdrop')?.addEventListener('click', e => { if (e.target.id === 'machine3ModalBackdrop') fecharModalMaquina3(); });
         el('machine3')?.addEventListener('change', updateCalcularPorAparelhoUI);
-        el('brand3')?.addEventListener('change', updateCalcularPorAparelhoUI);
         el('flagDisplayButton3')?.addEventListener('click', () => window.openFlagSelector?.('3'));
         el('entradaAparelho')?.addEventListener('input', calculateAparelho);
         el('valorExtraAparelho')?.addEventListener('input', calculateAparelho);

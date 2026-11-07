@@ -134,7 +134,6 @@
         el('machine2Chip')?.addEventListener('click', abrirModalMaquina2);
         el('machine2ModalBackdrop')?.addEventListener('click', e => { if (e.target.id === 'machine2ModalBackdrop') fecharModalMaquina2(); });
         el('machine2')?.addEventListener('change', updateRepassarValoresUI);
-        el('brand2')?.addEventListener('change', updateRepassarValoresUI);
         el('flagDisplayButton2')?.addEventListener('click', () => window.openFlagSelector?.('2'));
         el('repassarValue')?.addEventListener('input', calculateRepassarValores);
         el('repassarExtra')?.addEventListener('input', calculateRepassarValores);

@@ -29,14 +29,16 @@
         });
     }
 
-    // ── Callback agregador quando as taxas carregam (chamado pelo core.js) ──
-    // Fechar Venda tem o seu próprio hook independente (_fvOnRatesLoaded),
-    // exposto em calculadoras/fechar-venda.js.
+    // ── Callback agregador quando as taxas ou a config das maquininhas carregam (chamado pelo core.js) ──
+    // A config traz as bandeiras de cada máquina; se chegar depois de a calculadora já estar aberta, a bandeira
+    // mostrada e o cálculo precisam ser refeitos. Fechar Venda tem o seu próprio hook independente
+    // (_fvOnRatesLoaded / _fvOnMaquininhasLoaded), exposto em calculadoras/fechar-venda.js.
     window._calcOnRatesLoaded = function () {
         if (typeof window.updateRepassarValoresUI === 'function') window.updateRepassarValoresUI();
         if (typeof window.updateCalcularEmprestimoUI === 'function') window.updateCalcularEmprestimoUI();
         if (typeof window.updateCalcularPorAparelhoUI === 'function') window.updateCalcularPorAparelhoUI();
     };
+    window._calcOnMaquininhasLoaded = window._calcOnRatesLoaded;
 
     window._vsQuandoDomPronto(() => {
         // Navegação a partir da Calculadora Home
