@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8"/>
+    <script>
+        // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
+        // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
+        window._VS_VERSAO = '2026-11-06.1';
+        window.__vsErros = [];
+        window.__vsFalhasDeCarga = [];
+        window.addEventListener('error', function (e) {
+            var t = e.target;
+            if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+                window.__vsFalhasDeCarga.push(String(t.src || t.href).split('/').slice(-2).join('/'));
+                return;
+            }
+            window.__vsErros.push((String(e.filename || '').split('/').pop() || '?') + ':' + e.lineno + ' ' + e.message);
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+            var r = e.reason;
+            window.__vsErros.push('promessa: ' + ((r && r.code ? r.code + ' ' : '') + ((r && r.message) || r)));
+        });
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+    <meta name="theme-color" content="#07101f"/>
+    <meta name="mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+    <meta name="apple-mobile-web-app-title" content="Vortex"/>
+    <title>VortexSmart</title>
+    <link rel="manifest" href="manifest.json"/>
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png"/>
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png"/>
+    <script>
+        // Um só projeto, dois formatos: o computador (e o programa .exe) usa style.pc.css + barra lateral;
+        // o celular usa style.mobile.css + barra inferior. Roda antes de qualquer pintura, então não
+        // há "pulo" de layout. Regra: programa instalado ou mouse de verdade (hover + pointer fino) = PC;
+        // o resto (toque) = celular. "?shell=pc" ou "?shell=mobile" força um formato nesta aba (teste).
+        // Os blocos de HTML que só existem em um formato levam data-shell-only; o script lá no fim do body
+        // remove os do outro formato ANTES do core.js, pra nunca haver ids duplicados.
+        (function () {
+            var shell = null;
+            try {
+                var q = new URLSearchParams(location.search).get('shell');
+                if (q === 'pc' || q === 'mobile') sessionStorage.setItem('vsShell', q);
+                shell = sessionStorage.getItem('vsShell');
+            } catch (e) { /* storage bloqueado — segue pela detecção automática */ }
+            if (shell !== 'pc' && shell !== 'mobile') {
+                var noPrograma = typeof window.vsmartPrint === 'object' && window.vsmartPrint !== null;
+                var mouse = !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+                shell = (noPrograma || mouse) ? 'pc' : 'mobile';
+            }
+            document.documentElement.setAttribute('data-shell', shell);
+            document.write('<link rel="stylesheet" href="style.' + shell + '.css"/>');
+        })();
+    </script>
+    <style>
+        html[data-shell="pc"] [data-shell-only="mobile"], html[data-shell="mobile"] [data-shell-only="pc"] { display: none !important; }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" crossorigin="anonymous"/>
+</head>
+<body>
+
+<!-- ── Loading Overlay ─────────────────────────────────────── -->
+<div id="loadingOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(5px);">
+    <div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status"></div>
+    <h5 class="mt-3 text-white fw-light">Carregando VortexSmart...</h5>
+</div>
+
+<!-- ── Tela de Login ────────────────────────────────────────
+     Primeira coisa que aparece sem sessão ativa. Sem ela, ninguém
+     entra no app — não existe mais o login anônimo automático que
+     o app tinha antes (era o modelo de loja única). ──────────── -->
+<div id="loginScreen" class="container text-center" style="display:none;min-height:100vh;justify-content:center;">
+    <div style="width:100%;max-width:380px;margin:0 auto;">
+        <div style="margin-bottom:32px;">
+            <div style="width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#a78bfa,#5b3df5);display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin:0 auto 14px;">🌀</div>
+            <h2 style="margin:0;">VortexSmart</h2>
+            <div class="text-secondary small" style="margin-top:4px;">Entre com sua conta</div>
+        </div>
+
+        <div class="mb-3" style="text-align:left;">
+            <label class="form-label">Email</label>
+            <input class="form-control" id="loginEmail" type="email" placeholder="seu@email.com" autocomplete="username"/>
+        </div>
+        <div class="mb-3" style="text-align:left;">
+            <label class="form-label">Senha</label>
+            <input class="form-control" id="loginSenha" type="password" placeholder="Sua senha" autocomplete="current-password"/>
+        </div>
+
+        <div id="loginErro" class="text-danger small mb-3" style="display:none;text-align:left;"></div>
+
+        <button type="button" class="btn btn-primary w-100" id="loginEntrarBtn">
+            <i class="bi bi-box-arrow-in-right"></i> Entrar
+        </button>
+
+        <div class="text-secondary small mt-4">
+            Esqueceu a senha ou precisa de acesso? Fale com quem administra sua loja.
+        </div>
+    </div>
+</div>
+
+<!-- ── Toast ───────────────────────────────────────────────── -->
+<div id="toastNotification"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     MENU PRINCIPAL
+══════════════════════════════════════════════════════════ -->
+<div class="container text-center" id="mainMenu" style="display:none;">
+    <div data-shell-only="mobile" data-shell-unwrap>
+
+    <!-- Header compacto (mantém a personalização, mas sem tomar o protagonismo do hero) -->
+    <div style="width:100%;text-align:left;padding:14px 4px 10px;">
+        <div style="font-size:.8rem;color:var(--text-secondary);">Bem-vindo(a), <b id="userName" style="color:var(--text-strong);">Usuário</b></div>
+    </div>
+
+    <!-- Hero "Vendas Hoje" — estilo Vortex Pulse -->
+    <div class="pulse-hero" id="pulseHeroVendas">
+        <div class="pulse-hero-label" id="pulseHeroLabel">VENDAS HOJE</div>
+        <div class="pulse-hero-value" id="pulseHeroValor">0</div>
+        <div class="pulse-hero-stats">
+            <div class="pulse-hero-stat">
+                <span class="pulse-hero-stat-label">Faturado</span>
+                <span class="pulse-hero-stat-value" id="pulseHeroFaturado">R$ 0,00</span>
+                <span class="pulse-hero-stat-delta" id="pulseHeroFaturadoDelta"></span>
+            </div>
+            <div class="pulse-hero-stat">
+                <span class="pulse-hero-stat-label">Pendentes</span>
+                <span class="pulse-hero-stat-value" id="pulseHeroPendentes">0</span>
+                <span class="pulse-hero-stat-delta">aguardando pgto</span>
+            </div>
+        </div>
+        <div class="pulse-hero-bars" id="pulseHeroBars">
+            <span style="height:35%;"></span><span style="height:55%;"></span><span style="height:40%;"></span>
+            <span class="on" style="height:95%;"></span><span style="height:60%;"></span><span style="height:75%;"></span>
+            <span style="height:45%;"></span><span style="height:65%;"></span><span style="height:30%;"></span>
+        </div>
+    </div>
+
+    <!-- Atalhos rápidos (3, estilo Pulse — cartão com ícone quadrado, não círculo) -->
+    <div class="pulse-shortcuts">
+        <button class="pulse-shortcut" id="goToVenda">
+            <div class="pulse-shortcut-ic" style="background:#fbeaea;color:#c33;"><i class="bi bi-cart-check-fill"></i></div>
+            <span>Venda</span>
+        </button>
+        <button class="pulse-shortcut" id="goToCalculator">
+            <div class="pulse-shortcut-ic" style="background:#eef0ff;color:#5b3df5;"><i class="bi bi-calculator-fill"></i></div>
+            <span>Calculadora</span>
+        </button>
+        <button class="pulse-shortcut" id="goToDocumentos">
+            <div class="pulse-shortcut-ic" style="background:#eafaf0;color:#16a34a;"><i class="bi bi-file-earmark-text-fill"></i></div>
+            <span>Documento</span>
+        </button>
+    </div>
+
+    <!-- Lista principal — sem repetir o que já tem atalho em cima (Venda/Calculadora/Documento) -->
+    <div class="pulse-list">
+        <button class="pulse-list-item" id="goToEstoque">
+            <div class="pulse-list-ic" style="background:#fff4e5;color:#b45309;"><i class="bi bi-box-seam-fill"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Estoque</div><div class="pulse-list-sub">Produtos e conferência</div></div>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+        <button class="pulse-list-item" id="goToReparos">
+            <div class="pulse-list-ic" style="background:#f3e8ff;color:#7c3aed;"><i class="bi bi-wrench-adjustable-circle-fill"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Concertos</div><div class="pulse-list-sub" id="goToReparosSub">Configure pra liberar essa área</div></div>
+            <span class="lockbadge" id="goToReparosLock" style="display:none;"><i class="bi bi-lock-fill"></i></span>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+        <button class="pulse-list-item" id="goToReposicao">
+            <div class="pulse-list-ic" style="background:#eafaf5;color:#0d9488;"><i class="bi bi-cart3"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Reposição</div><div class="pulse-list-sub">Lista de compras da loja</div></div>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+        <button class="pulse-list-item" id="goToCredscan" style="display:none;">
+            <div class="pulse-list-ic" style="background:#f3e8ff;color:#5b3df5;"><i class="bi bi-cpu-fill"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">CredScan</div><div class="pulse-list-sub">Análise de crédito via IA</div></div>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+        <button class="pulse-list-item" id="goToFinanceiro" style="display:none;">
+            <div class="pulse-list-ic" style="background:#e6f9f0;color:#0f766e;"><i class="bi bi-graph-up-arrow"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Financeiro</div><div class="pulse-list-sub">Lançamentos, recorrentes e gráficos</div></div>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+    </div>
+    </div>
+    <div data-shell-only="pc" data-shell-unwrap>
+
+    <div class="vs-page-head">
+        <div style="text-align:left;">
+            <h1 class="vs-page-h1">Bem-vindo, <span id="userName">Usuário</span></h1>
+            <div class="vs-page-desc" id="vsHubDataHoje">&nbsp;</div>
+        </div>
+        <button class="vs-btn-primary" onclick="if (typeof window.openVendaSection === 'function') window.openVendaSection('lancarVenda');">
+            <i class="bi bi-plus-lg"></i> Nova Venda
+        </button>
+    </div>
+
+    <!-- Stat row: hero (Vendas Hoje) + Faturado Hoje + Pendentes, 3
+         cards do mesmo tamanho lado a lado. -->
+    <div class="vs-stat-row-3">
+        <div class="vs-stat-card vs-stat-hero" id="pulseHeroVendas">
+            <div class="vs-stat-label" id="pulseHeroLabel">VENDAS HOJE</div>
+            <div class="vs-stat-value" id="pulseHeroValor">0</div>
+            <div class="vs-stat-hero-bars" id="pulseHeroBars">
+                <span style="height:35%;"></span><span style="height:55%;"></span><span style="height:40%;"></span>
+                <span class="on" style="height:95%;"></span><span style="height:60%;"></span><span style="height:75%;"></span>
+                <span style="height:45%;"></span><span style="height:65%;"></span><span style="height:30%;"></span>
+            </div>
+        </div>
+        <div class="vs-stat-card">
+            <div class="vs-stat-label">FATURADO HOJE</div>
+            <div class="vs-stat-value" id="vsStatFaturadoValor">R$ 0,00</div>
+            <div class="vs-stat-delta" id="vsStatFaturadoDelta">&nbsp;</div>
+        </div>
+        <div class="vs-stat-card">
+            <div class="vs-stat-label">PENDENTES</div>
+            <div class="vs-stat-value vs-stat-value-accent" id="vsStatPendentesValor">0</div>
+            <div class="vs-stat-sub">Aguardando pagamento</div>
+        </div>
+    </div>
+
+    <!-- Atalhos rápidos: Nova Venda, Calculadora, Recibo, Estoque -->
+    <div class="vs-quick-grid-4">
+        <button class="vs-quick-card" onclick="if (typeof window.openVendaSection === 'function') window.openVendaSection('lancarVenda');">
+            <div class="vs-quick-ic" style="background:rgba(217,119,6,.16);color:#f0a94e;"><i class="bi bi-plus-lg"></i></div>
+            <div class="vs-quick-t">Nova Venda</div>
+            <div class="vs-quick-s">Lançar & vender</div>
+        </button>
+        <button class="vs-quick-card" id="goToCalculator">
+            <div class="vs-quick-ic" style="background:rgba(91,61,245,.14);color:#8f7bff;"><i class="bi bi-calculator-fill"></i></div>
+            <div class="vs-quick-t">Calculadora</div>
+            <div class="vs-quick-s">Taxa de maquininha</div>
+        </button>
+        <button class="vs-quick-card" onclick="document.getElementById('goToDocumentos').click();">
+            <div class="vs-quick-ic" style="background:rgba(34,197,94,.14);color:#4ade80;"><i class="bi bi-receipt"></i></div>
+            <div class="vs-quick-t">Recibo</div>
+            <div class="vs-quick-s">Emitir documento</div>
+        </button>
+        <button class="vs-quick-card" id="goToEstoque">
+            <div class="vs-quick-ic" style="background:rgba(217,119,6,.16);color:#f0a94e;"><i class="bi bi-box-seam-fill"></i></div>
+            <div class="vs-quick-t">Estoque</div>
+            <div class="vs-quick-s">Produtos & conferência</div>
+        </button>
+    </div>
+
+    <div class="vs-section-label">Áreas do sistema</div>
+
+    <div class="pulse-list vs-hub-grid-3">
+        <button class="pulse-list-item vs-hub-tile" id="homeRelatoriosTile" onclick="if (typeof window.openVendaSection === 'function') window.openVendaSection('vendaRelatorios');">
+            <div class="pulse-list-ic vs-hub-tile-ic" style="background:rgba(91,61,245,.14);color:#8f7bff;"><i class="bi bi-bar-chart-fill"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Relatórios de Vendas</div><div class="pulse-list-sub">Resumo por período</div></div>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+        <button class="pulse-list-item vs-hub-tile" id="goToReparos">
+            <div class="pulse-list-ic vs-hub-tile-ic" style="background:rgba(139,108,240,.16);color:#a78bfa;"><i class="bi bi-wrench-adjustable-circle-fill"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Concertos</div><div class="pulse-list-sub" id="goToReparosSub">Configure pra liberar essa área</div></div>
+            <span class="lockbadge" id="goToReparosLock" style="display:none;"><i class="bi bi-lock-fill"></i></span>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+        <button class="pulse-list-item vs-hub-tile" id="goToReposicao">
+            <div class="pulse-list-ic vs-hub-tile-ic" style="background:rgba(13,148,136,.16);color:#2dd4bf;"><i class="bi bi-cart3"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Reposição</div><div class="pulse-list-sub">Lista de compras da loja</div></div>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+        <button class="pulse-list-item vs-hub-tile" id="goToCredscan" style="display:none;">
+            <div class="pulse-list-ic vs-hub-tile-ic" style="background:rgba(91,61,245,.14);color:#8f7bff;"><i class="bi bi-cpu-fill"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">CredScan</div><div class="pulse-list-sub">Análise de crédito via IA</div></div>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+        <button class="pulse-list-item vs-hub-tile" id="goToFinanceiro" style="display:none;">
+            <div class="pulse-list-ic vs-hub-tile-ic" style="background:rgba(59,130,246,.14);color:#60a5fa;"><i class="bi bi-graph-up-arrow"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Financeiro</div><div class="pulse-list-sub">Lançamentos & recorrentes</div></div>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+        <button class="pulse-list-item vs-hub-tile" id="goToDocumentos">
+            <div class="pulse-list-ic vs-hub-tile-ic" style="background:rgba(34,197,94,.14);color:#4ade80;"><i class="bi bi-file-earmark-text-fill"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Documentos</div><div class="pulse-list-sub">Contrato, garantia, orçamento</div></div>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+        <button class="pulse-list-item vs-hub-tile" onclick="if (typeof window.openConfiguracoesSection === 'function') window.openConfiguracoesSection('configuracoesHome');">
+            <div class="pulse-list-ic vs-hub-tile-ic" style="background:rgba(148,163,184,.14);color:#94a3b8;"><i class="bi bi-gear-fill"></i></div>
+            <div class="pulse-list-txt"><div class="pulse-list-title">Configurações</div><div class="pulse-list-sub">Produtos, taxas, sistema</div></div>
+            <i class="bi bi-chevron-right pulse-list-chev"></i>
+        </button>
+    </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     DOCUMENTOS CONTAINER
+══════════════════════════════════════════════════════════ -->
+<div id="documentosContainer" class="hidden">
+
+    <!-- Documentos Home -->
+    <div class="container text-center" id="documentosHome" style="display:none;">
+        <div class="hub-back-row">
+            <button type="button" class="btn-back" aria-label="Voltar ao Início"><i class="bi bi-arrow-left"></i></button>
+        </div>
+        <h2 class="hub-title">Documentos &amp; Garantias,<br/>do que você precisa?</h2>
+        <div data-shell-only="mobile" data-shell-unwrap>
+        <div class="ctw-card-grid ctw-grid-5">
+            <div class="ctw-grid-row2">
+                <button class="card-v2" id="openContrato2">
+                    <div class="stripe" style="--grad:linear-gradient(90deg,#93c5fd,#4f8cff);"></div>
+                    <div class="body">
+                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#93c5fd,#4f8cff);--shadow:rgba(79,140,255,.4);color:#fff;">📄</div>
+                        <div class="name-v2">Contrato</div>
+                        <div class="tag-v2" style="--tagbg:#dbeafe;--tagcolor:#4f8cff;">/ Boleto</div>
+                    </div>
+                </button>
+                <button class="card-v2" id="openGarantia2">
+                    <div class="stripe" style="--grad:linear-gradient(90deg,#5eead4,#0f766e);"></div>
+                    <div class="body">
+                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#5eead4,#0f766e);--shadow:rgba(15,118,110,.4);color:#fff;">📓</div>
+                        <div class="name-v2">Garantia</div>
+                        <div class="tag-v2" style="--tagbg:#d6f3ef;--tagcolor:#0f766e;">Bookip</div>
+                    </div>
+                </button>
+            </div>
+            <div class="ctw-grid-row2">
+                <button class="card-v2" id="openRecibo2">
+                    <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
+                    <div class="body">
+                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">🧾</div>
+                        <div class="name-v2">Recibo</div>
+                        <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Simples</div>
+                    </div>
+                </button>
+                <button class="card-v2" id="openOrcamento2">
+                    <div class="stripe" style="--grad:linear-gradient(90deg,#a78bfa,#5b3df5);"></div>
+                    <div class="body">
+                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#a78bfa,#5b3df5);--shadow:rgba(91,61,245,.4);color:#fff;">📋</div>
+                        <div class="name-v2">Orçamento</div>
+                        <div class="tag-v2" style="--tagbg:#ede9fe;--tagcolor:#5b3df5;">PDF</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+        </div>
+        <div data-shell-only="pc" data-shell-unwrap>
+        <div class="ctw-card-grid">
+            <button class="card-v2" id="openContrato2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#93c5fd,#4f8cff);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#93c5fd,#4f8cff);--shadow:rgba(79,140,255,.4);color:#fff;">📄</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Contrato</div>
+                        <div class="desc-v2">Gera contrato de venda com opção de parcelar em boleto</div>
+                        <div class="tag-v2" style="--tagbg:#dbeafe;--tagcolor:#4f8cff;">/ Boleto</div>
+                    </div>
+                </div>
+            </button>
+            <button class="card-v2" id="openGarantia2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#5eead4,#0f766e);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#5eead4,#0f766e);--shadow:rgba(15,118,110,.4);color:#fff;">📓</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Garantia</div>
+                        <div class="desc-v2">Emite termo de garantia vinculado a uma venda (Bookip)</div>
+                        <div class="tag-v2" style="--tagbg:#d6f3ef;--tagcolor:#0f766e;">Bookip</div>
+                    </div>
+                </div>
+            </button>
+            <button class="card-v2" id="openRecibo2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">🧾</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Recibo</div>
+                        <div class="desc-v2">Recibo simples de pagamento, sem vínculo com estoque</div>
+                        <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Simples</div>
+                    </div>
+                </div>
+            </button>
+            <button class="card-v2" id="openOrcamento2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#a78bfa,#5b3df5);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#a78bfa,#5b3df5);--shadow:rgba(91,61,245,.4);color:#fff;">📋</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Orçamento</div>
+                        <div class="desc-v2">Monta um orçamento em PDF pra enviar ao cliente</div>
+                        <div class="tag-v2" style="--tagbg:#ede9fe;--tagcolor:#5b3df5;">PDF</div>
+                    </div>
+                </div>
+            </button>
+        </div>
+        </div>
+    </div>
+
+    <!-- Contrato — HTML gerado pelo documentos.js -->
+    <div id="documentosContrato" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+    <!-- Garantia / Bookip — HTML gerado pelo documentos.js -->
+    <div id="documentosGarantia" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+    <!-- Recibo Simples — HTML gerado pelo documentos.js -->
+    <div id="documentosRecibo" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+    <!-- Orçamento — HTML gerado pelo documentos/orcamento.js -->
+    <div id="documentosOrcamento" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+</div><!-- /documentosContainer -->
+
+<!-- ══════════════════════════════════════════════════════════
+     ESTOQUE CONTAINER
+══════════════════════════════════════════════════════════ -->
+<div id="estoqueContainer" class="hidden">
+
+    <!-- Estoque Home -->
+    <div class="container text-center" id="estoqueHome" style="display:none;">
+        <div class="hub-back-row">
+            <button type="button" class="btn-back" aria-label="Voltar ao Início"><i class="bi bi-arrow-left"></i></button>
+        </div>
+        <h2 class="hub-title">Estoque,<br/>o que você quer fazer?</h2>
+        <div data-shell-only="mobile" data-shell-unwrap>
+        <div class="ctw-card-grid">
+            <button class="card-v2" id="openEstoqueProdutos2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#fb923c,#c2410c);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#fb923c,#c2410c);--shadow:rgba(194,65,12,.4);color:#fff;">📦</div>
+                    <div class="name-v2">Produtos</div>
+                    <div class="tag-v2" style="--tagbg:#fde3d0;--tagcolor:#c2410c;">Cadastro</div>
+                </div>
+            </button>
+            <button class="card-v2" id="openEstoqueConferencia2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">📋</div>
+                    <div class="name-v2">Conferência</div>
+                    <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Contagem</div>
+                </div>
+            </button>
+            <button class="card-v2" id="openEstoqueMovimentacao2" style="display:none;">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#818cf8,#4f46e5);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#818cf8,#4f46e5);--shadow:rgba(79,70,229,.4);color:#fff;">🧭</div>
+                    <div class="name-v2">Movimentação</div>
+                    <div class="tag-v2" style="--tagbg:#e0e7ff;--tagcolor:#4f46e5;">Gestor</div>
+                </div>
+            </button>
+        </div>
+        </div>
+        <div data-shell-only="pc" data-shell-unwrap>
+        <div class="ctw-card-grid">
+            <button class="card-v2" id="openEstoqueProdutos2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#fb923c,#c2410c);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#fb923c,#c2410c);--shadow:rgba(194,65,12,.4);color:#fff;">📦</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Produtos</div>
+                        <div class="desc-v2">Cadastra, edita e organiza os produtos da loja</div>
+                        <div class="tag-v2" style="--tagbg:#fde3d0;--tagcolor:#c2410c;">Cadastro</div>
+                    </div>
+                </div>
+            </button>
+            <button class="card-v2" id="openEstoqueConferencia2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">📋</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Conferência</div>
+                        <div class="desc-v2">Confere a contagem física do estoque contra o sistema</div>
+                        <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Contagem</div>
+                    </div>
+                </div>
+            </button>
+            <button class="card-v2" id="openEstoqueMovimentacao2" style="display:none;">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#818cf8,#4f46e5);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#818cf8,#4f46e5);--shadow:rgba(79,70,229,.4);color:#fff;">🧭</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Movimentação</div>
+                        <div class="desc-v2">Histórico de entradas e saídas de produtos</div>
+                        <div class="tag-v2" style="--tagbg:#e0e7ff;--tagcolor:#4f46e5;">Gestor</div>
+                    </div>
+                </div>
+            </button>
+        </div>
+        </div>
+    </div>
+
+    <!-- Produtos — HTML gerado pelo estoque/produtos.js -->
+    <div id="estoqueProdutos" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+    <!-- Conferência — HTML gerado pelo estoque/conferencia.js -->
+    <div id="estoqueConferencia" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+    <!-- Movimentação de Produto — HTML gerado pelo estoque/movimentacao.js -->
+    <div id="estoqueMovimentacao" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+</div><!-- /estoqueContainer -->
+
+<!-- ══════════════════════════════════════════════════════════
+     VENDA CONTAINER
+══════════════════════════════════════════════════════════ -->
+<div id="vendaContainer" class="hidden">
+
+    <!-- Venda Home -->
+    <div class="container text-center" id="vendaHome" style="display:none;">
+        <div class="hub-back-row">
+            <button type="button" class="btn-back" aria-label="Voltar ao Início"><i class="bi bi-arrow-left"></i></button>
+        </div>
+        <h2 class="hub-title">Vendas,<br/>o que você quer fazer?</h2>
+        <div data-shell-only="mobile" data-shell-unwrap>
+        <div class="ctw-card-grid">
+            <button class="card-v2" id="openLancarVenda2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">🛒</div>
+                    <div class="name-v2">Nova</div>
+                    <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Venda</div>
+                </div>
+            </button>
+            <button class="card-v2" id="openHistoricoVendas2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#93c5fd,#4f8cff);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#93c5fd,#4f8cff);--shadow:rgba(79,140,255,.4);color:#fff;">🕒</div>
+                    <div class="name-v2">Histórico</div>
+                    <div class="tag-v2" style="--tagbg:#dbeafe;--tagcolor:#4f8cff;">Vendas</div>
+                </div>
+            </button>
+            <button class="card-v2" id="openRelatoriosVendas2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#a78bfa,#5b3df5);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#a78bfa,#5b3df5);--shadow:rgba(91,61,245,.4);color:#fff;">📊</div>
+                    <div class="name-v2">Relatórios</div>
+                    <div class="tag-v2" style="--tagbg:#ede9fe;--tagcolor:#5b3df5;">Período</div>
+                </div>
+            </button>
+        </div>
+        </div>
+        <div data-shell-only="pc" data-shell-unwrap>
+        <div class="ctw-card-grid">
+            <button class="card-v2" id="openLancarVenda2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">🛒</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Nova Venda</div>
+                        <div class="desc-v2">Lança uma venda nova e monta o carrinho</div>
+                        <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Venda</div>
+                    </div>
+                </div>
+            </button>
+            <button class="card-v2" id="openHistoricoVendas2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#93c5fd,#4f8cff);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#93c5fd,#4f8cff);--shadow:rgba(79,140,255,.4);color:#fff;">🕒</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Histórico</div>
+                        <div class="desc-v2">Consulta, edita e imprime recibo das vendas já feitas</div>
+                        <div class="tag-v2" style="--tagbg:#dbeafe;--tagcolor:#4f8cff;">Vendas</div>
+                    </div>
+                </div>
+            </button>
+            <button class="card-v2" id="openRelatoriosVendas2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#a78bfa,#5b3df5);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#a78bfa,#5b3df5);--shadow:rgba(91,61,245,.4);color:#fff;">📊</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Relatórios</div>
+                        <div class="desc-v2">Resumo de vendas por período escolhido</div>
+                        <div class="tag-v2" style="--tagbg:#ede9fe;--tagcolor:#5b3df5;">Período</div>
+                    </div>
+                </div>
+            </button>
+        </div>
+        </div>
+    </div>
+
+    <!-- Nova Venda — HTML gerado pelo venda/lancar.js -->
+    <div id="lancarVenda" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+    <!-- Histórico — HTML gerado pelo venda/historico.js -->
+    <div id="historicoVendas" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+    <!-- Fechar Venda (etapa 2: pagamento, pode ser fracionado) — HTML gerado pelo venda/fechar.js -->
+    <div id="vendaFechar" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+    <!-- Relatórios — HTML gerado pelo venda/relatorios.js -->
+    <div id="vendaRelatorios" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+</div><!-- /vendaContainer -->
+
+<!-- ══════════════════════════════════════════════════════════
+     CONCERTOS CONTAINER — HTML gerado pelos arquivos em /reparos/
+══════════════════════════════════════════════════════════ -->
+<div id="reparosContainer" class="hidden">
+    <div id="reparosLista" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="reparosForm" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+</div><!-- /reparosContainer -->
+
+<!-- ══════════════════════════════════════════════════════════
+     REPOSIÇÃO CONTAINER — HTML gerado por /reposicao/lista.js
+══════════════════════════════════════════════════════════ -->
+<div id="reposicaoContainer" class="hidden">
+    <div id="reposicaoLista" style="display:flex;width:100%;flex-direction:column;align-items:center;"></div>
+</div><!-- /reposicaoContainer -->
+
+<!-- ══════════════════════════════════════════════════════════
+     CREDSCAN CONTAINER — HTML gerado por /credscan/lista.js e
+     /credscan/detalhe.js
+══════════════════════════════════════════════════════════ -->
+<div id="credscanContainer" class="hidden">
+    <div id="credscanLista" style="display:flex;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="credscanDetalhe" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+</div><!-- /credscanContainer -->
+
+<!-- ══════════════════════════════════════════════════════════
+     FINANCEIRO CONTAINER
+══════════════════════════════════════════════════════════ -->
+<div id="financeiroContainer" class="hidden">
+    <div id="financeiroHome" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="financeiroLancamentos" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="financeiroRecorrentes" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="financeiroGraficos" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="financeiroResumo" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+</div><!-- /financeiroContainer -->
+
+<!-- ══════════════════════════════════════════════════════════
+     CONFIGURAÇÕES CONTAINER
+══════════════════════════════════════════════════════════ -->
+<div id="configuracoesContainer" class="hidden">
+
+    <!-- Configurações Home -->
+    <div class="container text-center" id="configuracoesHome" style="display:none;">
+        <div class="section-header">
+            <h3>Configurações</h3>
+        </div>
+        <div class="content-card w-100">
+            <div class="cfg-section-title">Catálogo &amp; Vendas</div>
+            <div class="cfgA-card">
+                <button type="button" class="cfgA-row" id="openConfigProdutos2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#fb923c,#c2410c);">📦</div>
+                    <div class="cfgA-name">Produtos</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+                <button type="button" class="cfgA-row" id="openConfigTaxas2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#a78bfa,#5b3df5);">🏷️</div>
+                    <div class="cfgA-name">Taxas</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+            </div>
+
+            <div class="cfg-section-title">Pessoas</div>
+            <div class="cfgA-card">
+                <button type="button" class="cfgA-row" id="openConfigClientes2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#f472b6,#be185d);">👥</div>
+                    <div class="cfgA-name">Clientes</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+                <button type="button" class="cfgA-row" id="openConfigUsuarios2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#93c5fd,#4f8cff);">🔐</div>
+                    <div class="cfgA-name">Usuários &amp; Permissões</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+            </div>
+
+            <div class="cfg-section-title">Loja</div>
+            <div class="cfgA-card">
+                <button type="button" class="cfgA-row" id="openConfigDocumentos2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#5eead4,#0f766e);">📄</div>
+                    <div class="cfgA-name">Documentos &amp; Layout</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+                <button type="button" class="cfgA-row" id="openConfigCustomizacoes2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#fbbf24,#b45309);">✨</div>
+                    <div class="cfgA-name">Customizações</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+                <button type="button" class="cfgA-row" id="openConfigNotificacoes2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#4f8cff,#2563eb);">🔔</div>
+                    <div class="cfgA-name">Notificações</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+                <button type="button" class="cfgA-row" id="openConfigReparos2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#c4b5fd,#7c3aed);">🔧</div>
+                    <div class="cfgA-name">Concertos</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+                <button type="button" class="cfgA-row" id="openConfigCredscan2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#5b3df5,#4f8cff);">🧠</div>
+                    <div class="cfgA-name">CredScan</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+            </div>
+
+            <div class="cfg-section-title">Sistema</div>
+            <div class="cfgA-card">
+                <button type="button" class="cfgA-row" id="openConfigBackup2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#818cf8,#4338ca);">🗄️</div>
+                    <div class="cfgA-name">Backup &amp; Dados</div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+                <button data-electron-only type="button" class="cfgA-row" id="openConfigImpressora2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#94a3b8,#334155);">🖨️</div>
+                    <div class="cfgA-name">Impressora de Recibo<span id="cfgImpressoraReciboNome" style="display:block;font-weight:500;font-size:.7rem;opacity:.7;margin-top:2px;"></span></div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+                <button type="button" class="cfgA-row" id="openConfigDiagnostico2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#34d399,#047857);">🩺</div>
+                    <div class="cfgA-name">Diagnóstico do sistema<span style="display:block;font-weight:500;font-size:.7rem;opacity:.7;margin-top:2px;">Se algo não funcionar, abra aqui e copie o relatório</span></div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+                <button data-electron-only type="button" class="cfgA-row" id="openConfigImpressoraEtiqueta2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#38bdf8,#0369a1);">🏷️</div>
+                    <div class="cfgA-name">Impressora de Etiquetas<span id="cfgImpressoraEtiquetaNome" style="display:block;font-weight:500;font-size:.7rem;opacity:.7;margin-top:2px;"></span></div>
+                    <span class="cfgA-chev">›</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sub-módulos — HTML gerado pelos respectivos arquivos em /configuracoes/ -->
+    <div id="configuracoesProdutos" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="configuracoesTaxas" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="configuracoesClientes" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="configuracoesUsuarios" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="configuracoesDocumentos" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="configuracoesCustomizacoes" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="configuracoesNotificacoes" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="configuracoesBackup" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="configuracoesReparos" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+    <div id="configuracoesCredscan" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+</div><!-- /configuracoesContainer -->
+
+<!-- ══════════════════════════════════════════════════════════
+     CALCULADORA CONTAINER
+══════════════════════════════════════════════════════════ -->
+<div id="calculatorContainer" class="hidden">
+
+    <!-- Calculator Home -->
+    <div class="container text-center" id="calculatorHome" style="display:none;">
+        <div class="hub-back-row">
+            <button type="button" class="btn-back" aria-label="Voltar ao Início"><i class="bi bi-arrow-left"></i></button>
+        </div>
+        <h2 class="hub-title">Calculadora de Taxas,<br/>O que você quer fazer?</h2>
+        <div data-shell-only="mobile" data-shell-unwrap>
+        <div class="ctw-card-grid ctw-grid-5">
+            <div class="ctw-grid-row2">
+                <button class="card-v2" id="openFecharVenda2">
+                    <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
+                    <div class="body">
+                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">💵</div>
+                        <div class="name-v2">Remover</div>
+                        <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Taxa</div>
+                    </div>
+                </button>
+                <button class="card-v2" id="openRepassarValores2">
+                    <div class="stripe" style="--grad:linear-gradient(90deg,#93c5fd,#4f8cff);"></div>
+                    <div class="body">
+                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#93c5fd,#4f8cff);--shadow:rgba(79,140,255,.4);color:#fff;">🔁</div>
+                        <div class="name-v2">Repassar</div>
+                        <div class="tag-v2" style="--tagbg:#dbeafe;--tagcolor:#4f8cff;">Valores</div>
+                    </div>
+                </button>
+            </div>
+            <div class="ctw-grid-row2">
+                <button class="card-v2" id="openCalcularEmprestimo2">
+                    <div class="stripe" style="--grad:linear-gradient(90deg,#fb923c,#c2410c);"></div>
+                    <div class="body">
+                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#fb923c,#c2410c);--shadow:rgba(194,65,12,.4);color:#fff;">🏦</div>
+                        <div class="name-v2">Calcular</div>
+                        <div class="tag-v2" style="--tagbg:#fde3d0;--tagcolor:#c2410c;">Empréstimo</div>
+                    </div>
+                </button>
+                <button class="card-v2" id="openCalcularPorAparelho2">
+                    <div class="stripe" style="--grad:linear-gradient(90deg,#a78bfa,#5b3df5);"></div>
+                    <div class="body">
+                        <div class="icon-v2" style="--grad:linear-gradient(135deg,#a78bfa,#5b3df5);--shadow:rgba(91,61,245,.4);color:#fff;">📱</div>
+                        <div class="name-v2">Por</div>
+                        <div class="tag-v2" style="--tagbg:#ede9fe;--tagcolor:#5b3df5;">Aparelho</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+        </div>
+        <div data-shell-only="pc" data-shell-unwrap>
+        <div class="ctw-card-grid">
+            <button class="card-v2" id="openFecharVenda2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#4ade80,#16a34a);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#4ade80,#16a34a);--shadow:rgba(22,163,74,.4);color:#fff;">💵</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Remover Taxa</div>
+                        <div class="desc-v2">Descobre o valor líquido depois do desconto da maquininha</div>
+                        <div class="tag-v2" style="--tagbg:#dcfce7;--tagcolor:#16a34a;">Taxa</div>
+                    </div>
+                </div>
+            </button>
+            <button class="card-v2" id="openRepassarValores2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#93c5fd,#4f8cff);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#93c5fd,#4f8cff);--shadow:rgba(79,140,255,.4);color:#fff;">🔁</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Repassar Valores</div>
+                        <div class="desc-v2">Calcula quanto cobrar do cliente pra taxa não sair do seu bolso</div>
+                        <div class="tag-v2" style="--tagbg:#dbeafe;--tagcolor:#4f8cff;">Valores</div>
+                    </div>
+                </div>
+            </button>
+            <button class="card-v2" id="openCalcularEmprestimo2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#fb923c,#c2410c);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#fb923c,#c2410c);--shadow:rgba(194,65,12,.4);color:#fff;">🏦</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Calcular Empréstimo</div>
+                        <div class="desc-v2">Simula parcelas de um empréstimo com juros</div>
+                        <div class="tag-v2" style="--tagbg:#fde3d0;--tagcolor:#c2410c;">Empréstimo</div>
+                    </div>
+                </div>
+            </button>
+            <button class="card-v2" id="openCalcularPorAparelho2">
+                <div class="stripe" style="--grad:linear-gradient(90deg,#a78bfa,#5b3df5);"></div>
+                <div class="body">
+                    <div class="icon-v2" style="--grad:linear-gradient(135deg,#a78bfa,#5b3df5);--shadow:rgba(91,61,245,.4);color:#fff;">📱</div>
+                    <div class="txt-v2">
+                        <div class="name-v2">Por Aparelho</div>
+                        <div class="desc-v2">Calcula taxa de um produto específico do seu estoque</div>
+                        <div class="tag-v2" style="--tagbg:#ede9fe;--tagcolor:#5b3df5;">Aparelho</div>
+                    </div>
+                </div>
+            </button>
+        </div>
+        </div>
+    </div>
+
+    <!-- fecharVenda — HTML gerado pelo calculadoras/fechar-venda.js -->
+    <div id="fecharVenda" style="display:none;width:100%;flex-direction:column;align-items:center;"></div>
+
+    <!-- Repassar Valores -->
+    <div class="container" id="repassarValores" style="display:none;">
+        <div class="section-header">
+            <button type="button" class="btn-back" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
+            <h3>Repassar Valores</h3>
+        </div>
+        <div class="content-card w-100">
+            <div class="row mb-3 w-100 justify-content-center">
+                <div class="col-12 col-md-6 mb-3">
+                    <label class="form-label">Maquininha</label>
+                    <input type="hidden" id="machine2">
+                    <!-- Antes era <select> com opções fixas (pagbank/infinity/valorante/
+                         nubank) — mesmo bug do machine3: máquinas agora vêm dinâmicas do
+                         Firebase, e um <select> rejeita valor que não está entre suas
+                         <option>, travando a troca de maquininha. Input hidden aceita
+                         qualquer valor. -->
+                    <div class="apr-machine-chip" id="machine2Chip">
+                        <div class="apr-machine-chip-left">
+                            <div class="apr-machine-chip-icon"><i class="bi bi-credit-card-2-front"></i></div>
+                            <div>
+                                <div class="apr-machine-chip-label">Maquininha</div>
+                                <div class="apr-machine-chip-value" id="machine2ChipValue">PagBank</div>
+                            </div>
+                        </div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 mb-3 hidden" id="flagDisplayContainer2">
+                    <label class="form-label">Bandeira</label>
+                    <button class="btn-flag-display w-100" id="flagDisplayButton2"></button>
+                </div>
+            </div>
+            <div class="hidden" id="brand2Container">
+                <select id="brand2" onchange="updateRepassarValoresUI()">
+                    <option value="visa">Visa</option><option value="mastercard">Mastercard</option>
+                    <option value="hiper">Hiper</option><option value="hipercard">Hipercard</option>
+                    <option value="elo">Elo</option><option value="amex">Amex</option>
+                </select>
+            </div>
+            <div class="mb-3 max-width-400-margin-1rem">
+                <label class="form-label" for="repassarValue"><i class="bi bi-calculator"></i> Valor Desejado (líquido)</label>
+                <input class="form-control form-control-lg" id="repassarValue" type="number" step="0.01" min="0" placeholder="Digite o valor desejado"/>
+            </div>
+            <div class="extra-value-toggle mx-auto mt-2">
+                <button class="btn-toggle-extra" id="toggleRepassarExtraBtn" aria-label="Adicionar lucro extra">
+                    <i class="bi bi-chevron-down"></i>
+                </button>
+            </div>
+            <div class="extra-value-container mx-auto max-width-400" id="repassarExtraContainer">
+                <div class="mb-3">
+                    <label class="form-label text-warning" for="repassarExtra"><i class="bi bi-piggy-bank-fill"></i> Adicional</label>
+                    <input class="form-control" id="repassarExtra" type="number" step="0.01" min="0" placeholder="Ex: 50,00"/>
+                </div>
+            </div>
+            <div class="w-100 d-flex flex-column align-items-center" id="resultRepassarValores"></div>
+            <div class="text-center mt-3 w-100" id="exportRepassarContainer" style="display:none;">
+                <button class="btn btn-info" id="exportRepassarBtn"><i class="bi bi-camera-fill"></i> Exportar Imagem</button>
+            </div>
+        </div>
+
+        <!-- Fora do .content-card de propósito (backdrop-filter quebra position:fixed) -->
+        <div class="apr-modal-backdrop" id="machine2ModalBackdrop">
+            <div class="apr-modal-card">
+                <div class="apr-modal-title">Escolher maquininha</div>
+                <div id="machine2ModalList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calcular Empréstimo -->
+    <div class="container" id="calcularEmprestimo" style="display:none;">
+        <div class="section-header">
+            <button type="button" class="btn-back" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
+            <h3>Calcular Empréstimo</h3>
+        </div>
+        <div class="content-card w-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="lucro-display" id="emprestimoLucroDisplay"></div>
+                <button id="openLucroModalBtn" class="btn btn-sm btn-icon-circle btn-gear-large" aria-label="Configurar Lucro"><i class="bi bi-gear-fill"></i></button>
+            </div>
+            <div id="valorLiquidoDisplay" class="mb-3"></div>
+            <div class="mb-3 max-width-400-margin-1rem">
+                <label class="form-label" for="emprestimoValue"><i class="bi bi-cash-coin"></i> Valor Base do Empréstimo</label>
+                <input class="form-control form-control-lg" id="emprestimoValue" type="number" step="0.01" min="0" placeholder="Ex: 10000"/>
+            </div>
+            <div class="row mb-3 w-100 justify-content-center">
+                <div class="col-12 col-md-6 mb-3">
+                    <label class="form-label">Maquininha</label>
+                    <input type="hidden" id="machine4">
+                    <!-- Antes era <select> com opções fixas — mesmo bug do machine3/
+                         machine2: máquinas dinâmicas do Firebase não batem com as
+                         <option> fixas, travando a troca. Input hidden aceita
+                         qualquer valor. -->
+                    <div class="apr-machine-chip" id="machine4Chip">
+                        <div class="apr-machine-chip-left">
+                            <div class="apr-machine-chip-icon"><i class="bi bi-credit-card-2-front"></i></div>
+                            <div>
+                                <div class="apr-machine-chip-label">Maquininha</div>
+                                <div class="apr-machine-chip-value" id="machine4ChipValue">Valorante</div>
+                            </div>
+                        </div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 mb-3 hidden" id="flagDisplayContainer4">
+                    <label class="form-label">Bandeira</label>
+                    <button class="btn-flag-display w-100" id="flagDisplayButton4"></button>
+                </div>
+            </div>
+            <div class="hidden" id="brand4Container">
+                <select id="brand4" onchange="updateCalcularEmprestimoUI()">
+                    <option value="visa">Visa</option><option value="mastercard">Mastercard</option>
+                    <option value="hiper">Hiper</option><option value="hipercard">Hipercard</option>
+                    <option value="elo">Elo</option><option value="amex">Amex</option>
+                </select>
+            </div>
+            <div class="w-100 d-flex flex-column align-items-center" id="resultCalcularEmprestimo"></div>
+            <div class="text-center mt-3 w-100" id="exportEmprestimoContainer" style="display:none;">
+                <button class="btn btn-info" id="exportEmprestimoBtn"><i class="bi bi-camera-fill"></i> Exportar Imagem</button>
+            </div>
+        </div>
+
+        <!-- Fora do .content-card de propósito (backdrop-filter quebra position:fixed) -->
+        <div class="apr-modal-backdrop" id="machine4ModalBackdrop">
+            <div class="apr-modal-card">
+                <div class="apr-modal-title">Escolher maquininha</div>
+                <div id="machine4ModalList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calcular por Aparelho -->
+    <div class="container" id="calcularPorAparelho" style="display:none;">
+        <div class="section-header">
+            <button type="button" class="btn-back" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
+            <h3>Calcular por Aparelho</h3>
+        </div>
+        <div class="content-card w-100">
+            <div id="aparelhoContentWrapper">
+                <div class="favoritos" id="aparelhoFavoritosContainer"></div>
+                <div class="mb-3 search-wrapper mx-auto">
+                    <label class="form-label" for="aparelhoSearch"><i class="bi bi-search"></i> Pesquisar Aparelho</label>
+                    <input autocomplete="off" data-lpignore="true" data-form-type="other" class="form-control" id="aparelhoSearch" name="aparelho-busca-produto" placeholder="Carregando..." type="search"/>
+                    <div class="search-results-container list-group" id="aparelhoResultsContainer"></div>
+                </div>
+                <div id="aparelhoInfoNote" class="text-center text-secondary small my-2 hidden aparelho-info-note"></div>
+                <div id="carrinhoAparelhosContainer" class="mb-3"></div>
+                <div class="row mb-3 justify-content-center g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="entradaAparelho"><i class="bi bi-wallet2"></i> Entrada (R$)</label>
+                        <input class="form-control" id="entradaAparelho" type="number" step="0.01" min="0" placeholder="Opcional"/>
+                    </div>
+                </div>
+                <div class="extra-value-toggle mx-auto">
+                    <button class="btn-toggle-extra" id="toggleValorExtraBtn" aria-label="Adicionar valor extra">
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                </div>
+                <div class="extra-value-container mx-auto" id="valorExtraContainer">
+                    <h4 class="mt-2 text-center" id="aparelhoPrecoTotalDisplay"></h4>
+                    <div class="mb-3">
+                        <label class="form-label" for="valorExtraAparelho"><i class="bi bi-plus-circle"></i> Valor adicional</label>
+                        <input class="form-control" id="valorExtraAparelho" type="number" step="0.01" min="0" placeholder="Ex: 40,00"/>
+                    </div>
+                </div>
+                <div class="row my-3 w-100 justify-content-center">
+                    <div class="col-12 col-md-6 mb-3">
+                        <label class="form-label">Maquininha</label>
+                        <input type="hidden" id="machine3">
+                        <!-- Antes era <select> com opções fixas (pagbank/infinity/valorante/
+                             nubank) — como as máquinas agora vêm dinâmicas do Firebase
+                             (Config → Taxas), um <select> rejeita silenciosamente qualquer
+                             valor que não esteja entre suas <option>, fazendo a troca de
+                             maquininha nunca "pegar". Input hidden aceita qualquer valor. -->
+                        <div class="apr-machine-chip" id="machine3Chip">
+                            <div class="apr-machine-chip-left">
+                                <div class="apr-machine-chip-icon"><i class="bi bi-credit-card-2-front"></i></div>
+                                <div>
+                                    <div class="apr-machine-chip-label">Maquininha</div>
+                                    <div class="apr-machine-chip-value" id="machine3ChipValue">PagBank</div>
+                                </div>
+                            </div>
+                            <i class="bi bi-chevron-down"></i>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6 mb-3 hidden" id="flagDisplayContainer3">
+                        <label class="form-label">Bandeira</label>
+                        <button class="btn-flag-display w-100" id="flagDisplayButton3"></button>
+                    </div>
+                </div>
+                <div class="hidden" id="brand3Container">
+                    <select id="brand3" onchange="updateCalcularPorAparelhoUI()">
+                        <option value="visa">Visa</option><option value="mastercard">Mastercard</option>
+                        <option value="hiper">Hiper</option><option value="hipercard">Hipercard</option>
+                        <option value="elo">Elo</option><option value="amex">Amex</option>
+                    </select>
+                </div>
+                <div class="w-100 d-flex flex-column align-items-center" id="resultCalcularPorAparelho"></div>
+                <div class="text-center mt-3 w-100" id="exportAparelhoContainer" style="display:none;">
+                    <button class="btn btn-info" id="exportAparelhoBtn"><i class="bi bi-camera-fill"></i> Exportar Imagem</button>
+                </div>
+            </div>
+
+            <div id="aparelhoEmptyStateWrapper" class="hidden text-center" style="padding:2rem 0;">
+                <i class="bi bi-box2-heart" style="font-size:4rem;color:var(--primary-color);"></i>
+                <h4 class="mt-4">Lista de produtos vazia</h4>
+                <p class="text-secondary">Adicione produtos na seção de Administração do CTW.</p>
+            </div>
+        </div>
+
+        <!-- Fora do .content-card de propósito: ele tem backdrop-filter, que
+             "sequestra" elementos position:fixed igual o transform fazia.
+             Modal e botão flutuante SÓ funcionam fixos de verdade aqui fora. -->
+        <div class="apr-modal-backdrop" id="machine3ModalBackdrop">
+            <div class="apr-modal-card">
+                <div class="apr-modal-title">Escolher maquininha</div>
+                <div id="machine3ModalList"></div>
+            </div>
+        </div>
+        <button type="button" class="apr-copy-fab" id="aprCopiarSelecionadosBtn" style="display:none;">
+            <i class="bi bi-clipboard-check"></i> <span id="aprCopiarSelecionadosLabel">Copiar selecionados</span>
+        </button>
+    </div>
+
+</div><!-- /calculatorContainer -->
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAIS
+══════════════════════════════════════════════════════════ -->
+<!-- Modal geral (confirm/alert) -->
+<div class="custom-modal-overlay" id="customModalOverlay">
+    <div class="custom-modal-content">
+        <h4 id="customModalMessage"></h4>
+        <input class="hidden form-control" id="customModalPasswordInput" placeholder="Digite a senha" type="text" style="-webkit-text-security: disc;" autocomplete="off" data-lpignore="true" data-form-type="other" name="modal-confirm-code"/>
+        <div id="customModalButtons" class="mt-3">
+            <button class="btn btn-ok">OK</button>
+            <button class="btn btn-cancel">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Flag selector -->
+<div class="custom-modal-overlay" id="flagSelectorModalOverlay">
+    <div class="custom-modal-content" id="flagSelectorModalContent">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 id="flagSelectorTitle" class="mb-0">Selecione a Bandeira</h4>
+            <button class="btn-icon-circle" id="closeFlagModalBtn"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="d-grid gap-2" id="flagSelectorButtons"></div>
+    </div>
+</div>
+
+<!-- Modal Lucro (Empréstimo) -->
+<div class="custom-modal-overlay" id="lucroModalOverlay">
+    <div class="custom-modal-content">
+        <h4>Alterar Lucro (%)</h4>
+        <input class="form-control mt-3" id="lucroPercentInput" type="number" step="1" min="0" placeholder="Ex: 15"/>
+        <div class="mt-3">
+            <button class="btn btn-primary" id="saveLucroBtn">Salvar</button>
+            <button class="btn btn-secondary" id="cancelLucroBtn">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal nome favorito (Aparelho) -->
+<div class="custom-modal-overlay" id="favoriteNameModalOverlay">
+    <div class="custom-modal-content">
+        <h4>Salvar Favorito</h4>
+        <p class="text-secondary small mb-3">Digite um nome para esta configuração.</p>
+        <input class="form-control" id="favoriteNameInput" placeholder="Ex: iPhone com entrada" type="text"/>
+        <div class="mt-3">
+            <button class="btn btn-primary" id="confirmSaveFavoriteBtn">Salvar</button>
+            <button class="btn btn-secondary" id="cancelSaveFavoriteBtn">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Perfil Sheet -->
+<div class="ctw-sheet-overlay" id="profileSheetOverlay">
+    <div class="ctw-sheet" id="profileSheet">
+        <div class="ctw-sheet-handle"></div>
+        <div class="ctw-sheet-header">
+            <div class="ctw-sheet-avatar" id="profileSheetAvatar">👤</div>
+            <div class="ctw-sheet-idbox">
+                <div class="ctw-sheet-name" id="profileSheetName">Usuário</div>
+                <div class="ctw-sheet-papel" id="profileSheetPapel">—</div>
+            </div>
+        </div>
+        <button class="ctw-sheet-item" id="profileOpenConfig">
+            <span class="ctw-sheet-item-ic" style="background:linear-gradient(135deg,#93c5fd,#4f8cff);"><i class="bi bi-gear-fill"></i></span>
+            <span>Configurações</span>
+            <i class="bi bi-chevron-right ctw-sheet-chevron"></i>
+        </button>
+        <button class="ctw-sheet-item" id="profileOpenCustomizacoes">
+            <span class="ctw-sheet-item-ic" style="background:linear-gradient(135deg,#fbbf24,#f59e0b);"><i class="bi bi-stars"></i></span>
+            <span>Customizações</span>
+            <i class="bi bi-chevron-right ctw-sheet-chevron"></i>
+        </button>
+        <button class="ctw-sheet-item" id="profileOpenNotificacoes">
+            <span class="ctw-sheet-item-ic" style="background:linear-gradient(135deg,#4f8cff,#2563eb);"><i class="bi bi-bell-fill"></i></span>
+            <span>Notificações</span>
+            <i class="bi bi-chevron-right ctw-sheet-chevron"></i>
+        </button>
+        <div class="ctw-sheet-divider"></div>
+        <button class="ctw-sheet-item ctw-sheet-item-danger" id="profileOpenSair">
+            <span class="ctw-sheet-item-ic" style="background:linear-gradient(135deg,#f87171,#dc2626);"><i class="bi bi-box-arrow-right"></i></span>
+            <span>Sair</span>
+            <i class="bi bi-chevron-right ctw-sheet-chevron"></i>
+        </button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     NAVBAR
+══════════════════════════════════════════════════════════ -->
+<nav data-shell-only="mobile" id="ctwBottomNav" class="ctw-bottom-nav" aria-label="Navegação principal" style="display:none;">
+    <button class="ctw-nav-btn ctw-nav-active" id="ctwNavHome" title="Início">
+        <span class="ctw-nav-icon"><i class="bi bi-house-fill"></i></span>
+        <span class="ctw-nav-label">Início</span>
+    </button>
+    <button class="ctw-nav-ring-btn" id="ctwNavNotif" title="Notificações">
+        <span class="ctw-nav-ring"><i class="bi bi-bell-fill"></i><span class="ctw-nav-dot" id="ctwNavNotifDot" style="display:none;"></span></span>
+    </button>
+    <button class="ctw-nav-btn" id="ctwNavProfile" title="Perfil">
+        <span class="ctw-nav-icon"><i class="bi bi-person-fill"></i></span>
+        <span class="ctw-nav-label" id="ctwNavProfileLabel">Perfil</span>
+    </button>
+</nav>
+
+<nav data-shell-only="pc" id="vsSidebar" class="vs-sidebar" aria-label="Navegação principal">
+    <div class="vs-sidebar-brand">
+        <div class="vs-sidebar-mark">VS</div>
+        <div>
+            <div class="vs-sidebar-name">VortexSmart</div>
+            <div class="vs-sidebar-sub" id="vsSidebarLojaNome">&nbsp;</div>
+        </div>
+    </div>
+
+    <div class="vs-sidebar-scroll">
+        <div class="vs-sidebar-label">GERAL</div>
+        <button class="ctw-nav-btn vs-nav-item ctw-nav-active" id="ctwNavHome" title="Início">
+            <span class="vs-nav-ic"><i class="bi bi-house-fill"></i></span>
+            <span class="ctw-nav-label">Início</span>
+        </button>
+
+        <div class="vs-sidebar-label">OPERAÇÃO</div>
+        <button class="vs-nav-item" onclick="if (typeof window.openVendaSection === 'function') window.openVendaSection('lancarVenda');">
+            <span class="vs-nav-ic"><i class="bi bi-plus-lg"></i></span>
+            <span class="ctw-nav-label">Nova Venda</span>
+        </button>
+        <button class="vs-nav-item" onclick="if (typeof window.openVendaSection === 'function') window.openVendaSection('historicoVendas');">
+            <span class="vs-nav-ic"><i class="bi bi-list-ul"></i></span>
+            <span class="ctw-nav-label">Histórico</span>
+        </button>
+        <button class="vs-nav-item" onclick="document.getElementById('goToEstoque')?.click();">
+            <span class="vs-nav-ic"><i class="bi bi-box-seam-fill"></i></span>
+            <span class="ctw-nav-label">Estoque</span>
+        </button>
+        <button class="vs-nav-item" id="vsSideReparos" onclick="document.getElementById('goToReparos')?.click();">
+            <span class="vs-nav-ic"><i class="bi bi-gear-fill"></i></span>
+            <span class="ctw-nav-label">Concertos</span>
+        </button>
+        <button class="vs-nav-item" onclick="document.getElementById('goToReposicao')?.click();">
+            <span class="vs-nav-ic"><i class="bi bi-arrow-repeat"></i></span>
+            <span class="ctw-nav-label">Reposição</span>
+        </button>
+
+        <div class="vs-sidebar-label">FERRAMENTAS</div>
+        <button class="vs-nav-item" onclick="document.getElementById('goToCalculator')?.click();">
+            <span class="vs-nav-ic"><i class="bi bi-percent"></i></span>
+            <span class="ctw-nav-label">Calculadora</span>
+        </button>
+        <button class="vs-nav-item" onclick="document.getElementById('goToDocumentos')?.click();">
+            <span class="vs-nav-ic"><i class="bi bi-file-earmark-text-fill"></i></span>
+            <span class="ctw-nav-label">Documentos</span>
+        </button>
+        <button class="vs-nav-item" id="vsSideFinanceiro" style="display:none;" onclick="document.getElementById('goToFinanceiro')?.click();">
+            <span class="vs-nav-ic"><i class="bi bi-currency-dollar"></i></span>
+            <span class="ctw-nav-label">Financeiro</span>
+        </button>
+
+        <div class="vs-sidebar-label">SISTEMA</div>
+        <button class="vs-nav-item" onclick="if (typeof window.openConfiguracoesSection === 'function') window.openConfiguracoesSection('configuracoesHome');">
+            <span class="vs-nav-ic"><i class="bi bi-tools"></i></span>
+            <span class="ctw-nav-label">Configurações</span>
+        </button>
+    </div>
+
+    <div class="vs-sidebar-footer">
+        <button class="ctw-nav-ring-btn vs-nav-item" id="ctwNavNotif" title="Notificações">
+            <span class="vs-nav-ic"><i class="bi bi-bell-fill"></i></span>
+            <span class="ctw-nav-label">Notificações</span>
+            <span class="ctw-nav-dot" id="ctwNavNotifDot" style="display:none;"></span>
+        </button>
+        <button class="ctw-nav-btn vs-nav-item" id="ctwNavProfile" title="Perfil">
+            <span class="vs-nav-ic"><i class="bi bi-person-fill"></i></span>
+            <span class="ctw-nav-label" id="ctwNavProfileLabel">Perfil</span>
+        </button>
+    </div>
+</nav>
+
+<!-- Central de Notificações — gaveta lateral (desliza da direita).
+     Conteúdo dinâmico gerado por notificacoes-central.js -->
+<!-- Flash de "teletransporte" — toca só na transição entre uma
+     notificação e a tela que ela abre (Histórico, Estoque, etc.),
+     pra não parecer um corte seco. Ver notificacoes-central.js -->
+<div class="notif-teleport-flash" id="notifTeleportFlash"></div>
+
+<div class="notif-drawer-overlay" id="notifDrawerOverlay">
+    <div class="notif-drawer">
+        <div class="notif-drawer-header">
+            <div class="notif-drawer-titulo">Notificações</div>
+            <button type="button" class="notif-drawer-fechar" id="notifDrawerFecharBtn"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="notif-drawer-lista" id="notifDrawerLista"></div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════════════════ -->
+<script>
+    // Remove o HTML do outro formato (ver o script de detecção no <head>) e o que só serve ao programa
+    // instalado (impressoras) quando a página roda no navegador. Tem que rodar antes do core.js.
+    (function () {
+        var shell = document.documentElement.getAttribute('data-shell');
+        if (!(typeof window.vsmartPrint === 'object' && window.vsmartPrint !== null)) {
+            document.querySelectorAll('[data-electron-only]').forEach(function (el) { el.remove(); });
+        }
+        document.querySelectorAll('[data-shell-only]').forEach(function (el) {
+            if (el.getAttribute('data-shell-only') !== shell) { el.remove(); return; }
+            el.removeAttribute('data-shell-only');
+            if (el.hasAttribute('data-shell-unwrap')) el.replaceWith.apply(el, Array.prototype.slice.call(el.childNodes));
+        });
+    })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="lib/jsbarcode.min.js" defer></script>
+<script src="acesso-loja.js" defer></script>
+<script type="module" src="core.js" defer></script>
+<script src="diagnostico-sistema.js" defer></script>
+<script src="calculadoras/router.js" defer></script>
+<script src="calculadoras/export-imagem.js" defer></script>
+<script src="calculadoras/repassar-valores.js" defer></script>
+<script src="calculadoras/emprestimo.js" defer></script>
+<script src="calculadoras/por-aparelho.js" defer></script>
+<script src="calculadoras/fechar-venda.js" defer></script>
+<script src="documentos/router.js" defer></script>
+<script src="documentos/bookip.js" defer></script>
+<script src="documentos/contrato.js" defer></script>
+<script src="documentos/recibo.js" defer></script>
+<script src="documentos/orcamento.js" defer></script>
+<script src="estoque/router.js" defer></script>
+<script src="estoque/produtos.js" defer></script>
+<script src="estoque/conferencia.js" defer></script>
+<script src="estoque/movimentacao.js" defer></script>
+<script src="venda/router.js" defer></script>
+<script src="venda/lancar.js" defer></script>
+<script src="venda/historico.js" defer></script>
+<script src="impressao/recibo-termico.js" defer></script>
+<script src="impressao/etiqueta-termica.js" defer></script>
+<script src="venda/fechar.js" defer></script>
+<script src="venda/relatorios.js" defer></script>
+<script src="reparos/pattern-widget.js" defer></script>
+<script src="reparos/router.js" defer></script>
+<script src="reparos/lista.js" defer></script>
+<script src="reparos/form.js" defer></script>
+<script src="financeiro/router.js" defer></script>
+<script src="financeiro/painel-dinheiro.js" defer></script>
+<script src="financeiro/lancamentos.js" defer></script>
+<script src="financeiro/recorrentes.js" defer></script>
+<script src="financeiro/graficos.js" defer></script>
+<script src="financeiro/resumo.js" defer></script>
+<script src="reparos/documento.js" defer></script>
+<script src="reparos/finalizar-entrega.js" defer></script>
+<script src="reposicao/router.js" defer></script>
+<script src="reposicao/lista.js" defer></script>
+<script src="credscan/motor.js" defer></script>
+<script src="credscan/router.js" defer></script>
+<script src="credscan/lista.js" defer></script>
+<script src="credscan/detalhe.js" defer></script>
+<script src="configuracoes/router.js" defer></script>
+<script src="configuracoes/config-documentos.js" defer></script>
+<script src="configuracoes/config-backup.js" defer></script>
+<script src="configuracoes/config-produtos.js" defer></script>
+<script src="configuracoes/config-taxas.js" defer></script>
+<script src="configuracoes/config-clientes.js" defer></script>
+<script src="configuracoes/config-usuarios.js" defer></script>
+<script src="configuracoes/config-customizacoes.js" defer></script>
+<script src="configuracoes/config-notificacoes.js" defer></script>
+<script src="configuracoes/config-reparos.js" defer></script>
+<script src="configuracoes/config-credscan.js" defer></script>
+<script src="notificacoes-central.js" defer></script>
+
+<script>
+  // Registro do Service Worker — habilita instalação como PWA de verdade
+  // e cache do app shell (recarga instantânea se o Android matar o processo).
+  //
+  // SW_VERSION: carimbo na URL de registro. Isso é MAIS forte que
+  // confiar em cabeçalho de cache — navegador nenhum guarda cache de
+  // uma URL que ele nunca viu antes, então mudar esse número força uma
+  // busca de verdade no servidor, sem depender de Cache-Control, de
+  // limite de 24h que o navegador aplica sozinho pra checagem de SW
+  // novo, nem de nada estar configurado certinho do lado do servidor.
+  // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
+  // versão de um, sobe a do outro junto.
+  const SW_VERSION = 'v8';
+
+  if ('serviceWorker' in navigator) {
+    let registroSW = null;
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register(`sw.js?v=${SW_VERSION}`)
+        .then(reg => { registroSW = reg; })
+        .catch((err) => {
+          console.warn('Falha ao registrar Service Worker:', err);
+        });
+    });
+
+    // Assim que um Service Worker NOVO assume o controle da página
+    // (depois de instalado e ativado em segundo plano — sw.js já usa
+    // skipWaiting()+clients.claim() pra isso ser rápido), recarrega a
+    // aba sozinha, uma vez só. Sem isso, mesmo com o SW novo pronto, a
+    // aba que já tava aberta continuava rodando os arquivos antigos
+    // que já tinha carregado na memória — só via a versão nova quem
+    // fechasse e abrisse o app nas contas certas, ou em aba anônima.
+    let jaRecarregou = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (jaRecarregou) return;
+      jaRecarregou = true;
+      window.location.reload();
+    });
+
+    // A checagem de "tem Service Worker novo?" normalmente só acontece
+    // quando a página CARREGA. Isso deixa passar o caso de alguém abrir
+    // o app de manhã e ficar com ele em segundo plano o dia inteiro sem
+    // fechar — nesse cenário nunca teria carregado de novo, então nunca
+    // ia checar. Aqui força uma checagem extra toda vez que o app volta
+    // a ficar visível (o usuário troca de app e volta, por exemplo),
+    // sem custo nenhum se já estiver tudo atualizado.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && registroSW) {
+        registroSW.update().catch(() => {});
+      }
+    });
+
+    // ── Painel de diagnóstico — só aparece com ?swdebug=1 na URL ────
+    // Mostra o estado REAL do Service Worker nesse aparelho agora,
+    // sem precisar de DevTools. Temporário, só pra achar a causa do
+    // cache grudando — depois que resolver, dá pra tirar esse bloco.
+    if (new URLSearchParams(location.search).get('swdebug') === '1') {
+      window.addEventListener('load', () => {
+        setTimeout(async () => {
+          const linhas = [];
+          linhas.push('SW_VERSION no HTML: ' + SW_VERSION);
+
+          try {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            linhas.push('Registros de SW encontrados: ' + regs.length);
+            regs.forEach((r, i) => {
+              linhas.push(`[${i}] scope: ${r.scope}`);
+              linhas.push(`[${i}] active: ${r.active ? r.active.scriptURL + ' (' + r.active.state + ')' : '—'}`);
+              linhas.push(`[${i}] waiting: ${r.waiting ? r.waiting.scriptURL + ' (' + r.waiting.state + ')' : '—'}`);
+              linhas.push(`[${i}] installing: ${r.installing ? r.installing.scriptURL + ' (' + r.installing.state + ')' : '—'}`);
+            });
+          } catch (e) {
+            linhas.push('Erro ao ler registros: ' + e.message);
+          }
+
+          linhas.push('Controller desta aba: ' + (navigator.serviceWorker.controller ? navigator.serviceWorker.controller.scriptURL : '— (nenhum)'));
+
+          try {
+            const nomes = await caches.keys();
+            linhas.push('Caches no aparelho: ' + (nomes.join(', ') || '— nenhum'));
+          } catch (e) {
+            linhas.push('Erro ao ler caches: ' + e.message);
+          }
+
+          try {
+            const resp = await fetch('sw.js?bypass=' + Date.now(), { cache: 'no-store' });
+            const texto = await resp.text();
+            const match = texto.match(/CACHE_VERSION\s*=\s*'([^']+)'/);
+            linhas.push('CACHE_VERSION no servidor AGORA: ' + (match ? match[1] : '— não achei no arquivo'));
+          } catch (e) {
+            linhas.push('Erro ao buscar sw.js do servidor: ' + e.message);
+          }
+
+          const painel = document.createElement('div');
+          painel.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#000;color:#0f0;font-family:monospace;font-size:11px;padding:14px;overflow:auto;white-space:pre-wrap;line-height:1.6;';
+          painel.textContent = linhas.join('\n');
+          const fechar = document.createElement('button');
+          fechar.textContent = '✕ Fechar';
+          fechar.style.cssText = 'position:fixed;top:10px;right:10px;z-index:1000000;background:#f00;color:#fff;border:none;padding:8px 12px;border-radius:6px;font-size:14px;';
+          fechar.onclick = () => painel.remove();
+          painel.appendChild(fechar);
+          document.body.appendChild(painel);
+        }, 1500); // espera um pouco pro registro do SW ter chance de assentar
+      });
+    }
+  }
+</script>
+
+</body>
+</html>

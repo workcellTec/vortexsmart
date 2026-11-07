@@ -1,0 +1,72 @@
+{
+  "name": "vortexsmart-pdv-desktop",
+  "version": "1.0.0",
+  "description": "VortexSmart PDV - versão desktop (Windows) com impressão térmica, etiquetas e leitor de código de barras",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:debug": "electron . --debug",
+    "pack": "electron-builder --win --x64 --dir",
+    "dist": "electron-builder --win --x64",
+    "dist:simples": "electron-builder --win --x64 -c.win.signAndEditExecutable=false"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.6.3"
+  },
+  "author": "VortexSmart",
+  "build": {
+    "appId": "com.vortexsmart.pdv",
+    "productName": "VortexSmart PDV",
+    "copyright": "VortexSmart",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "impressao/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../app",
+        "to": "web",
+        "filter": [
+          "**/*",
+          "!admin-criar-loja.html",
+          "!diagnostico-bloqueio.html",
+          "!storage.rules",
+          "!firebase",
+          "!404.html"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "VortexSmart-PDV-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VortexSmart PDV",
+      "language": "1046",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

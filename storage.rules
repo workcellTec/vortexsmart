@@ -1,0 +1,23 @@
+// ================================================================
+// storage.rules — VortexSmart SaaS · Regras do Firebase Storage
+//
+// Isola cada loja na própria "pastinha" (lojas/{lojaId}/...) — ninguém
+// lê ou escreve na pasta de outra loja.
+//
+// Por que usar request.auth.token.lojaId (custom claim) em vez de
+// consultar o Realtime Database (como firebase-rules-saas.json faz
+// pra descobrir lojaId/papel/permissoes): regra de Storage NÃO
+// consegue ler o Realtime Database — só enxerga o que já vem gravado
+// no próprio token de login. A lojaId é gravada nesse token pelas
+// Cloud Functions (criarLoja/criarFuncionario), no momento em que o
+// usuário é criado — ver functions/index.js.
+// ================================================================
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /lojas/{lojaId}/{allPaths=**} {
+      allow read, write: if request.auth != null
+                          && request.auth.token.lojaId == lojaId;
+    }
+  }
+}

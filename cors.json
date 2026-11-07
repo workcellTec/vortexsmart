@@ -1,0 +1,11 @@
+[
+  {
+    "origin": [
+      "https://vortex-b3761.web.app",
+      "https://vortex-b3761.firebaseapp.com",
+      "http://localhost:26543"
+    ],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600
+  }
+]

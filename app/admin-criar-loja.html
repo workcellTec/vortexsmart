@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>VortexSmart · Admin</title>
+<style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+        margin: 0; min-height: 100dvh; background: #07101f; color: #e8ecf5;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px;
+    }
+    .card {
+        width: 100%; max-width: 460px; background: #0e1a30; border: 1px solid #1e2c47;
+        border-radius: 20px; padding: 26px 20px; margin-top: 24px;
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 4px; }
+    h2 { font-size: 1rem; margin: 0 0 4px; }
+    .sub { font-size: .8rem; color: #8b97ad; margin: 0 0 20px; line-height: 1.5; }
+    label { display: block; font-size: .78rem; font-weight: 600; color: #a8b3c7; margin: 14px 0 6px; }
+    input, select {
+        width: 100%; padding: 12px 14px; border-radius: 12px; border: 1.5px solid #223252;
+        background: #0a1424; color: #e8ecf5; font-size: .95rem; outline: none;
+    }
+    input:focus, textarea:focus, select:focus { border-color: #5b3df5; }
+    textarea {
+        width: 100%; padding: 12px 14px; border-radius: 12px; border: 1.5px solid #223252;
+        background: #0a1424; color: #e8ecf5; font-size: .95rem; outline: none;
+        font-family: inherit; resize: vertical; min-height: 80px;
+    }
+    button {
+        width: 100%; margin-top: 20px; padding: 13px; border: none; border-radius: 12px;
+        background: linear-gradient(135deg, #5b3df5, #4f8cff); color: #fff;
+        font-size: .92rem; font-weight: 700; cursor: pointer;
+    }
+    button:disabled { opacity: .5; cursor: default; }
+    button.secundario { background: #1a2740; }
+    button.perigo { background: #3a1414; border: 1px solid rgba(220,38,38,.5); color: #f87171; }
+    .msg { margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: .82rem; line-height: 1.5; display: none; white-space: pre-line; }
+    .msg.erro { background: rgba(220,38,38,.12); border: 1px solid rgba(220,38,38,.35); color: #f87171; display: block; }
+    .msg.ok   { background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.35); color: #4ade80; display: block; }
+    .hidden { display: none !important; }
+    .voltar { background: none; border: none; color: #8b97ad; font-size: .78rem; margin-bottom: 14px; padding: 0; text-align: left; width: auto; cursor: pointer; }
+    .divisor { border: none; border-top: 1px solid #1e2c47; margin: 26px 0; }
+
+    /* ── Painel: métricas + busca + lista de lojas ─────────────── */
+    .stats { display: flex; gap: 10px; margin-bottom: 16px; }
+    .stat-box { flex: 1; background: #0a1424; border: 1px solid #1e2c47; border-radius: 14px; padding: 12px 14px; }
+    .stat-box .num { font-size: 1.4rem; font-weight: 700; line-height: 1.1; }
+    .stat-box .lbl { font-size: .72rem; color: #8b97ad; margin-top: 2px; }
+    .stat-box.ok .num { color: #4ade80; }
+    .stat-box.bad .num { color: #f87171; }
+
+    .acoes-topo { display: flex; gap: 8px; margin-bottom: 16px; }
+    .acoes-topo button { margin-top: 0; }
+    .acoes-topo button.icone { width: 46px; flex: 0 0 46px; padding: 0; font-size: 1.1rem; }
+
+    .loja-item {
+        display: flex; align-items: center; gap: 10px; padding: 12px 8px;
+        border-bottom: 1px solid #1a2740; cursor: pointer;
+    }
+    .loja-item:last-child { border-bottom: none; }
+    .loja-avatar {
+        width: 36px; height: 36px; border-radius: 50%; background: #17233d;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1rem;
+    }
+    .loja-info { flex: 1; min-width: 0; }
+    .loja-nome { font-size: .9rem; font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .loja-sub { font-size: .75rem; color: #8b97ad; margin: 2px 0 0; }
+    .badge { font-size: .68rem; font-weight: 700; padding: 3px 9px; border-radius: 8px; flex-shrink: 0; }
+    .badge.ativa { background: rgba(34,197,94,.15); color: #4ade80; }
+    .badge.bloq { background: rgba(220,38,38,.15); color: #f87171; }
+    #vazioLista { text-align: center; color: #5c6884; font-size: .85rem; padding: 24px 0; }
+
+    /* ── Detalhe da loja ────────────────────────────────────────── */
+    .membro-item {
+        display: flex; align-items: center; gap: 10px; padding: 10px 4px;
+        border-bottom: 1px solid #1a2740;
+    }
+    .membro-item:last-child { border-bottom: none; }
+    .membro-avatar {
+        width: 32px; height: 32px; border-radius: 50%; background: #221a4a; color: #b3a8f5;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        font-size: .72rem; font-weight: 700; flex-shrink: 0;
+    }
+    .membro-nome { font-size: .85rem; font-weight: 600; margin: 0; }
+    .membro-papel { font-size: .72rem; color: #8b97ad; margin: 1px 0 0; text-transform: capitalize; }
+    .membro-acoes { display: flex; gap: 4px; flex-shrink: 0; }
+    .btn-icone-mini {
+        width: 30px; height: 30px; border-radius: 8px; border: 1px solid #223252; background: #0a1424;
+        color: #a8b3c7; font-size: .82rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        margin-top: 0; padding: 0;
+    }
+    .btn-icone-mini.perigo { border-color: rgba(220,38,38,.4); color: #f87171; }
+
+    .caixa {
+        background: #0a1424; border: 1px solid #1e2c47; border-radius: 14px; padding: 14px 16px; margin-bottom: 16px;
+    }
+    .caixa-topo { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .caixa-topo p { margin: 0; }
+    .caixa-topo .btn-mini {
+        width: auto; margin-top: 0; padding: 8px 14px; font-size: .78rem; white-space: nowrap;
+    }
+    .zona-perigo { border: 1px solid rgba(220,38,38,.4); border-radius: 14px; padding: 14px 16px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+
+    <!-- ── Tela de Login (admin) ─────────────────────────────── -->
+    <div id="telaLogin">
+        <h1>🔐 Admin VortexSmart</h1>
+        <p class="sub">Entra com sua conta de admin.</p>
+        <label for="loginEmail">Seu e-mail (admin)</label>
+        <input type="email" id="loginEmail" placeholder="seu@email.com" autocomplete="username"/>
+        <label for="loginSenha">Sua senha</label>
+        <input type="password" id="loginSenha" placeholder="Sua senha" autocomplete="current-password"/>
+        <button id="btnLogin">Entrar</button>
+        <div id="msgLogin" class="msg"></div>
+    </div>
+
+    <!-- ── Painel principal (dashboard de lojas) ─────────────── -->
+    <div id="telaPainel" class="hidden">
+        <button class="voltar" id="btnSair">← Sair</button>
+        <h1>🏪 Painel Admin</h1>
+        <p class="sub">Todas as lojas do sistema.</p>
+
+        <div class="stats">
+            <div class="stat-box ok">
+                <div class="num" id="statAtivas">—</div>
+                <div class="lbl">Ativas</div>
+            </div>
+            <div class="stat-box bad">
+                <div class="num" id="statBloqueadas">—</div>
+                <div class="lbl">Bloqueadas</div>
+            </div>
+        </div>
+
+        <div class="acoes-topo">
+            <input type="text" id="buscaLoja" placeholder="Buscar loja pelo nome" oninput="filtrarLojas()"/>
+            <button class="icone secundario" id="btnAtualizarLista" title="Atualizar">↻</button>
+        </div>
+
+        <div id="listaLojas"></div>
+        <div id="vazioLista" class="hidden">Nenhuma loja encontrada.</div>
+        <div id="msgPainel" class="msg"></div>
+
+        <hr class="divisor"/>
+
+        <button id="btnIrCriarLoja">+ Criar Loja Nova</button>
+        <button class="secundario" id="btnIrNotifBroadcast">📢 Notificação pra Todo Mundo</button>
+    </div>
+
+    <!-- ── Detalhe da loja ────────────────────────────────────── -->
+    <div id="telaDetalheLoja" class="hidden">
+        <button class="voltar" id="btnVoltarDetalhe">← Voltar</button>
+        <h1 id="detNome">—</h1>
+        <p class="sub" id="detId">—</p>
+
+        <div class="caixa">
+            <div class="caixa-topo">
+                <div>
+                    <p style="font-weight:700; font-size:.88rem;">Acesso ao sistema</p>
+                    <p style="font-size:.78rem; color:#8b97ad; margin-top:2px;" id="detAcessoStatus">—</p>
+                </div>
+                <button class="btn-mini" id="btnToggleBloqueio">—</button>
+            </div>
+            <div id="motivoBloqueioBox" class="hidden" style="margin-top:12px;">
+                <input type="text" id="motivoBloqueioInput" placeholder="Motivo (ex: falta de pagamento)"/>
+                <button id="btnConfirmarBloqueio" style="margin-top:10px;">Confirmar bloqueio</button>
+            </div>
+        </div>
+
+        <label for="editarNomeLojaInput">Nome da loja</label>
+        <input type="text" id="editarNomeLojaInput"/>
+        <button class="secundario" id="btnSalvarNomeLoja">Salvar nome</button>
+        <div id="msgNomeLoja" class="msg"></div>
+
+        <hr class="divisor"/>
+
+        <h2>Membros</h2>
+        <p class="sub" style="margin-bottom:10px;">Toca no ✉️ pra trocar o email, na 🔑 pra resetar a senha, ou na 🗑️ pra apagar o usuário.</p>
+        <div id="listaMembros"></div>
+        <div id="msgMembros" class="msg"></div>
+
+        <hr class="divisor"/>
+
+        <h2>📢 Notificação pra essa loja</h2>
+        <label for="notifLojaTitulo">Título</label>
+        <input type="text" id="notifLojaTitulo" placeholder="Ex: Regularize o pagamento"/>
+        <label for="notifLojaCorpo">Mensagem</label>
+        <textarea id="notifLojaCorpo" placeholder="Ex: A mensalidade de agosto está em aberto."></textarea>
+        <button class="secundario" id="btnEnviarNotifLoja">Enviar só pra essa loja</button>
+        <div id="msgNotifLoja" class="msg"></div>
+
+        <hr class="divisor"/>
+
+        <div class="zona-perigo">
+            <h2 style="color:#f87171;">⚠️ Apagar loja</h2>
+            <p class="sub" style="margin-bottom:12px;">Remove a loja, os dados financeiros e todos os usuários vinculados. Um backup em .json é baixado automaticamente antes de apagar. Não tem como desfazer.</p>
+            <label for="confirmaNomeLojaInput">Digite "<span id="confirmaNomeAlvo"></span>" pra confirmar</label>
+            <input type="text" id="confirmaNomeLojaInput" oninput="checarConfirmaApagar()" autocomplete="off"/>
+            <button class="perigo" id="btnApagarLoja" disabled>Apagar loja permanentemente</button>
+            <div id="msgApagarLoja" class="msg"></div>
+        </div>
+    </div>
+
+    <!-- ── Criar Loja ─────────────────────────────────────────── -->
+    <div id="telaCriarLoja" class="hidden">
+        <button class="voltar" id="btnVoltarCriarLoja">← Voltar</button>
+        <h1>🏪 Criar Loja Nova</h1>
+        <p class="sub">Cria a loja e o usuário Gestor dela de uma vez.</p>
+
+        <label for="nomeLoja">Nome da loja</label>
+        <input type="text" id="nomeLoja" placeholder="Ex: Celular Fácil Centro"/>
+
+        <label for="nomeGestor">Nome do Gestor</label>
+        <input type="text" id="nomeGestor" placeholder="Ex: João Silva"/>
+
+        <label for="emailGestor">E-mail do Gestor (login dele)</label>
+        <input type="email" id="emailGestor" placeholder="gestor@exemplo.com" autocomplete="off"/>
+
+        <label for="senhaGestor">Senha do Gestor (mín. 6 caracteres)</label>
+        <input type="text" id="senhaGestor" placeholder="Senha de acesso" autocomplete="off"/>
+
+        <button id="btnCriarLoja">Criar Loja</button>
+        <div id="msgCriarLoja" class="msg"></div>
+    </div>
+
+    <!-- ── Notificação broadcast ──────────────────────────────── -->
+    <div id="telaNotifBroadcast" class="hidden">
+        <button class="voltar" id="btnVoltarNotifBroadcast">← Voltar</button>
+        <h1>📢 Notificação pra Todo Mundo</h1>
+        <p class="sub">Vai pra TODOS os usuários de TODAS as lojas que já ativaram notificação. Esse aviso não tem como o usuário desligar.</p>
+
+        <label for="notifTitulo">Título</label>
+        <input type="text" id="notifTitulo" placeholder="Ex: Atualização disponível"/>
+
+        <label for="notifCorpo">Mensagem</label>
+        <textarea id="notifCorpo" placeholder="Ex: Agora dá pra ver o caminho completo de qualquer produto em Estoque → Movimentação."></textarea>
+
+        <button id="btnEnviarNotificacao">Enviar pra todo mundo</button>
+        <div id="msgNotificacao" class="msg"></div>
+    </div>
+
+</div>
+
+<script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js';
+    import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.9.1/firebase-functions.js';
+
+    // Mesma config do app principal (core.js) — mesmo projeto Firebase.
+    const firebaseConfig = {
+        apiKey:            'AIzaSyC1HuGxN7ko4MdYYJCM5QDQmkpbN5lfxA4',
+        authDomain:        'vortex-b3761.firebaseapp.com',
+        databaseURL:       'https://vortex-b3761-default-rtdb.firebaseio.com',
+        projectId:         'vortex-b3761',
+        storageBucket:     'vortex-b3761.firebasestorage.app',
+        messagingSenderId: '920463151800',
+        appId:             '1:920463151800:web:6011489281000edab365a4d'
+    };
+    const app       = initializeApp(firebaseConfig);
+    const auth      = getAuth(app);
+    const functions = getFunctions(app);
+
+    const criarLojaFn             = httpsCallable(functions, 'criarLoja');
+    const enviarNotificacaoFn     = httpsCallable(functions, 'enviarNotificacaoBroadcast');
+    const enviarNotificacaoLojaFn = httpsCallable(functions, 'enviarNotificacaoLoja');
+    const adminListarLojasFn      = httpsCallable(functions, 'adminListarLojas');
+    const adminBloquearLojaFn     = httpsCallable(functions, 'adminBloquearLoja');
+    const adminDesbloquearLojaFn  = httpsCallable(functions, 'adminDesbloquearLoja');
+    const adminEditarNomeLojaFn   = httpsCallable(functions, 'adminEditarNomeLoja');
+    const adminEditarEmailFn      = httpsCallable(functions, 'adminEditarEmailUsuario');
+    const adminResetarSenhaFn     = httpsCallable(functions, 'adminResetarSenhaUsuario');
+    const adminApagarUsuarioFn    = httpsCallable(functions, 'adminApagarUsuario');
+    const adminApagarLojaFn       = httpsCallable(functions, 'adminApagarLoja');
+
+    const el = id => document.getElementById(id);
+
+    function mostrarMsg(elId, texto, tipo) {
+        const box = el(elId);
+        box.textContent = texto;
+        box.className = 'msg ' + tipo;
+    }
+    function limparMsg(elId) {
+        const box = el(elId);
+        box.textContent = '';
+        box.className = 'msg';
+    }
+
+    // ── Navegação entre telas (todas dentro do mesmo .card) ─────────
+    const TELAS = ['telaLogin', 'telaPainel', 'telaDetalheLoja', 'telaCriarLoja', 'telaNotifBroadcast'];
+    function mostrarTela(id) {
+        TELAS.forEach(t => el(t).classList.toggle('hidden', t !== id));
+    }
+
+    // ── Login ────────────────────────────────────────────────────
+    el('btnLogin').addEventListener('click', () => {
+        const email = el('loginEmail').value.trim();
+        const senha = el('loginSenha').value;
+        limparMsg('msgLogin');
+        if (!email || !senha) { mostrarMsg('msgLogin', 'Preenche e-mail e senha.', 'erro'); return; }
+
+        el('btnLogin').disabled = true;
+        el('btnLogin').textContent = 'Entrando...';
+        signInWithEmailAndPassword(auth, email, senha)
+            .catch(e => {
+                mostrarMsg('msgLogin', 'Erro ao entrar: ' + (e.code || e.message), 'erro');
+            })
+            .finally(() => {
+                el('btnLogin').disabled = false;
+                el('btnLogin').textContent = 'Entrar';
+            });
+    });
+
+    el('btnSair').addEventListener('click', () => signOut(auth));
+
+    onAuthStateChanged(auth, user => {
+        if (user) {
+            mostrarTela('telaPainel');
+            carregarLojas();
+        } else {
+            mostrarTela('telaLogin');
+        }
+    });
+
+    // ── Painel: carregar e listar lojas ─────────────────────────────
+    let lojasCache = [];
+    let lojaAtual = null;
+
+    function carregarLojas() {
+        limparMsg('msgPainel');
+        el('listaLojas').innerHTML = '<p style="text-align:center;color:#5c6884;font-size:.85rem;padding:16px 0;">Carregando...</p>';
+        adminListarLojasFn()
+            .then(result => {
+                lojasCache = (result.data && result.data.lojas) || [];
+                renderizarLojas(lojasCache);
+            })
+            .catch(e => {
+                el('listaLojas').innerHTML = '';
+                mostrarMsg('msgPainel', '❌ Erro ao carregar lojas: ' + (e.message || e.code), 'erro');
+            });
+    }
+
+    function renderizarLojas(lista) {
+        const cont = el('listaLojas');
+        const ativas = lojasCache.filter(l => !l.bloqueada).length;
+        const bloqueadas = lojasCache.filter(l => l.bloqueada).length;
+        el('statAtivas').textContent = ativas;
+        el('statBloqueadas').textContent = bloqueadas;
+
+        cont.innerHTML = '';
+        el('vazioLista').classList.toggle('hidden', lista.length > 0);
+
+        lista.forEach(loja => {
+            const item = document.createElement('div');
+            item.className = 'loja-item';
+            item.innerHTML = `
+                <div class="loja-avatar">🏪</div>
+                <div class="loja-info">
+                    <p class="loja-nome"></p>
+                    <p class="loja-sub"></p>
+                </div>
+                <span class="badge ${loja.bloqueada ? 'bloq' : 'ativa'}">${loja.bloqueada ? 'Bloqueada' : 'Ativa'}</span>
+            `;
+            item.querySelector('.loja-nome').textContent = loja.nome;
+            const qtdMembros = (loja.membros || []).length;
+            item.querySelector('.loja-sub').textContent = `${qtdMembros} membro${qtdMembros !== 1 ? 's' : ''}`;
+            item.addEventListener('click', () => abrirDetalheLoja(loja.lojaId));
+            cont.appendChild(item);
+        });
+    }
+
+    function filtrarLojas() {
+        const termo = el('buscaLoja').value.trim().toLowerCase();
+        const filtradas = termo
+            ? lojasCache.filter(l => l.nome.toLowerCase().includes(termo))
+            : lojasCache;
+        renderizarLojas(filtradas);
+    }
+
+    el('btnAtualizarLista').addEventListener('click', carregarLojas);
+
+    // ── Detalhe da loja ──────────────────────────────────────────
+    function abrirDetalheLoja(lojaId) {
+        lojaAtual = lojasCache.find(l => l.lojaId === lojaId);
+        if (!lojaAtual) return;
+        renderizarDetalheLoja();
+        mostrarTela('telaDetalheLoja');
+    }
+
+    function renderizarDetalheLoja() {
+        ['msgNomeLoja', 'msgMembros', 'msgNotifLoja', 'msgApagarLoja'].forEach(limparMsg);
+
+        el('detNome').textContent = lojaAtual.nome;
+        el('detId').textContent = lojaAtual.lojaId;
+        el('editarNomeLojaInput').value = lojaAtual.nome;
+        el('confirmaNomeAlvo').textContent = lojaAtual.nome;
+        el('confirmaNomeLojaInput').value = '';
+        el('btnApagarLoja').disabled = true;
+        el('motivoBloqueioBox').classList.add('hidden');
+        el('motivoBloqueioInput').value = '';
+
+        if (lojaAtual.bloqueada) {
+            el('detAcessoStatus').textContent = 'Bloqueado — ' + (lojaAtual.bloqueioMotivo || 'sem motivo registrado');
+            el('btnToggleBloqueio').textContent = 'Desbloquear';
+            el('btnToggleBloqueio').className = 'btn-mini secundario';
+        } else {
+            el('detAcessoStatus').textContent = 'Liberado';
+            el('btnToggleBloqueio').textContent = 'Bloquear';
+            el('btnToggleBloqueio').className = 'btn-mini perigo';
+        }
+
+        const cont = el('listaMembros');
+        cont.innerHTML = '';
+        (lojaAtual.membros || []).forEach(m => {
+            const iniciais = (m.nome || m.email || '?').trim().split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase();
+            const item = document.createElement('div');
+            item.className = 'membro-item';
+            item.innerHTML = `
+                <div class="membro-avatar">${iniciais}</div>
+                <div style="flex:1; min-width:0;">
+                    <p class="membro-nome"></p>
+                    <p class="membro-papel"></p>
+                </div>
+                <div class="membro-acoes">
+                    <button class="btn-icone-mini" title="Trocar email">✉️</button>
+                    <button class="btn-icone-mini" title="Resetar senha">🔑</button>
+                    <button class="btn-icone-mini perigo" title="Apagar usuário">🗑️</button>
+                </div>
+            `;
+            item.querySelector('.membro-nome').textContent = m.nome || '(sem nome)';
+            item.querySelector('.membro-papel').textContent = m.papel;
+            const [btnEmail, btnSenha, btnApagar] = item.querySelectorAll('.btn-icone-mini');
+            btnEmail.addEventListener('click', () => editarEmailMembro(m));
+            btnSenha.addEventListener('click', () => resetarSenhaMembro(m));
+            btnApagar.addEventListener('click', () => apagarMembro(m));
+            cont.appendChild(item);
+        });
+    }
+
+    el('btnVoltarDetalhe').addEventListener('click', () => { mostrarTela('telaPainel'); carregarLojas(); });
+
+    // ── Bloquear / desbloquear ───────────────────────────────────
+    el('btnToggleBloqueio').addEventListener('click', () => {
+        if (lojaAtual.bloqueada) {
+            const btn = el('btnToggleBloqueio');
+            btn.disabled = true;
+            adminDesbloquearLojaFn({ lojaId: lojaAtual.lojaId })
+                .then(() => {
+                    lojaAtual.bloqueada = false;
+                    lojaAtual.bloqueioMotivo = null;
+                    renderizarDetalheLoja();
+                })
+                .catch(e => mostrarMsg('msgNomeLoja', '❌ Erro: ' + (e.message || e.code), 'erro'))
+                .finally(() => { btn.disabled = false; });
+        } else {
+            el('motivoBloqueioBox').classList.toggle('hidden');
+            el('motivoBloqueioInput').focus();
+        }
+    });
+
+    el('btnConfirmarBloqueio').addEventListener('click', () => {
+        const motivo = el('motivoBloqueioInput').value.trim();
+        if (!motivo) { mostrarMsg('msgNomeLoja', 'Descreve o motivo do bloqueio.', 'erro'); return; }
+        const btn = el('btnConfirmarBloqueio');
+        btn.disabled = true;
+        btn.textContent = 'Bloqueando...';
+        adminBloquearLojaFn({ lojaId: lojaAtual.lojaId, motivo })
+            .then(() => {
+                lojaAtual.bloqueada = true;
+                lojaAtual.bloqueioMotivo = motivo;
+                renderizarDetalheLoja();
+            })
+            .catch(e => mostrarMsg('msgNomeLoja', '❌ Erro: ' + (e.message || e.code), 'erro'))
+            .finally(() => { btn.disabled = false; btn.textContent = 'Confirmar bloqueio'; });
+    });
+
+    // ── Editar nome da loja ──────────────────────────────────────
+    el('btnSalvarNomeLoja').addEventListener('click', () => {
+        const novoNome = el('editarNomeLojaInput').value.trim();
+        limparMsg('msgNomeLoja');
+        if (!novoNome) { mostrarMsg('msgNomeLoja', 'O nome não pode ficar vazio.', 'erro'); return; }
+
+        const btn = el('btnSalvarNomeLoja');
+        btn.disabled = true;
+        btn.textContent = 'Salvando...';
+        adminEditarNomeLojaFn({ lojaId: lojaAtual.lojaId, novoNome })
+            .then(() => {
+                lojaAtual.nome = novoNome;
+                el('detNome').textContent = novoNome;
+                el('confirmaNomeAlvo').textContent = novoNome;
+                mostrarMsg('msgNomeLoja', '✅ Nome atualizado.', 'ok');
+            })
+            .catch(e => mostrarMsg('msgNomeLoja', '❌ Erro: ' + (e.message || e.code), 'erro'))
+            .finally(() => { btn.disabled = false; btn.textContent = 'Salvar nome'; });
+    });
+
+    // ── Ações por membro ──────────────────────────────────────────
+    function editarEmailMembro(membro) {
+        const novoEmail = prompt(`Novo e-mail para ${membro.nome || membro.email}:`, membro.email || '');
+        if (!novoEmail || novoEmail.trim() === membro.email) return;
+        limparMsg('msgMembros');
+        adminEditarEmailFn({ uid: membro.uid, novoEmail: novoEmail.trim() })
+            .then(() => {
+                membro.email = novoEmail.trim();
+                mostrarMsg('msgMembros', `✅ Email de "${membro.nome}" atualizado.`, 'ok');
+            })
+            .catch(e => mostrarMsg('msgMembros', '❌ Erro: ' + (e.message || e.code), 'erro'));
+    }
+
+    function resetarSenhaMembro(membro) {
+        const novaSenha = prompt(`Nova senha para ${membro.nome || membro.email} (mín. 6 caracteres):`, '');
+        if (!novaSenha) return;
+        if (novaSenha.length < 6) { mostrarMsg('msgMembros', 'A senha precisa ter pelo menos 6 caracteres.', 'erro'); return; }
+        limparMsg('msgMembros');
+        adminResetarSenhaFn({ uid: membro.uid, novaSenha })
+            .then(() => mostrarMsg('msgMembros', `✅ Senha de "${membro.nome}" resetada.`, 'ok'))
+            .catch(e => mostrarMsg('msgMembros', '❌ Erro: ' + (e.message || e.code), 'erro'));
+    }
+
+    function apagarMembro(membro) {
+        const aviso = membro.papel === 'gestor'
+            ? `"${membro.nome}" é Gestor dessa loja. Apagar sem promover outro Gestor antes deixa a loja sem ninguém pra gerenciar. Apagar mesmo assim?`
+            : `Apagar "${membro.nome}"? Essa ação não tem volta.`;
+        if (!confirm(aviso)) return;
+        limparMsg('msgMembros');
+        adminApagarUsuarioFn({ uid: membro.uid })
+            .then(() => {
+                lojaAtual.membros = lojaAtual.membros.filter(m => m.uid !== membro.uid);
+                renderizarDetalheLoja();
+                mostrarMsg('msgMembros', `✅ "${membro.nome}" apagado.`, 'ok');
+            })
+            .catch(e => mostrarMsg('msgMembros', '❌ Erro: ' + (e.message || e.code), 'erro'));
+    }
+
+    // ── Notificação pra 1 loja ───────────────────────────────────
+    el('btnEnviarNotifLoja').addEventListener('click', () => {
+        const titulo = el('notifLojaTitulo').value.trim();
+        const corpo = el('notifLojaCorpo').value.trim();
+        limparMsg('msgNotifLoja');
+        if (!titulo || !corpo) { mostrarMsg('msgNotifLoja', 'Preenche título e mensagem.', 'erro'); return; }
+
+        const btn = el('btnEnviarNotifLoja');
+        btn.disabled = true;
+        btn.textContent = 'Enviando...';
+        enviarNotificacaoLojaFn({ lojaId: lojaAtual.lojaId, titulo, corpo })
+            .then(result => {
+                mostrarMsg('msgNotifLoja', '✅ ' + (result.data?.mensagem || 'Enviado!'), 'ok');
+                el('notifLojaTitulo').value = '';
+                el('notifLojaCorpo').value = '';
+            })
+            .catch(e => mostrarMsg('msgNotifLoja', '❌ Erro: ' + (e.message || e.code), 'erro'))
+            .finally(() => { btn.disabled = false; btn.textContent = 'Enviar só pra essa loja'; });
+    });
+
+    // ── Apagar loja (com backup automático em .json) ─────────────
+    function checarConfirmaApagar() {
+        el('btnApagarLoja').disabled = el('confirmaNomeLojaInput').value.trim() !== lojaAtual.nome;
+    }
+    window.checarConfirmaApagar = checarConfirmaApagar;
+
+    function baixarJSON(nomeArquivo, objeto) {
+        const blob = new Blob([JSON.stringify(objeto, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nomeArquivo;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    el('btnApagarLoja').addEventListener('click', () => {
+        const confirmacaoNome = el('confirmaNomeLojaInput').value.trim();
+        if (confirmacaoNome !== lojaAtual.nome) return;
+        if (!confirm(`Apagar "${lojaAtual.nome}" e TODOS os dados dela? Isso não tem volta.`)) return;
+
+        limparMsg('msgApagarLoja');
+        const btn = el('btnApagarLoja');
+        btn.disabled = true;
+        btn.textContent = 'Apagando... pode levar alguns segundos';
+
+        adminApagarLojaFn({ lojaId: lojaAtual.lojaId, confirmacaoNome })
+            .then(result => {
+                const d = result.data || {};
+                if (d.backup) {
+                    const nomeArquivo = `backup-${lojaAtual.nome.replace(/[^a-z0-9]+/gi, '-')}-${Date.now()}.json`;
+                    baixarJSON(nomeArquivo, d.backup);
+                }
+                const erros = Array.isArray(d.erros) ? d.erros : [];
+                mostrarMsg(
+                    'msgApagarLoja',
+                    '✅ ' + (d.mensagem || 'Loja apagada.') + ' Backup baixado.' +
+                    (erros.length ? `\n⚠️ ${erros.length} aviso(s):\n${erros.join('\n')}` : ''),
+                    'ok'
+                );
+                setTimeout(() => { mostrarTela('telaPainel'); carregarLojas(); }, 2500);
+            })
+            .catch(e => {
+                mostrarMsg('msgApagarLoja', '❌ Erro: ' + (e.message || e.code || 'desconhecido'), 'erro');
+                btn.disabled = false;
+                btn.textContent = 'Apagar loja permanentemente';
+            });
+    });
+
+    // ── Navegação: Criar Loja ────────────────────────────────────
+    el('btnIrCriarLoja').addEventListener('click', () => { limparMsg('msgCriarLoja'); mostrarTela('telaCriarLoja'); });
+    el('btnVoltarCriarLoja').addEventListener('click', () => mostrarTela('telaPainel'));
+
+    el('btnCriarLoja').addEventListener('click', () => {
+        const nomeLoja    = el('nomeLoja').value.trim();
+        const nomeGestor  = el('nomeGestor').value.trim();
+        const emailGestor = el('emailGestor').value.trim();
+        const senhaGestor = el('senhaGestor').value;
+        limparMsg('msgCriarLoja');
+
+        if (!nomeLoja || !nomeGestor || !emailGestor || !senhaGestor) {
+            mostrarMsg('msgCriarLoja', 'Preenche todos os campos.', 'erro'); return;
+        }
+        if (senhaGestor.length < 6) {
+            mostrarMsg('msgCriarLoja', 'A senha do Gestor precisa ter pelo menos 6 caracteres.', 'erro'); return;
+        }
+
+        const btn = el('btnCriarLoja');
+        btn.disabled = true;
+        btn.textContent = 'Criando...';
+
+        criarLojaFn({ nomeLoja, nomeGestor, emailGestor, senhaGestor })
+            .then(result => {
+                mostrarMsg('msgCriarLoja', '✅ ' + (result.data?.mensagem || 'Loja criada!') + `\n\nlojaId: ${result.data?.lojaId || '—'}`, 'ok');
+                el('nomeLoja').value = '';
+                el('nomeGestor').value = '';
+                el('emailGestor').value = '';
+                el('senhaGestor').value = '';
+            })
+            .catch(e => {
+                mostrarMsg('msgCriarLoja', '❌ Erro: ' + (e.message || e.code || 'desconhecido'), 'erro');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = 'Criar Loja';
+            });
+    });
+
+    // ── Navegação: Notificação broadcast ─────────────────────────
+    el('btnIrNotifBroadcast').addEventListener('click', () => { limparMsg('msgNotificacao'); mostrarTela('telaNotifBroadcast'); });
+    el('btnVoltarNotifBroadcast').addEventListener('click', () => mostrarTela('telaPainel'));
+
+    el('btnEnviarNotificacao').addEventListener('click', () => {
+        const titulo = el('notifTitulo').value.trim();
+        const corpo  = el('notifCorpo').value.trim();
+        limparMsg('msgNotificacao');
+
+        if (!titulo || !corpo) {
+            mostrarMsg('msgNotificacao', 'Preenche título e mensagem.', 'erro'); return;
+        }
+
+        const btn = el('btnEnviarNotificacao');
+        btn.disabled = true;
+        btn.textContent = 'Enviando...';
+
+        enviarNotificacaoFn({ titulo, corpo })
+            .then(result => {
+                mostrarMsg('msgNotificacao', '✅ ' + (result.data?.mensagem || 'Enviado!'), 'ok');
+                el('notifTitulo').value = '';
+                el('notifCorpo').value = '';
+            })
+            .catch(e => {
+                mostrarMsg('msgNotificacao', '❌ Erro: ' + (e.message || e.code || 'desconhecido'), 'erro');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = 'Enviar pra todo mundo';
+            });
+    });
+</script>
+
+</body>
+</html>
