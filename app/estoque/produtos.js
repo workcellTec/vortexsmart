@@ -216,6 +216,7 @@
         const header = el('stqModalHeader');
         header.className = 'stq-modal-header ' + corClasse;
         el('stqModalTitle').textContent = titulo;
+        backdrop.classList.remove('stq-fp-tela'); // tela cheia (celular) é só do formulário de produto: ele se marca depois de abrir
         backdrop.classList.add('show');
         // Trava a rolagem de fundo enquanto o modal tá aberto (sem isso a
         // lista de produtos por baixo continua respondendo ao dedo).
@@ -654,6 +655,7 @@
                 renderCorPicker();
             });
         });
+        atualizarResumosForm();
     }
 
     function adicionarCorCustom() {
@@ -754,85 +756,133 @@
         });
     }
 
+    // Formulário Novo/Editar produto. A MESMA estrutura serve celular e PC: no celular as classes
+    // stq-fp-* viram seções, cartões, seletor "Já tinha / Acabei de comprar", chips e grupos
+    // recolhíveis (style.mobile.css); no PC elas ficam neutras e o formulário continua como sempre
+    // foi (style.pc.css). Os ids e os campos de verdade (input/select/radio/checkbox) são os de sempre.
     function formBodyHtml(viaAlerta) {
+        const etiquetaOk = typeof window._etiquetaTermicaDisponivel === 'function' && window._etiquetaTermicaDisponivel();
         return `
-            <div class="mb-3">
-                <label class="form-label" for="stqNome"><i class="bi bi-box-seam"></i> Nome do Produto</label>
-                <input class="form-control" id="stqNome" type="text" placeholder="Ex: iPhone 11 128GB"/>
-            </div>
-            <div class="mb-3">
-                <label class="form-label" for="stqCodigoBarras"><i class="bi bi-upc-scan"></i> Código de Barras <span class="text-secondary small">(opcional)</span></label>
-                <div style="display:flex;gap:8px;">
-                    <input class="form-control" id="stqCodigoBarras" type="text" placeholder="Leia com a pistola, digite, ou gere abaixo" style="flex:1;"/>
-                    <button type="button" class="btn btn-secondary" id="stqGerarCodigoBtn" title="Gerar e salvar código de barras"><i class="bi bi-magic"></i></button>
+            <div class="stq-fp ${viaAlerta ? 'stq-fp-alerta' : ''}">
+                <div class="stq-fp-sec">O produto</div>
+                <div class="stq-fp-card">
+                    <div class="mb-3 stq-fp-nome">
+                        <label class="form-label" for="stqNome"><i class="bi bi-box-seam"></i> Nome do Produto</label>
+                        <input class="form-control" id="stqNome" type="text" placeholder="Ex: iPhone 11 128GB" autocomplete="off"/>
+                    </div>
                 </div>
-                <div id="stqBarcodePreviewWrap" class="hidden mt-2" style="text-align:center;background:#fff;border-radius:8px;padding:10px;">
-                    <svg id="stqBarcodePreview"></svg>
-                    ${typeof window._etiquetaTermicaDisponivel === 'function' && window._etiquetaTermicaDisponivel() ? `
-                    <div style="display:flex;gap:8px;justify-content:center;align-items:center;" class="mt-1">
-                        <label for="stqCopiasEtiqueta" class="small mb-0" style="color:#333;">Qtd</label>
-                        <input type="number" class="form-control form-control-sm" id="stqCopiasEtiqueta" min="1" max="100" step="1" value="1" style="width:72px;"/>
-                        <button type="button" class="btn btn-sm btn-info" id="stqImprimirCodigoBtn"><i class="bi bi-printer-fill"></i> Imprimir etiqueta</button>
-                    </div>` : ''}
+
+                <div class="stq-fp-sec">Preço</div>
+                <div class="stq-fp-card">
+                    <div class="row w-100 mb-3" style="display:flex;gap:10px;">
+                        <div style="flex:1;" class="${viaAlerta ? 'stq-campo-destacado' : ''}">
+                            <label class="form-label" for="stqPrecoCompra">
+                                <i class="bi bi-cart-dash"></i> Compra <span class="text-secondary small stq-fp-hint-uso">(usada no lucro)</span>
+                                ${viaAlerta ? `<span class="stq-badge-auto">🔄 Automático</span>` : ''}
+                            </label>
+                            <input class="form-control" id="stqPrecoCompra" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00"/>
+                        </div>
+                        <div style="flex:1;">
+                            <label class="form-label" for="stqValor"><i class="bi bi-cart-check"></i> Venda</label>
+                            <input class="form-control" id="stqValor" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00"/>
+                        </div>
+                    </div>
+                    <div class="stq-fp-lucro" id="stqLucroLinha"></div>
+                    <div id="stqMargemWrap"></div>
                 </div>
-            </div>
-            <div class="row w-100 mb-3" style="display:flex;gap:10px;">
-                <div style="flex:1;" class="${viaAlerta ? 'stq-campo-destacado' : ''}">
-                    <label class="form-label" for="stqPrecoCompra">
-                        <i class="bi bi-cart-dash"></i> Compra <span class="text-secondary small">(usada no lucro)</span>
-                        ${viaAlerta ? `<span class="stq-badge-auto">🔄 Automático</span>` : ''}
-                    </label>
-                    <input class="form-control" id="stqPrecoCompra" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00"/>
+
+                <div class="stq-fp-sec">Estoque</div>
+                <div class="stq-fp-card">
+                    <div class="mb-3">
+                        <label class="form-label" for="stqQuantidade"><i class="bi bi-123"></i> Quantidade em Estoque</label>
+                        <div class="stq-fp-step">
+                            <button type="button" class="stq-fp-stepbtn" id="stqQtdMenos" aria-label="Diminuir quantidade">−</button>
+                            <input class="form-control" id="stqQuantidade" type="number" step="1" min="0" placeholder="0" inputmode="numeric"/>
+                            <button type="button" class="stq-fp-stepbtn" id="stqQtdMais" aria-label="Aumentar quantidade">+</button>
+                        </div>
+                    </div>
+                    <div class="mb-3 small" id="stqCompraInicialDica" style="display:none;color:#fbbf24;"></div>
+                    <div class="mb-3" id="stqCompraInicialWrap" style="display:none;">
+                        <div class="form-label fw-semibold">Esse estoque você…</div>
+                        <div class="stq-fp-seg">
+                            <label for="stqOrigemTinha" class="stq-origem-opcao" data-origem="tinha">
+                                <input class="form-check-input mt-1" type="radio" name="stqOrigemEstoque" id="stqOrigemTinha" value="tinha"/>
+                                <span><strong>Já tinha</strong><span class="text-secondary small d-block stq-origem-desc">Só estou cadastrando. Não vira despesa. O preço de compra continua valendo pro lucro.</span></span>
+                            </label>
+                            <label for="stqOrigemCompreiRadio" class="stq-origem-opcao" data-origem="comprei">
+                                <input class="form-check-input mt-1" type="radio" name="stqOrigemEstoque" id="stqOrigemCompreiRadio" value="comprei"/>
+                                <span><strong>Acabei de comprar</strong><span class="text-secondary small d-block stq-origem-desc" id="stqOrigemCompreiTexto"></span></span>
+                            </label>
+                        </div>
+                        <div class="stq-fp-explica" id="stqOrigemExplica"></div>
+                    </div>
                 </div>
-                <div style="flex:1;">
-                    <label class="form-label" for="stqValor"><i class="bi bi-cart-check"></i> Venda</label>
-                    <input class="form-control" id="stqValor" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00"/>
+
+                <div class="stq-fp-grupo" id="stqGrupoDetalhes">
+                    <button type="button" class="stq-fp-gh" aria-expanded="false">
+                        <span class="stq-fp-gic"><i class="bi bi-tag-fill"></i></span>
+                        <span class="stq-fp-gt"><span class="stq-fp-gn">Detalhes</span><span class="stq-fp-gs" id="stqResumoDetalhes"></span></span>
+                        <i class="bi bi-chevron-right stq-fp-chev"></i>
+                    </button>
+                    <div class="stq-fp-gcorpo">
+                        <div class="mb-3 stq-fp-codigo">
+                            <label class="form-label" for="stqCodigoBarras"><i class="bi bi-upc-scan"></i> Código de Barras <span class="text-secondary small">(opcional)</span></label>
+                            <div style="display:flex;gap:8px;">
+                                <input class="form-control" id="stqCodigoBarras" type="text" placeholder="Leia com a pistola, digite, ou gere abaixo" style="flex:1;"/>
+                                <button type="button" class="btn btn-secondary" id="stqGerarCodigoBtn" title="Gerar e salvar código de barras"><i class="bi bi-magic"></i></button>
+                            </div>
+                            <div id="stqBarcodePreviewWrap" class="hidden mt-2" style="text-align:center;background:#fff;border-radius:8px;padding:10px;">
+                                <svg id="stqBarcodePreview"></svg>
+                                ${etiquetaOk ? `
+                                <div style="display:flex;gap:8px;justify-content:center;align-items:center;" class="mt-1">
+                                    <label for="stqCopiasEtiqueta" class="small mb-0" style="color:#333;">Qtd</label>
+                                    <input type="number" class="form-control form-control-sm" id="stqCopiasEtiqueta" min="1" max="100" step="1" value="1" style="width:72px;"/>
+                                    <button type="button" class="btn btn-sm btn-info" id="stqImprimirCodigoBtn"><i class="bi bi-printer-fill"></i> Imprimir etiqueta</button>
+                                </div>` : ''}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="stqCondicao"><i class="bi bi-patch-check"></i> Condição <span class="text-secondary small">(opcional)</span></label>
+                            <select class="form-control" id="stqCondicao">
+                                <option value="">Sem condição definida</option>
+                                ${Object.entries(window._condicoesProduto || {}).map(([slug, nome]) => `<option value="${esc(slug)}">${esc(nome)}</option>`).join('')}
+                            </select>
+                            <div class="stq-fp-chips" id="stqCondicaoChips"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label"><i class="bi bi-palette"></i> Cores disponíveis</label>
+                            <div class="stq-cor-picker" id="stqCorPicker"></div>
+                            <div class="stq-cor-add-row">
+                                <input class="form-control" id="stqCorCustom" type="text" placeholder="Outra cor..." style="flex:2;"/>
+                                <input class="form-control" id="stqCorCustomHex" type="color" value="#666666" style="flex:0 0 46px;padding:4px;"/>
+                                <button class="btn btn-secondary btn-sm" id="stqCorAddBtn">+</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div id="stqMargemWrap"></div>
-            <div class="mb-3">
-                <label class="form-label" for="stqQuantidade"><i class="bi bi-123"></i> Quantidade em Estoque</label>
-                <input class="form-control" id="stqQuantidade" type="number" step="1" min="0" placeholder="0"/>
-            </div>
-            <div class="mb-3 small" id="stqCompraInicialDica" style="display:none;color:#fbbf24;"></div>
-            <div class="mb-3" id="stqCompraInicialWrap" style="display:none;">
-                <div class="form-label fw-semibold">Esse estoque você…</div>
-                <label for="stqOrigemTinha" class="stq-origem-opcao" style="display:flex;gap:12px;align-items:flex-start;padding:12px;margin-bottom:8px;border:1.5px solid rgba(148,163,184,.35);border-radius:12px;cursor:pointer;">
-                    <input class="form-check-input mt-1" type="radio" name="stqOrigemEstoque" id="stqOrigemTinha" value="tinha"/>
-                    <span><strong>Já tinha</strong><span class="text-secondary small d-block">Só estou cadastrando. Não vira despesa. O preço de compra continua valendo pro lucro.</span></span>
-                </label>
-                <label for="stqOrigemCompreiRadio" class="stq-origem-opcao" style="display:flex;gap:12px;align-items:flex-start;padding:12px;border:1.5px solid rgba(148,163,184,.35);border-radius:12px;cursor:pointer;">
-                    <input class="form-check-input mt-1" type="radio" name="stqOrigemEstoque" id="stqOrigemCompreiRadio" value="comprei"/>
-                    <span><strong>Acabei de comprar</strong><span class="text-secondary small d-block" id="stqOrigemCompreiTexto"></span></span>
-                </label>
-            </div>
-            <div class="mb-3">
-                <label class="form-label" for="stqCondicao"><i class="bi bi-patch-check"></i> Condição <span class="text-secondary small">(opcional)</span></label>
-                <select class="form-control" id="stqCondicao">
-                    <option value="">Sem condição definida</option>
-                    ${Object.entries(window._condicoesProduto || {}).map(([slug, nome]) => `<option value="${esc(slug)}">${esc(nome)}</option>`).join('')}
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label"><i class="bi bi-palette"></i> Cores disponíveis</label>
-                <div class="stq-cor-picker" id="stqCorPicker"></div>
-                <div class="stq-cor-add-row">
-                    <input class="form-control" id="stqCorCustom" type="text" placeholder="Outra cor..." style="flex:2;"/>
-                    <input class="form-control" id="stqCorCustomHex" type="color" value="#666666" style="flex:0 0 46px;padding:4px;"/>
-                    <button class="btn btn-secondary btn-sm" id="stqCorAddBtn">+</button>
+
+                <div class="stq-fp-grupo" id="stqGrupoAvisos">
+                    <button type="button" class="stq-fp-gh" aria-expanded="false">
+                        <span class="stq-fp-gic"><i class="bi bi-bell-fill"></i></span>
+                        <span class="stq-fp-gt"><span class="stq-fp-gn">Avisos e conferência</span><span class="stq-fp-gs" id="stqResumoAvisos"></span></span>
+                        <i class="bi bi-chevron-right stq-fp-chev"></i>
+                    </button>
+                    <div class="stq-fp-gcorpo">
+                        <div class="mb-3 form-check form-switch stq-fp-lin">
+                            <input class="form-check-input" type="checkbox" id="stqIgnorarContagem"/>
+                            <label class="form-check-label" for="stqIgnorarContagem">Ocultar da Conferência de Estoque</label>
+                        </div>
+                        <div class="mb-3 form-check form-switch stq-fp-lin">
+                            <input class="form-check-input" type="checkbox" id="stqSilenciarNotificacao"/>
+                            <label class="form-check-label" for="stqSilenciarNotificacao">Não avisar sobre estoque baixo desse produto</label>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="mb-3 form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="stqIgnorarContagem"/>
-                <label class="form-check-label" for="stqIgnorarContagem">Ocultar da Conferência de Estoque</label>
-            </div>
-            <div class="mb-3 form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="stqSilenciarNotificacao"/>
-                <label class="form-check-label" for="stqSilenciarNotificacao">Não avisar sobre estoque baixo desse produto</label>
-            </div>
-            <div class="stq-modal-actions">
-                <button class="stq-modal-btn-cancel" id="stqCancelFormBtn">Cancelar</button>
-                <button class="stq-modal-btn-save" id="stqSaveBtn">Salvar</button>
+
+                <div class="stq-modal-actions">
+                    <button class="stq-modal-btn-cancel" id="stqCancelFormBtn">Cancelar</button>
+                    <button class="stq-modal-btn-save" id="stqSaveBtn">Salvar<small class="stq-fp-salvar-sub" id="stqSaveSub"></small></button>
+                </div>
             </div>
         `;
     }
@@ -901,7 +951,20 @@
         escreverMoeda(vendaInput, vendaSugerida);
     }
 
+    // Linha "Lucro por unidade" (celular): venda − compra, em R$ e em % sobre o custo.
+    function atualizarLucroLinha() {
+        const linha = el('stqLucroLinha');
+        if (!linha) return;
+        const compra = lerMoeda(el('stqPrecoCompra'));
+        const venda = lerMoeda(el('stqValor'));
+        if (!(compra > 0) || !(venda > 0)) { linha.innerHTML = '<span>Lucro por unidade</span><b>—</b>'; return; }
+        const lucro = venda - compra;
+        const pct = (lucro / compra) * 100;
+        linha.innerHTML = `<span>Lucro por unidade</span><b class="${lucro < 0 ? 'ruim' : (pct >= 30 ? 'boa' : '')}">${fmt(lucro)} · ${pct.toFixed(0)}%</b>`;
+    }
+
     function atualizarMargemAoVivo() {
+        atualizarLucroLinha();
         if (!produtoAtualDoAlerta) return;
         const compra = lerMoeda(el('stqPrecoCompra'));
         const venda = lerMoeda(el('stqValor'));
@@ -925,7 +988,20 @@
         el('stqQuantidade')?.addEventListener('input', atualizarCompraInicial);
         el('stqValor')?.addEventListener('input', atualizarMargemAoVivo);
         el('stqGerarCodigoBtn')?.addEventListener('click', gerarCodigoBarrasParaForm);
-        el('stqCodigoBarras')?.addEventListener('input', () => renderBarcodePreview(el('stqCodigoBarras').value));
+        el('stqCodigoBarras')?.addEventListener('input', () => { renderBarcodePreview(el('stqCodigoBarras').value); atualizarResumosForm(); });
+        el('stqQtdMenos')?.addEventListener('click', () => passoQuantidade(-1));
+        el('stqQtdMais')?.addEventListener('click', () => passoQuantidade(1));
+        el('stqCondicaoChips')?.addEventListener('click', e => {
+            const chip = e.target.closest('.stq-fp-chip');
+            if (!chip || !el('stqCondicao')) return;
+            el('stqCondicao').value = chip.dataset.v;
+            atualizarResumosForm();
+        });
+        ['stqIgnorarContagem', 'stqSilenciarNotificacao'].forEach(id => el(id)?.addEventListener('change', atualizarResumosForm));
+        document.querySelectorAll('.stq-fp-gh').forEach(btn => btn.addEventListener('click', () => {
+            const aberto = btn.parentElement.classList.toggle('aberto');
+            btn.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+        }));
         el('stqImprimirCodigoBtn')?.addEventListener('click', () => imprimirEtiquetaCodigoBarras(el('stqCodigoBarras')?.value || ''));
         renderCorPicker();
         renderMargemBox();
@@ -934,8 +1010,41 @@
             const r = document.querySelector(`input[name="stqOrigemEstoque"][value="${origemEstoqueLembrada}"]`);
             if (r) r.checked = true;
         }
-        realcarOrigemEscolhida();
-        atualizarCompraInicial();
+        realcarOrigemEscolhida(); // também atualiza o bloco de origem (atualizarCompraInicial)
+        atualizarLucroLinha();
+        atualizarResumosForm();
+    }
+
+    // Botões − / + da Quantidade (celular). Dispara 'input' pra tudo que depende do campo
+    // (bloco "já tinha / acabei de comprar", total da compra) reagir como se tivesse digitado.
+    function passoQuantidade(delta) {
+        const campo = el('stqQuantidade');
+        if (!campo) return;
+        campo.value = Math.max(0, (parseInt(campo.value, 10) || 0) + delta);
+        campo.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // Chips da Condição (espelham o <select>, que segue sendo o campo lido no Salvar) e as linhas
+    // de resumo dos grupos recolhidos "Detalhes" e "Avisos e conferência" (celular).
+    function atualizarResumosForm() {
+        const sel = el('stqCondicao');
+        const chips = el('stqCondicaoChips');
+        if (sel && chips) {
+            chips.innerHTML = Array.from(sel.options).map(o =>
+                `<button type="button" class="stq-fp-chip ${o.value === sel.value ? 'active' : ''}" data-v="${esc(o.value)}">${esc(o.value === '' ? 'Nenhuma' : o.textContent)}</button>`
+            ).join('');
+        }
+        const detalhes = [];
+        if (sel && sel.value && sel.selectedOptions[0]) detalhes.push(sel.selectedOptions[0].textContent);
+        if (coresSelecionadas.length) detalhes.push(coresSelecionadas.length + (coresSelecionadas.length > 1 ? ' cores' : ' cor'));
+        if ((el('stqCodigoBarras')?.value || '').trim()) detalhes.push('código de barras');
+        const avisos = [];
+        if (el('stqIgnorarContagem')?.checked) avisos.push('fora da conferência');
+        if (el('stqSilenciarNotificacao')?.checked) avisos.push('sem aviso de estoque baixo');
+        const rDet = el('stqResumoDetalhes');
+        const rAv = el('stqResumoAvisos');
+        if (rDet) rDet.textContent = detalhes.length ? detalhes.join(' · ') : 'Condição, cores e código de barras';
+        if (rAv) rAv.textContent = avisos.length ? avisos.join(' · ') : 'Tudo padrão';
     }
 
     // ── Estoque do cadastro de produto novo: "já tinha" ou "acabei de comprar"? ──
@@ -956,10 +1065,10 @@
     }
     function realcarOrigemEscolhida() {
         document.querySelectorAll('#stqCompraInicialWrap .stq-origem-opcao').forEach(l => {
-            const marcada = !!l.querySelector('input')?.checked;
-            l.style.borderColor = marcada ? 'var(--acento-hero)' : 'rgba(148,163,184,.35)';
-            l.style.background = marcada ? 'rgba(var(--acento-hero-rgb),.08)' : 'transparent';
+            l.classList.toggle('escolhida', !!l.querySelector('input')?.checked);
+            l.classList.remove('stq-origem-erro');
         });
+        atualizarCompraInicial();
     }
     function atualizarCompraInicial() {
         const wrap = el('stqCompraInicialWrap');
@@ -967,7 +1076,9 @@
         const quantidade = parseInt(el('stqQuantidade')?.value, 10) || 0;
         const valorUnitario = lerMoeda(el('stqPrecoCompra'));
         const calculavel = quantidade > 0 && valorUnitario > 0; // dá pra mostrar o total da compra
+        const origem = origemDoEstoqueEscolhida();
         wrap.style.display = editingId ? 'none' : ''; // visível desde o início no cadastro novo; nunca na edição
+        wrap.dataset.ativa = (quantidade > 0 || origem) ? '1' : '0'; // celular: a pergunta só aparece com quantidade (ou se já houver escolha)
         // A dica lembra de preencher a Compra: é o que o lucro usa (não tem nada a ver com lançar
         // despesa). Aparece desde que o formulário abre, enquanto a Compra estiver vazia; some quando
         // ela é preenchida (o custo já está garantido) e no modo edição.
@@ -984,6 +1095,21 @@
         el('stqOrigemCompreiTexto').textContent = calculavel
             ? `Lança como despesa no Financeiro — ${fmt(quantidade * valorUnitario)} (${quantidade} × ${fmt(valorUnitario)}), hoje.`
             : 'Lança como despesa no Financeiro o total da compra (Quantidade × Compra), hoje.';
+
+        // Celular: uma explicação só, da opção escolhida, no lugar do texto dentro de cada opção.
+        const explica = el('stqOrigemExplica');
+        if (explica) {
+            let tom = '', texto;
+            if (!origem) texto = 'Escolha uma das duas pra eu saber se isso vira despesa.';
+            else if (origem === 'tinha') texto = 'Só cadastro. Não vira despesa. O preço de compra segue valendo pro lucro.';
+            else if (calculavel) { tom = ' ok'; texto = `Vai lançar ${fmt(quantidade * valorUnitario)} como despesa em Financeiro › Produto (${quantidade} × ${fmt(valorUnitario)}).`; }
+            else { tom = ' aviso'; texto = `Falta ${quantidade > 0 ? 'o preço de Compra' : (valorUnitario > 0 ? 'a Quantidade' : 'a Quantidade e o preço de Compra')} pra lançar a despesa no Financeiro.`; }
+            explica.className = 'stq-fp-explica' + tom;
+            explica.textContent = texto;
+        }
+        // Celular: o botão Salvar diz o que vai acontecer com o Financeiro.
+        const sub = el('stqSaveSub');
+        if (sub) sub.textContent = !editingId && origem === 'comprei' && calculavel ? `e lançar ${fmt(quantidade * valorUnitario)} no Financeiro` : '';
     }
     // Há quantidade E preço de compra (a pergunta está na tela) e nenhuma opção foi marcada?
     function faltaEscolherOrigemDoEstoque() {
@@ -993,7 +1119,7 @@
     }
     function avisarFaltaEscolherOrigem() {
         window.showCustomModal({ message: 'Escolha se esse estoque você já tinha ou se acabou de comprar. É assim que o app sabe se lança a compra no Financeiro.' });
-        document.querySelectorAll('#stqCompraInicialWrap .stq-origem-opcao').forEach(l => { l.style.borderColor = '#f87171'; });
+        document.querySelectorAll('#stqCompraInicialWrap .stq-origem-opcao').forEach(l => l.classList.add('stq-origem-erro'));
         el('stqCompraInicialWrap')?.scrollIntoView?.({ block: 'center' });
     }
     // Barra o salvamento (e avisa) quando: há quantidade + compra e nada foi escolhido; ou foi escolhido
@@ -1173,6 +1299,7 @@
             }
             if (el('stqCodigoBarras')) el('stqCodigoBarras').value = codigoFinal;
             renderBarcodePreview(codigoFinal);
+            atualizarResumosForm();
             if (jaTinhaCodigo) {
                 window.showCustomModal({ message: `Este produto já tinha o código ${codigoFinal} (gerado em outro caixa). Mantido esse código.` });
             } else if (typeof window._showSuccessOverlay === 'function') {
@@ -1296,6 +1423,7 @@
         coresSelecionadas = [];
         produtoAtualDoAlerta = null;
         const body = abrirModal('primary', 'Novo Produto');
+        el('stqModalBackdrop').classList.add('stq-fp-tela');
         body.innerHTML = formBodyHtml(false);
         bindFormEvents();
     }
@@ -1320,6 +1448,7 @@
         margemModo = 'valor';
         produtoAtualDoAlerta = viaAlerta ? produto : null;
         const body = abrirModal('primary', 'Editar Produto');
+        el('stqModalBackdrop').classList.add('stq-fp-tela');
         body.innerHTML = formBodyHtml(!!viaAlerta);
         bindFormEvents();
         el('stqNome').value = produto.nome || '';
@@ -1331,6 +1460,17 @@
         el('stqIgnorarContagem').checked = !!produto.ignorarContagem;
         if (el('stqSilenciarNotificacao')) el('stqSilenciarNotificacao').checked = !!produto.notificacaoEstoqueDesativada;
         if (el('stqCondicao')) el('stqCondicao').value = produto.condicao || '';
+        atualizarMargemAoVivo();
+        atualizarResumosForm();
+        // Celular: os grupos recolhidos já abrem se tiverem algo preenchido (não esconde o que o produto tem).
+        const abrirGrupo = (id, temConteudo) => {
+            const g = el(id);
+            if (!g || !temConteudo) return;
+            g.classList.add('aberto');
+            g.querySelector('.stq-fp-gh')?.setAttribute('aria-expanded', 'true');
+        };
+        abrirGrupo('stqGrupoDetalhes', !!(produto.codigoBarras || produto.condicao || coresSelecionadas.length));
+        abrirGrupo('stqGrupoAvisos', !!(produto.ignorarContagem || produto.notificacaoEstoqueDesativada));
     }
 
     // Lê o formulário aberto e monta o payload do produto (sem quantidade

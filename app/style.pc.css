@@ -2017,6 +2017,20 @@ body.tema-claro .section-header { background: transparent; box-shadow: none; bor
 .stq-modal-btn-save:active { filter:brightness(1.1); }
 .stq-modal-btn-save:disabled { opacity:.45; box-shadow:none; cursor:not-allowed; }
 
+/* Novo/Editar produto — a estrutura do formulário é a mesma do celular (ver style.mobile.css). No PC
+   as peças do layout do celular ficam neutras: o formulário continua exatamente como sempre foi,
+   na mesma ordem (Nome, Código de barras, Compra/Venda, Quantidade, origem, Condição, Cores, avisos). */
+.stq-fp { display:flex; flex-direction:column; }
+.stq-fp-card, .stq-fp-grupo, .stq-fp-gcorpo { display:contents; }
+.stq-fp-nome { order:-2; }
+.stq-fp-codigo { order:-1; }
+.stq-fp .stq-modal-actions { margin-top:2px; } /* em coluna flex as margens não colapsam: 12px do último campo + 2px = os 14px de sempre */
+.stq-fp-sec, .stq-fp-lucro, .stq-fp-gh, .stq-fp-stepbtn, .stq-fp-chips, .stq-fp-explica, .stq-fp-salvar-sub { display:none; }
+.stq-origem-opcao { display:flex; gap:12px; align-items:flex-start; padding:12px; border:1.5px solid rgba(148,163,184,.35); border-radius:12px; cursor:pointer; }
+.stq-origem-opcao:first-child { margin-bottom:8px; }
+.stq-origem-opcao.escolhida { border-color:var(--acento-hero); background:rgba(var(--acento-hero-rgb),.08); }
+.stq-origem-opcao.stq-origem-erro { border-color:#f87171; }
+
 /* ── Conferência — visual Neon, consistente com Produtos ──────── */
 .stq-conf-header-finalize { display:flex; align-items:center; gap:6px; background:rgba(139,92,246,.16); border:1px solid rgba(139,92,246,.4); color:#c4b5fd; font-size:.66rem; font-weight:700; padding:7px 12px; border-radius:20px; white-space:nowrap; cursor:pointer; }
 
