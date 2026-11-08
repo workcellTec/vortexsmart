@@ -997,15 +997,20 @@
         el('stqCompraInicialWrap')?.scrollIntoView?.({ block: 'center' });
     }
     // Barra o salvamento (e avisa) quando: há quantidade + compra e nada foi escolhido; ou foi escolhido
-    // "Acabei de comprar" com quantidade mas SEM o valor de compra (não dá pra lançar a despesa — antes
-    // o produto salvava calado, sem despesa nenhuma, mesmo a pessoa tendo dito que comprou).
+    // "Acabei de comprar" e falta a quantidade e/ou o valor de compra (sem os dois não dá pra lançar a
+    // despesa — antes o produto salvava calado, sem despesa nenhuma, mesmo a pessoa tendo dito que
+    // comprou: com a Quantidade em branco, que é como o formulário abre, nada acontecia e nada avisava).
     function origemDoEstoqueBloqueia() {
         if (editingId) return false;
         if (faltaEscolherOrigemDoEstoque()) { avisarFaltaEscolherOrigem(); return true; }
-        const quantidade = parseInt(el('stqQuantidade')?.value, 10) || 0;
-        if (origemDoEstoqueEscolhida() === 'comprei' && quantidade > 0 && !(lerMoeda(el('stqPrecoCompra')) > 0)) {
-            window.showCustomModal({ message: 'Pra lançar a compra no Financeiro, preencha o campo Compra (quanto você pagou em cada unidade).' });
-            return true;
+        if (origemDoEstoqueEscolhida() === 'comprei') {
+            const faltando = [];
+            if (!((parseInt(el('stqQuantidade')?.value, 10) || 0) > 0)) faltando.push('a Quantidade em Estoque');
+            if (!(lerMoeda(el('stqPrecoCompra')) > 0)) faltando.push('o campo Compra (quanto você pagou em cada unidade)');
+            if (faltando.length) {
+                window.showCustomModal({ message: `Você marcou "Acabei de comprar", então preencha ${faltando.join(' e ')}: é com isso que a compra entra no Financeiro. Se não comprou agora, escolha "Já tinha".` });
+                return true;
+            }
         }
         return false;
     }
