@@ -7,7 +7,8 @@
 //   _renderFinanceiroLancamentos (financeiro/lancamentos.js)  — aba Movimentações
 //   _renderFinanceiroGraficos    (financeiro/graficos.js)     — aba Gráficos
 //   _renderFinanceiroRecorrentes (financeiro/recorrentes.js)  — contas fixas (gerenciar)
-// Expõe também: _finAbasHtml(ativa) / _finLigarAbas(raiz, ativa) — as 2 abas do topo.
+// Expõe também: _finAbasHtml(ativa) / _finLigarAbas(raiz, ativa) — as 2 abas do topo — e
+//   _finFolha(html) → caixa / _finFolhaFechar()  — a folha de baixo do celular (escolher período, escolher mês).
 //
 // ⚠️ DEPLOY PENDENTE (só dá pra fazer pelo PC, não pelo Termux):
 //   1. Regra do RTDB — dado mora em financeiro/{lojaId}/... (node RAIZ
@@ -53,6 +54,35 @@
             // substituir=true: trocar de aba não empilha histórico (o voltar sai do Financeiro).
             if (btn.dataset.finAba !== ativa) openFinanceiroSection(btn.dataset.finAba, null, true);
         }));
+    };
+
+    // ── Folha de baixo (celular) ──────────────────────────────────
+    // Mesma folha do "Meta do mês"/Concertos (.vs-folha-overlay). Uma só pro módulo inteiro; o "voltar"
+    // do Android fecha a folha em vez de sair da tela (ver _vsAbrirModal em core.js).
+    let folhaEl = null, folhaComHistorico = false;
+    window._finFolha = function (html) {
+        if (!folhaEl) {
+            folhaEl = document.createElement('div');
+            folhaEl.id = 'finFolha';
+            folhaEl.className = 'vs-folha-overlay';
+            folhaEl.innerHTML = '<div class="vs-folha" role="dialog" aria-modal="true"></div>';
+            document.body.appendChild(folhaEl);
+            folhaEl.addEventListener('click', e => { if (e.target === folhaEl) window._finFolhaFechar(); });
+        }
+        const caixa = folhaEl.firstElementChild;
+        caixa.innerHTML = '<div class="vs-folha-alca"></div>' + html;
+        caixa.scrollTop = 0;
+        if (!folhaEl.classList.contains('active')) {
+            void folhaEl.offsetWidth;   // sem o reflow a entrada não anima
+            folhaEl.classList.add('active');
+            if (typeof window._vsAbrirModal === 'function') { window._vsAbrirModal(window._finFolhaFechar); folhaComHistorico = true; }
+        }
+        return caixa;
+    };
+    window._finFolhaFechar = function () {
+        if (!folhaEl || !folhaEl.classList.contains('active')) return;
+        folhaEl.classList.remove('active');
+        if (folhaComHistorico) { folhaComHistorico = false; if (typeof window._vsFecharModal === 'function') window._vsFecharModal(); }
     };
 
     function openFinanceiroSection(sectionId, contexto, substituir) {

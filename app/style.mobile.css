@@ -857,33 +857,126 @@ code { overflow-wrap: anywhere; }
    ícone pra vermelho — mesmo raciocínio do .cancelado acima. */
 .pulse-tl-row.despesa .pulse-tl-ic { background:rgba(239,68,68,.12); color:var(--danger); }
 
-/* ══════════ Financeiro — gráficos em CSS puro (sem lib externa) ══════════
-   Mesma família visual do .pulse-waterfall/.pulse-hero-bars acima —
-   só formas novas de desenhar barra (comparação lado a lado, e uma
-   série diária de até 31 barras finas). */
-.fin-mes-picker { display:flex; align-items:center; justify-content:space-between; gap:6px; background:rgba(var(--overlay-rgb),.04); border-radius:12px; padding:6px 4px; }
-.fin-mes-picker-lbl { flex:1; text-align:center; font-family:var(--font); font-weight:700; font-size:.7rem; color:var(--text-strong); line-height:1.3; }
-.fin-mes-picker-lbl small { font-weight:600; color:var(--text-secondary); font-size:.62rem; }
-
-.fin-cmp-bars { display:flex; justify-content:center; gap:34px; align-items:flex-end; height:120px; margin-bottom:10px; padding:0 10px; }
-.fin-cmp-col { display:flex; flex-direction:column; align-items:center; gap:6px; height:100%; justify-content:flex-end; }
-.fin-cmp-bar-wrap { display:flex; align-items:flex-end; gap:6px; height:100px; }
-.fin-cmp-bar { width:20px; border-radius:5px 5px 0 0; min-height:4px; }
-.fin-cmp-col-lbl { font-size:.66rem; font-weight:700; color:var(--text-secondary); }
-
-.fin-pico-bars { display:flex; align-items:flex-end; gap:2px; height:110px; margin-bottom:10px; }
-.fin-pico-bar { flex:1; background:rgba(var(--primary-rgb),.22); border-radius:2px 2px 0 0; min-height:3px; }
-.fin-pico-bar.pico { background:var(--primary); }
-
-.fin-fluxo-wrap { display:flex; align-items:stretch; gap:1px; height:130px; margin-bottom:6px; }
-.fin-fluxo-col { display:flex; flex-direction:column; flex:1; min-width:2px; }
-.fin-fluxo-top { flex:1; display:flex; align-items:flex-end; }
-.fin-fluxo-bottom { flex:1; display:flex; align-items:flex-start; }
-.fin-fluxo-bar { width:100%; min-height:0; }
-.fin-fluxo-bar.receita { background:#22c55e; border-radius:2px 2px 0 0; }
-.fin-fluxo-bar.despesa { background:#ef4444; border-radius:0 0 2px 2px; }
-.fin-fluxo-linha { height:1px; background:rgba(var(--overlay-rgb),.14); flex-shrink:0; }
-.fin-info-badge { display:flex; align-items:center; justify-content:center; gap:6px; background:rgba(var(--primary-rgb),.1); border:1px dashed rgba(var(--primary-rgb),.4); border-radius:99px; padding:8px 14px; font-size:.72rem; font-weight:700; color:var(--primary); text-align:center; }
+/* ══════════ Financeiro → Gráficos (financeiro/graficos.js) ══════════
+   Três visões (Neste mês · Comparar · Últimos meses). Igual nos dois CSS; só as cores vêm das variáveis do tema. */
+.fg { --fg-cinza: #7C828B; }
+html.tema-claro .fg { --fg-cinza: #9AA0A8; }
+.fg-vis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; max-width: 520px; padding: 3px; margin: 12px 0 0; background: var(--surface-raised); border-radius: 14px; }
+.fg-vis button { min-height: 42px; border: 0; border-radius: 11px; background: none; color: var(--text-secondary); font-weight: 700; font-size: .84rem; font-family: inherit; cursor: pointer; }
+.fg-vis button.on { background: var(--surface); color: var(--text-strong); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.fg-nav { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; }
+.fg-seta { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--text-strong); cursor: pointer; }
+.fg-seta:disabled { opacity: .35; cursor: default; }
+.fg-mes-lbl { flex: 1; min-width: 0; border: 0; background: none; color: var(--text-strong); font-weight: 800; font-size: 1rem; font-family: inherit; cursor: pointer; text-align: center; }
+.fg-corpo { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 12px; align-items: start; margin-top: 12px; }
+.fg-card { min-width: 0; padding: 15px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; }
+.fg-card.larga, .fg-verd, .fg-vs, .fg-opt { grid-column: 1 / -1; }
+.fg-card h3 { margin: 0 0 2px; font-size: .95rem; font-weight: 800; color: var(--text-strong); }
+.fg-sub { margin-bottom: 12px; font-size: .78rem; line-height: 1.4; color: var(--text-secondary); }
+.fg-vazio { padding: 18px 8px; text-align: center; font-size: .86rem; color: var(--text-secondary); }
+.fg-dot { display: inline-block; flex: none; width: 9px; height: 9px; margin-right: 5px; border-radius: 50%; }
+.fg-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: .75rem; font-weight: 800; }
+.fg-pill.up { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
+.fg-pill.down { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+.fg-pill.neu { background: var(--surface-raised); color: var(--text-secondary); }
+/* anel */
+.fg-anel-linha { display: flex; align-items: center; gap: 14px; }
+.fg-anel { flex: none; width: 128px; height: 128px; }
+.fg-anel-k { fill: var(--text-secondary); font: 700 11px sans-serif; }
+.fg-anel-v { fill: var(--text-strong); font: 800 15px sans-serif; }
+.fg-leg { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.fg-leg div { display: flex; align-items: center; white-space: nowrap; font-size: .8rem; color: var(--text-secondary); }
+.fg-leg small { margin-left: 5px; font-size: .72rem; font-weight: 600; color: var(--text-muted); }
+.fg-leg b { margin-left: auto; padding-left: 8px; font-size: .82rem; color: var(--text-strong); }
+/* calendário */
+.fg-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; max-width: 560px; margin: 0 auto; }
+.fg-dw { padding-bottom: 2px; text-align: center; font-size: .7rem; font-weight: 700; color: var(--text-muted); }
+.fg-d { position: relative; aspect-ratio: 1 / 1.3; min-width: 0; padding: 4px 4px 3px; display: flex; flex-direction: column; justify-content: space-between; align-items: stretch; border: 2px solid transparent; border-radius: 11px; background: var(--surface-raised); color: var(--text-strong); font-family: inherit; text-align: left; cursor: pointer; overflow: hidden; }
+.fg-d.tem { background: color-mix(in srgb, var(--success) calc(var(--k) * 22% + 6%), var(--surface-raised)); }
+.fg-d .n { display: flex; align-items: center; justify-content: space-between; font-size: .68rem; font-weight: 700; line-height: 1; color: var(--text-secondary); }
+.fg-d .n .bi { font-size: .58rem; color: var(--warning); }
+.fg-d.mov .n { color: var(--text-strong); }
+.fg-d .v { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: .62rem; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; }
+.fg-d .v .e, .fg-info .e, .fg-res b.e { color: var(--success); }
+.fg-d .v .s, .fg-info .s, .fg-res b.s { color: var(--danger); }
+.fg-d.fut { background: transparent; border: 1.5px dashed rgba(var(--overlay-rgb), .12); cursor: default; }
+.fg-d.fut .n { color: var(--text-muted); opacity: .7; }
+.fg-d.hoje .n::after { content: ''; width: 5px; height: 5px; margin-left: 3px; border-radius: 50%; background: var(--primary); }
+.fg-d.sel { border-color: var(--text-strong); }
+.fg-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 12px; padding: 11px 13px; border-radius: 14px; background: var(--surface-raised); font-size: .8rem; color: var(--text-secondary); }
+.fg-info b { color: var(--text-strong); }
+.fg-info .e, .fg-info .s { display: inline-flex; align-items: center; gap: 4px; }
+.fg-info .e b { color: var(--success); }
+.fg-info .s b { color: var(--danger); }
+.fg-info .a b { color: var(--primary); }
+.fg-res { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.fg-res div { min-width: 0; padding: 10px 11px; border-radius: 14px; background: var(--surface-raised); font-size: .72rem; color: var(--text-secondary); }
+.fg-res b { display: block; margin-top: 3px; font-size: .86rem; color: var(--text-strong); }
+.fg-res small { display: block; margin-top: 1px; font-size: .68rem; color: var(--text-muted); }
+/* categorias */
+.fg-cat { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; margin-bottom: 13px; }
+.fg-cat .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .84rem; font-weight: 600; color: var(--text-strong); }
+.fg-cat .n span { margin-left: 6px; font-size: .74rem; color: var(--text-muted); }
+.fg-cat .v { font-size: .84rem; font-weight: 700; color: var(--text-strong); }
+.fg-cat .trilho { grid-column: 1 / -1; height: 9px; overflow: hidden; border-radius: 9px; background: var(--surface-raised); }
+.fg-cat .trilho i { display: block; height: 100%; border-radius: 9px; background: var(--primary); }
+/* comparar */
+.fg-vs { display: grid; grid-template-columns: 1fr 34px 1fr; gap: 6px; align-items: center; }
+.fg-mes-btn { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 58px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text-strong); font-family: inherit; text-align: left; cursor: pointer; }
+.fg-mes-btn.a { border-color: var(--primary); }
+.fg-mes-btn small { display: flex; align-items: center; font-size: .68rem; font-weight: 700; color: var(--text-secondary); }
+.fg-mes-btn b { display: flex; align-items: center; justify-content: space-between; font-size: .95rem; }
+.fg-mes-btn b .bi { font-size: .8rem; color: var(--text-secondary); }
+.fg-troca { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--surface-raised); color: var(--text-secondary); cursor: pointer; }
+.fg-opt { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 14px; background: var(--surface-raised); font-size: .8rem; line-height: 1.35; color: var(--text-strong); cursor: pointer; }
+.fg-opt small { display: block; margin-top: 1px; font-size: .72rem; color: var(--text-muted); }
+.fg-sw { position: relative; flex: none; width: 46px; height: 28px; margin-left: auto; }
+.fg-sw input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.fg-sw-trilho { position: absolute; inset: 0; border-radius: 14px; background: var(--border); transition: background .2s; pointer-events: none; }
+.fg-sw-trilho::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.fg-sw input:checked + .fg-sw-trilho { background: var(--primary); }
+.fg-sw input:checked + .fg-sw-trilho::after { transform: translateX(18px); }
+.fg-verd { padding: 16px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); }
+.fg-verd .t1 { font-size: .8rem; color: var(--text-secondary); }
+.fg-verd .t2 { margin: 4px 0 8px; font-size: 1.2rem; font-weight: 800; line-height: 1.25; color: var(--text-strong); }
+.fg-verd .t2 em { font-style: normal; }
+.fg-verd .t2 em.ok { color: var(--success); }
+.fg-verd .t2 em.ruim { color: var(--danger); }
+.fg-met { margin-bottom: 16px; }
+.fg-met:last-child { margin-bottom: 0; }
+.fg-met .h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: .84rem; font-weight: 700; color: var(--text-strong); }
+.fg-met .l { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin-top: 5px; }
+.fg-met .tr { height: 11px; overflow: hidden; border-radius: 11px; background: var(--surface-raised); }
+.fg-met .tr i { display: block; height: 100%; border-radius: 11px; }
+.fg-met .vl { min-width: 92px; text-align: right; font-size: .78rem; font-weight: 700; color: var(--text-strong); }
+.fg-met .vl.b { font-weight: 600; color: var(--text-secondary); }
+.fg-linha { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+.fg-eixo { display: flex; justify-content: space-between; margin-top: 6px; font-size: .68rem; color: var(--text-muted); }
+.fg-legenda { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin-top: 10px; font-size: .74rem; color: var(--text-secondary); }
+/* últimos meses */
+.fg-evo { display: flex; align-items: stretch; gap: 8px; height: 170px; padding-top: 6px; }
+.fg-evo .m { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 2px 0; border: 0; border-radius: 10px; background: none; font-family: inherit; cursor: pointer; }
+.fg-evo .m .bs { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+.fg-evo .m .bs i { display: block; width: 44%; max-width: 22px; border-radius: 5px 5px 2px 2px; }
+.fg-evo .m .bs i.e { background: var(--success); }
+.fg-evo .m .bs i.s { background: var(--danger); }
+.fg-evo .m .rot { font-size: .72rem; font-weight: 700; color: var(--text-muted); }
+.fg-evo .m.sel { background: rgba(var(--overlay-rgb), .07); }
+.fg-evo .m.sel .rot { color: var(--text-strong); }
+.fg-btn { width: 100%; min-height: 48px; margin-top: 12px; border: 0; border-radius: 14px; background: var(--primary-soft, rgba(var(--primary-rgb), .16)); color: var(--primary); font-weight: 800; font-size: .9rem; font-family: inherit; cursor: pointer; }
+.fg-lm { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 2px; border: 0; border-top: 1px solid rgba(var(--overlay-rgb), .07); background: none; font-family: inherit; text-align: left; cursor: pointer; }
+.fg-card .fg-lm:first-of-type { border-top: 0; }
+.fg-lm .n { flex: 1; min-width: 0; font-size: .9rem; font-weight: 700; color: var(--text-strong); }
+.fg-lm .n small { display: block; margin-top: 2px; font-size: .74rem; font-weight: 500; color: var(--text-secondary); }
+.fg-lm .d { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.fg-lm .d b { font-size: .9rem; color: var(--text-strong); }
+.fg-lm .d b.neg { color: var(--danger); }
+/* folha: escolher mês */
+.fg-meses { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-top: 4px; }
+.fg-meses button { min-height: 52px; border: 1.5px solid var(--border); border-radius: 14px; background: none; color: var(--text-strong); font-weight: 700; font-size: .88rem; line-height: 1.2; font-family: inherit; cursor: pointer; }
+.fg-meses button small { display: block; font-size: .68rem; font-weight: 500; color: var(--text-muted); }
+.fg-meses button.on { border-color: var(--primary); background: rgba(var(--primary-rgb), .14); color: var(--primary); }
+.fg-meses button:disabled { opacity: .35; cursor: default; }
 
 /* ══════════ Wizard de documentos (Bookip, Orçamento...) — sem sanfona ══════════
    Mesmo roxo/azul do hero da Início/Relatórios, pra manter uma cara só
@@ -2724,7 +2817,6 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 .repo-foto-preview img { width:100%; height:100%; object-fit:cover; display:block; }
 .repo-foto-preview button { position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%; border:none; background:rgba(0,0,0,.6); color:#fff; font-size:.65rem; display:flex; align-items:center; justify-content:center; padding:0; margin:0; }
 
-.fin-pd-mes { margin: 0 0 12px; text-align: center; font: 800 .95rem 'Space Grotesk', sans-serif; }
 
 /* Larguras compartilhadas (Financeiro e Concertos): antes cada tela tinha max-width inline fixo
    (herança do celular), que travava o conteúdo estreito mesmo com o container pai maior. */
@@ -2927,7 +3019,6 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 .fl-abas { display: inline-flex; gap: 2px; padding: 4px; margin: 0 0 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 13px; }
 .fl-abas button { height: 38px; padding: 0 22px; border: 0; background: none; border-radius: 9px; font: 600 .84rem 'Poppins', sans-serif; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
 .fl-abas button.on { background: rgba(var(--primary-rgb), .2); color: var(--primary); box-shadow: inset 0 0 0 1px rgba(var(--primary-rgb), .55); }
-.vs-fin-largura > .fl-abas { margin: 0 0 18px 4px; }
 .fl-fx { margin: 0 0 18px; }
 .fl-fx-h { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .fl-fx-h h3 { margin: 0; font: 800 1.05rem 'Space Grotesk', sans-serif; color: var(--text-strong); }
@@ -2988,17 +3079,24 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 .fl { display: flex; flex-direction: column; padding: 10px 14px 30px; }
 .fl .section-header { margin-bottom: 10px; }
 .fl .section-header p { display: none; }
-.fl-abas, .vs-fin-largura > .fl-abas { display: grid; grid-template-columns: 1fr 1fr; width: auto; margin: 0 0 12px; }
-.vs-fin-largura > .fl-abas { margin: 0 14px 12px; }
-.fl-abas button { height: 40px; padding: 0; font-size: .86rem; }
+/* Abas: texto com sublinhado (igual aos outros módulos) */
+.fl-abas { display: flex; gap: 26px; width: auto; margin: 6px 0 0; padding: 0; background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; }
+.fl-abas button { position: relative; height: auto; padding: 10px 0 11px; border-radius: 0; font: 700 15.5px/1.2 var(--font); color: var(--text-muted); }
+.fl-abas button.on { background: none; box-shadow: none; color: var(--text-strong); }
+.fl-abas button.on::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; border-radius: 3px; background: var(--primary); }
+/* Período: UMA linha — ‹ Novembro 2026 › e o botão "Mês ▾" (Dia/Semana/Mês/Personalizado ficam na folha) */
 .fl-bar { display: block; margin-bottom: 12px; }
-.fl-bar-l { flex-direction: column; align-items: stretch; gap: 8px; }
+.fl-bar-l { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 10px; }
 .fl-bar > .fl-btn { display: none; }
-.fl-seg, .fl-seg.s { width: 100%; height: 42px; }
-.fl-seg button { flex: 1 1 auto; justify-content: center; padding: 0 6px; font-size: .76rem; }
-.fl-step { width: 100%; height: 42px; justify-content: space-between; }
-.fl-step b { flex: 1; min-width: 0; }
-.fl-step.datas { flex-wrap: wrap; height: auto; padding: 8px 12px; }
+.fl-bar-l .fl-seg { display: none; }
+.fl-seg.s { width: 100%; height: 42px; }
+.fl-seg.s button { flex: 1 1 auto; justify-content: center; padding: 0 6px; font-size: .76rem; }
+.fl-step { flex: 1 1 0; min-width: 0; height: 40px; padding: 0; gap: 6px; background: none; border: 0; justify-content: space-between; }
+.fl-step button { width: 38px; height: 38px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--text-strong); }
+.fl-step b { flex: 1; min-width: 0; font: 800 1rem var(--font); }
+.fl-gran { order: 3; display: flex; align-items: center; gap: 5px; height: 38px; margin-left: auto; padding: 0 13px; border: 0; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font: 800 .8rem/1 var(--font); cursor: pointer; }
+.fl-gran .bi { font-size: .72rem; }
+.fl-step.datas { order: 4; flex: 1 1 100%; flex-wrap: wrap; height: auto; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); }
 
 /* Painel do dinheiro: Sobrou no caixa em cima, os 3 números embaixo, Lucro por último */
 .fin-pd { margin: 0 0 12px; }

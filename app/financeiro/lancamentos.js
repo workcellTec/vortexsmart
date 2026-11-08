@@ -298,13 +298,16 @@
                    <b>${labelPeriodoAtual()}</b>
                    <button type="button" id="finPeriodoProx" aria-label="Próximo"><i class="bi bi-chevron-right"></i></button>
                </div>`;
+        // PC: os 4 botões ficam à vista. Celular: eles saem da tela e o botão "Mês ▾" abre a folha com eles.
         wrap.innerHTML = `
             <div class="fl-seg">${tipos.map(t => `<button type="button" data-periodo="${t.v}"${periodoTipo === t.v ? ' class="on"' : ''}>${t.l}</button>`).join('')}</div>
             ${corpo}
+            <button type="button" class="fl-gran" id="finPeriodoGran" aria-label="Trocar entre dia, semana, mês e personalizado">${tipos.find(t => t.v === periodoTipo).l} <i class="bi bi-chevron-down"></i></button>
         `;
         wrap.querySelectorAll('[data-periodo]').forEach(btn => {
             btn.addEventListener('click', () => { periodoTipo = btn.dataset.periodo; redesenharPeriodo(true); });
         });
+        el('finPeriodoGran').addEventListener('click', abrirFolhaPeriodo);
 
         if (periodoTipo === 'personalizado') {
             el('finPeriodoDe').addEventListener('change', () => { personalDe = el('finPeriodoDe').value; redesenharPeriodo(false); });
@@ -313,6 +316,32 @@
             el('finPeriodoAnt').addEventListener('click', () => { navegarPeriodoAtual(-1); redesenharPeriodo(true); });
             el('finPeriodoProx').addEventListener('click', () => { navegarPeriodoAtual(1); redesenharPeriodo(true); });
         }
+    }
+
+    // Celular: folha "Ver por" (Dia / Semana / Mês / Personalizado). Escolher já aplica e fecha.
+    function abrirFolhaPeriodo() {
+        const opcoes = [
+            { v: 'dia', l: 'Dia', d: 'Um dia só' },
+            { v: 'semana', l: 'Semana', d: 'De domingo a sábado' },
+            { v: 'mes', l: 'Mês', d: 'O mês inteiro' },
+            { v: 'personalizado', l: 'Personalizado', d: 'Escolher a data de início e a de fim' }
+        ];
+        const caixa = window._finFolha(`
+            <div class="vs-folha-titulo">Ver por</div>
+            ${opcoes.map(o => `<button type="button" class="vs-linha" data-ver-por="${o.v}"><span class="vs-linha-nome">${o.l}<small>${o.d}</small></span>${periodoTipo === o.v ? '<i class="bi bi-check-lg" style="color:var(--primary);font-size:1.3rem;"></i>' : ''}</button>`).join('')}
+        `);
+        caixa.querySelectorAll('[data-ver-por]').forEach(btn => btn.addEventListener('click', () => {
+            periodoTipo = btn.dataset.verPor;
+            if (periodoTipo === 'personalizado' && (!personalDe || !personalAte)) {
+                // Já abre com algo útil (início do mês em exibição até hoje, ou até o fim dele se for um mês passado).
+                const ini = new Date(periodoRef.getFullYear(), periodoRef.getMonth(), 1);
+                const fimDoMes = new Date(periodoRef.getFullYear(), periodoRef.getMonth() + 1, 0);
+                personalDe = dataLocal(ini);
+                personalAte = dataLocal(fimDoMes > new Date() ? new Date() : fimDoMes);
+            }
+            window._finFolhaFechar();
+            redesenharPeriodo(true);
+        }));
     }
 
     // Mudou o período: painel, contas fixas (são do mês em exibição) e lista acompanham.
