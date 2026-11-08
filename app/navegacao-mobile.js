@@ -279,10 +279,10 @@
             titulo: 'Documentos', cont: 'documentosContainer', hubs: ['documentosHome'],
             abrir: sub => window.openDocumentosSection(sub, undefined, true),
             itens: [
-                { sub: 'documentosContrato', nome: 'Contrato' },
                 { sub: 'documentosGarantia', nome: 'Garantia' },
                 { sub: 'documentosRecibo', nome: 'Recibo' },
                 { sub: 'documentosOrcamento', nome: 'Orçamento' },
+                { sub: 'documentosContrato', nome: 'Contrato' },
             ],
         },
         calculadora: {
