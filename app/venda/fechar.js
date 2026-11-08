@@ -35,12 +35,12 @@
 // muda o status pra 'fechada'.
 //
 // Quando a forma é Cartão, calcula o valor LÍQUIDO daquela linha
-// usando a MESMA tabela de taxas que a Calculadora usa (window._getRate)
+// usando a MESMA tabela de taxas que a Calculadora usa (window._getTaxa)
 // — sem duplicar tabela nenhuma. O valor bruto continua sendo o que
 // soma no total da venda; o líquido é só o "quanto realmente entra"
 // depois da taxa. Dinheiro/Pix (e formas customizadas sem maquininha)
 // podem ter uma taxa % opcional cadastrada em Configurações → Taxas
-// (window._formasPagamentoConfig[forma].taxa) — ver taxaDaForma().
+// (window._formasPagamentoConfig[forma].taxa/taxaTipo) — ver taxaDaForma().
 //
 // Depois de fechada, a geração da Garantia (Bookip) é feita por um
 // botão separado no Histórico (venda/historico.js) — aqui não pergunta
@@ -48,7 +48,7 @@
 //
 // Depende de (via window.*):
 //   showCustomModal, _fmt, _lojaRef, _dbGet, _dbUpdate, _papelAtual,
-//   _vendaContexto (venda/router.js), _getRate, _areRatesLoaded,
+//   _vendaContexto (venda/router.js), _getTaxa/_taxaLiquido/_taxaTexto, _areRatesLoaded,
 //   _showSuccessOverlay, _setBtnLoading, _formasPagamentoConfig (core.js)
 // Expõe via window.*:
 //   _renderFecharVenda
@@ -87,13 +87,21 @@
         if (!cfgParcelado.oculta) lista.push({ v: 'parcelado', l: String(cfgParcelado.nome || '').trim() || 'Parcelado' });
         return lista;
     }
-    // Taxa % opcional que uma forma sem maquininha desconta do que a loja
-    // recebe (Configurações → Taxas & Máquinas → ✏️ na forma: Dinheiro, Pix
-    // ou as cadastradas). Cartão e Parcelado têm cálculo próprio. 0 = sem taxa.
+    // Taxa opcional que uma forma sem maquininha desconta do que a loja
+    // recebe (Configurações → Taxas & Máquinas → forma: Dinheiro, Pix ou as
+    // cadastradas): % sobre o pagamento ou R$ fixo por pagamento (taxaTipo).
+    // Cartão e Parcelado têm cálculo próprio. null = sem taxa.
     function taxaDaForma(v) {
-        if (v === 'cartao' || v === 'parcelado') return 0;
-        const t = Number((window._formasPagamentoConfig || {})[v]?.taxa);
-        return Number.isFinite(t) && t > 0 && t <= 100 ? t : 0;
+        return v === 'cartao' || v === 'parcelado' ? null : window._taxaDaForma(v);
+    }
+    // Grava o líquido no pagamento. Taxa fixa em R$ também guarda taxaReais:
+    // reduzir o pagamento depois (reduzirPagamentosParaNovoTotal) precisa saber
+    // que ela não encolhe junto com o valor. Taxa % de forma guarda `taxa`
+    // (campo já existente); a de cartão % não grava nada além do líquido.
+    function aplicarTaxaNoPagamento(pagamento, taxa, gravarPct) {
+        pagamento.valorLiquido = centavos2(window._taxaLiquido(pagamento.valor, taxa));
+        if (taxa.tipo === 'rs') pagamento.taxaReais = taxa.valor;
+        else if (gravarPct) pagamento.taxa = taxa.valor;
     }
     // Lista de máquinas: vem de Configurações → Taxas (Firebase). Esse
     // array só serve de fallback caso ainda não tenha carregado nada.
@@ -251,8 +259,12 @@
             // efetiva já registrada nesse pagamento (líquido/bruto
             // originais) — nunca subtrai a redução direto do líquido,
             // isso duplicaria/erraria o efeito da taxa.
+            // Taxa fixa em R$ (taxaReais) não encolhe com o valor: continua sendo
+            // descontada inteira, e o líquido nunca fica negativo.
             const taxaEfetiva = valorCent > 0 ? (1 - (p.valorLiquido ?? p.valor) / p.valor) : 0;
-            const novoLiquido = centavos2(novoValor * (1 - taxaEfetiva));
+            const novoLiquido = p.taxaReais != null
+                ? centavos2(Math.max(novoValor - p.taxaReais, 0))
+                : centavos2(novoValor * (1 - taxaEfetiva));
 
             return { ...p, valor: novoValor, valorLiquido: novoLiquido };
         });
@@ -285,8 +297,9 @@
         const bandeiras = bandeirasDaMaquina(maquina);
         if (bandeiras.length <= 1) return false; // 0 ou 1 bandeira: nada pra comparar, etapa nunca aparece
         const valores = bandeiras
-            .map(b => (typeof window._getRate === 'function' ? window._getRate(maquina, b.id, inst) : undefined))
-            .filter(v => v !== undefined);
+            .map(b => (typeof window._getTaxa === 'function' ? window._getTaxa(maquina, b.id, inst) : undefined))
+            .filter(t => t !== undefined)
+            .map(t => `${t.tipo}:${t.valor}`);
         return new Set(valores).size > 1;
     }
 
@@ -675,17 +688,17 @@
         const valor = valorDigitado();
         if (formaSelecionada === 'cartao' && wiz.maquina && valor > 0 && window._areRatesLoaded) {
             const inst = wiz.tipo === 'debito' ? 0 : wiz.parcelas;
-            const taxa = window._getRate ? window._getRate(wiz.maquina, bandeiraEfetiva(), inst) : undefined;
-            if (taxa !== undefined) {
-                const liquido = valor * (1 - taxa / 100);
-                previaEl.innerHTML = `<div class="venda-desconto-final mb-2">Líquido dessa linha (após taxa de ${taxa.toFixed(2)}%): <b>${fmt(liquido)}</b></div>`;
+            const taxa = window._getTaxa ? window._getTaxa(wiz.maquina, bandeiraEfetiva(), inst) : undefined;
+            if (taxa) {
+                const liquido = window._taxaLiquido(valor, taxa);
+                previaEl.innerHTML = `<div class="venda-desconto-final mb-2">Líquido dessa linha (após taxa de ${window._taxaTexto(taxa)}): <b>${fmt(liquido)}</b></div>`;
                 return;
             }
         }
-        const taxaForma = valor > 0 && formaSelecionada ? taxaDaForma(formaSelecionada) : 0;
-        if (taxaForma > 0) {
-            const liquido = centavos2(valor * (1 - taxaForma / 100));
-            previaEl.innerHTML = `<div class="venda-desconto-final mb-2">Líquido dessa linha (após taxa de ${taxaForma.toFixed(2)}%): <b>${fmt(liquido)}</b></div>`;
+        const taxaForma = valor > 0 && formaSelecionada ? taxaDaForma(formaSelecionada) : null;
+        if (taxaForma) {
+            const liquido = centavos2(window._taxaLiquido(valor, taxaForma));
+            previaEl.innerHTML = `<div class="venda-desconto-final mb-2">Líquido dessa linha (após taxa de ${window._taxaTexto(taxaForma)}): <b>${fmt(liquido)}</b></div>`;
             return;
         }
         previaEl.innerHTML = '';
@@ -709,20 +722,17 @@
         // é gravado AGORA, no pagamento — mudar a taxa depois na configuração
         // não reescreve vendas antigas. Financeiro/relatórios já leem o líquido.
         const taxaForma = taxaDaForma(formaSelecionada);
-        if (taxaForma > 0) {
-            pagamento.taxa = taxaForma;
-            pagamento.valorLiquido = centavos2(valor * (1 - taxaForma / 100));
-        }
+        if (taxaForma) aplicarTaxaNoPagamento(pagamento, taxaForma, true);
 
         if (formaSelecionada === 'cartao') {
             if (!window._areRatesLoaded) { modal({ message: 'As taxas ainda estão carregando, aguarde um instante.' }); return; }
             const inst = wiz.tipo === 'debito' ? 0 : wiz.parcelas;
-            const taxa = window._getRate ? window._getRate(wiz.maquina, bandeiraEfetiva(), inst) : undefined;
-            if (taxa === undefined) { modal({ message: 'Não tem taxa configurada pra essa combinação de máquina/bandeira/parcelas.' }); return; }
+            const taxa = window._getTaxa ? window._getTaxa(wiz.maquina, bandeiraEfetiva(), inst) : undefined;
+            if (!taxa) { modal({ message: 'Não tem taxa configurada pra essa combinação de máquina/bandeira/parcelas.' }); return; }
             pagamento.maquina = wiz.maquina;
             pagamento.bandeira = bandeiraEfetiva();
             pagamento.parcelas = wiz.tipo === 'debito' ? 1 : wiz.parcelas;
-            pagamento.valorLiquido = centavos2(valor * (1 - taxa / 100));
+            aplicarTaxaNoPagamento(pagamento, taxa);
         }
 
         if (formaSelecionada === 'parcelado') {

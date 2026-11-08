@@ -1,14 +1,15 @@
 // ================================================================
 // calculadoras/emprestimo.js — VortexSmart · Calcular Empréstimo
 // Depende de (via window.*):
-//   _areRatesLoaded, _getRate, safeStorage, updateFlagDisplay,
+//   _areRatesLoaded, _getTaxa/_taxaBruto, safeStorage, updateFlagDisplay,
 //   openFlagSelector, openCalculatorSection
 // ================================================================
 (function () {
     'use strict';
 
     const ratesOk = () => !!window._areRatesLoaded;
-    const getRate = (m, b, i) => typeof window._getRate === 'function' ? window._getRate(m, b, i) : undefined;
+    const getTaxa  = (m, b, i) => typeof window._getTaxa === 'function' ? window._getTaxa(m, b, i) : undefined;
+    const taxaBruto = (liquido, t) => window._taxaBruto(liquido, t);
     const storage = () => window.safeStorage || { getItem: k => { try { return localStorage.getItem(k); } catch (e) { return null; } } };
     const el      = id => document.getElementById(id);
     const fmt     = v  => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -111,14 +112,14 @@
         const arredond = storage().getItem('ctwArredondarEnabled') === 'true';
 
         const linhas = [];
-        const debitTax = getRate(machine, brand, 0);
-        if (debitTax != null) {
-            linhas.push({ inst: 'Débito', parcela: null, total: valorDesejado / (1 - debitTax / 100), debit: true });
+        const debitTax = getTaxa(machine, brand, 0);
+        if (debitTax) {
+            linhas.push({ inst: 'Débito', parcela: null, total: taxaBruto(valorDesejado, debitTax), debit: true });
         }
         for (let i = 1; i <= maxInst; i++) {
-            const tax = getRate(machine, brand, i);
-            if (tax === undefined) continue;
-            let bruto = valorDesejado / (1 - tax / 100);
+            const tax = getTaxa(machine, brand, i);
+            if (!tax) continue;
+            let bruto = taxaBruto(valorDesejado, tax);
             let parcela = bruto / i;
             if (arredond) { parcela = Math.floor(parcela) + 0.90; bruto = parcela * i; }
             linhas.push({ inst: `${i}x`, parcela, total: bruto, debit: false });

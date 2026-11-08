@@ -4,7 +4,7 @@
 // autocontido (helpers fv* próprios); só precisa de `el` e `fmt`
 // locais, que antes vinham do escopo compartilhado do calculadoras.js.
 // Depende de (via window.*):
-//   _areRatesLoaded, _getRate, products, _fuse, safeStorage,
+//   _areRatesLoaded, _getTaxa/_taxaLiquido/_taxaBruto/_taxaTexto, products, _fuse, safeStorage,
 //   _parseBrazilianCurrencyToFloat, openCalculatorSection
 // Expõe via window.*:
 //   _fvOnRatesLoaded, _initFecharVenda, _fvSelectProduct
@@ -19,9 +19,9 @@
     function fvRatesOk()   { return !!window._areRatesLoaded; }
     function getProds()  { return window.products || []; }
     function getFuse()   { return window._fuse || null; }
-    function fvGetRate(machine, brand, inst) {
-        return typeof window._getRate === 'function'
-            ? window._getRate(machine, brand, inst)
+    function fvGetTaxa(machine, brand, inst) {
+        return typeof window._getTaxa === 'function'
+            ? window._getTaxa(machine, brand, inst)
             : undefined;
     }
     function parseMoney(v) {
@@ -229,9 +229,9 @@
         el('fv_entrada_wrap')?.classList.remove('fv-h');
 
         // Sugere valor cobrado
-        const tax = fvGetRate(getMachine(), getBrand(), getInst());
-        if (tax !== undefined && el('fv_value') && !el('fv_entrada_check')?.checked) {
-            const sug = precoBase / (1 - tax/100);
+        const tax = fvGetTaxa(getMachine(), getBrand(), getInst());
+        if (tax && el('fv_value') && !el('fv_entrada_check')?.checked) {
+            const sug = window._taxaBruto(precoBase, tax);
             el('fv_value').value = sug.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
         }
         calculate();
@@ -269,8 +269,8 @@
             return;
         }
 
-        const tax = fvGetRate(getMachine(), getBrand(), getInst());
-        if (tax === undefined || tax === null) {
+        const tax = fvGetTaxa(getMachine(), getBrand(), getInst());
+        if (!tax) {
             zone.innerHTML = `<div class="fv-wait"><i class="bi bi-exclamation-triangle"></i> Taxa indisponível.</div>`;
             return;
         }
@@ -287,12 +287,12 @@
             const entrada = parseFloat(el('fv_entrada_valor')?.value)||0;
             const cartao  = parseFloat(el('fv_cartao_valor')?.value)||0;
             if (!entrada && !cartao) { zone.innerHTML=''; return; }
-            const liquidCartao  = cartao*(1-tax/100);
+            const liquidCartao  = window._taxaLiquido(cartao, tax);
             const total         = entrada + liquidCartao;
             const lucro         = total - precoBase;
             showResult(zone, {
                 liquid: total,
-                sub: `${fmt(entrada)} à vista + ${fmt(cartao)} cartão (${tax.toFixed(2)}%)`,
+                sub: `${fmt(entrada)} à vista + ${fmt(cartao)} cartão (${window._taxaTexto(tax)})`,
                 lucro,
             });
             return;
@@ -304,12 +304,12 @@
         if (!input || input <= 0) { zone.innerHTML=''; return; }
 
         const inst   = getInst();
-        const liquid = input*(1-tax/100);
+        const liquid = window._taxaLiquido(input, tax);
         const lucro  = isProd && precoBase>0 ? liquid-precoBase : null;
 
         showResult(zone, {
             liquid,
-            sub: `Taxa ${tax.toFixed(2)}% · ${inst===0?'Débito':`${inst}x`}`,
+            sub: `Taxa ${window._taxaTexto(tax)} · ${inst===0?'Débito':`${inst}x`}`,
             lucro,
         });
     }

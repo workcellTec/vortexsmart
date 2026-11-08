@@ -1,7 +1,7 @@
 // ================================================================
 // core.js — VortexSmart SaaS · Core / Firebase / Estado Compartilhado
 // Expõe via window.*:
-//   _rates, _areRatesLoaded, _getRate, products, _fuse,
+//   _rates, _areRatesLoaded, _getTaxa/_taxaLiquido/_taxaBruto/_taxaTexto/_taxaDaForma, products, _fuse,
 //   flagData, safeStorage, showCustomModal, showMainSection,
 //   openCalculatorSection, parseBrazilianCurrencyToFloat, escapeHtml,
 //   updateFlagDisplay, openFlagSelector, closeFlagModal,
@@ -430,26 +430,54 @@ window._parseBrazilianCurrencyToFloat = parseBrazilianCurrencyToFloat;
 window.escapeHtml = escapeHtml;
 window._fmt = fmt;
 
-// ── getRate ──────────────────────────────────────────────────────
-function getRate(machine, brand, installments) {
+// ── Taxa da maquininha ───────────────────────────────────────────
+// Cada taxa é { tipo, valor }: tipo 'pct' = % sobre a venda (valor 2.39 → 2,39%); tipo 'rs' = valor FIXO em
+// reais por transação, qualquer que seja o valor da venda (valor 0.5 → R$ 0,50). Débito e crédito têm
+// a unidade escolhida separadamente (debitoTipo / creditoTipo ao lado dos números; ausente = %).
+// undefined = não há taxa cadastrada pra essa combinação.
+function conjuntoDeTaxas(machine, brand) {
     if (!areRatesLoaded || !rates[machine]) return undefined;
     const set = rates[machine];
     // Maquininha achatada (0 bandeiras cadastradas) — debito/credito
     // direto na raiz, sem sub-chave de bandeira nenhuma. Generaliza o
     // que só o PagBank fazia antes (hardcoded); agora qualquer
     // maquininha com 0 bandeiras funciona assim.
-    if (set.debito !== undefined || set.credito !== undefined) {
-        return installments === 0 ? set.debito : set.credito[installments - 1];
-    }
+    if (set.debito !== undefined || set.credito !== undefined) return set;
     // 'hiper' historicamente cai na chave 'hipercard' pra maioria das
     // maquininhas (formato herdado do CTW) — só a Infinity tem uma
     // chave 'hiper' de verdade e separada. Preservado tal e qual pras
     // máquinas antigas; bandeiras novas (nome/id livre, cadastradas
     // pelo Gestor) não colidem com essa regra.
-    const bandeiraSet = (machine === 'infinity' && brand === 'hiper') ? rates.infinity.hiper : set[brand === 'hiper' ? 'hipercard' : brand];
-    return bandeiraSet ? (installments === 0 ? bandeiraSet.debito : bandeiraSet.credito[installments - 1]) : undefined;
+    return (machine === 'infinity' && brand === 'hiper') ? rates.infinity.hiper : set[brand === 'hiper' ? 'hipercard' : brand];
 }
-window._getRate = getRate;
+function getTaxa(machine, brand, installments) {
+    const set = conjuntoDeTaxas(machine, brand);
+    if (!set) return undefined;
+    const debito = installments === 0;
+    const valor = debito ? set.debito : (set.credito || [])[installments - 1];
+    if (typeof valor !== 'number' || !isFinite(valor)) return undefined;
+    return { tipo: (debito ? set.debitoTipo : set.creditoTipo) === 'rs' ? 'rs' : 'pct', valor };
+}
+// Quanto a loja recebe de um pagamento de `bruto` (nunca negativo: taxa fixa maior que o pagamento zera).
+function taxaLiquido(bruto, t) { return t.tipo === 'rs' ? Math.max(bruto - t.valor, 0) : bruto * (1 - t.valor / 100); }
+// Quanto o cliente precisa pagar pra loja receber `liquido` já descontada a taxa.
+function taxaBruto(liquido, t) { return t.tipo === 'rs' ? liquido + t.valor : liquido / (1 - t.valor / 100); }
+// "2,39%" ou "R$ 0,50" — pra telas e mensagens.
+function taxaTexto(t) { return t.tipo === 'rs' ? fmt(t.valor) : `${t.valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`; }
+// Taxa opcional de uma forma de pagamento sem maquininha (formasPagamentoConfig/{id}: taxa + taxaTipo).
+// null = sem taxa. Valor fora do aceitável (≤ 0, não numérico, % acima de 100) conta como sem taxa.
+function taxaDaFormaConfig(id) {
+    const cfg = (window._formasPagamentoConfig || {})[id];
+    const valor = Number(cfg?.taxa);
+    if (!Number.isFinite(valor) || valor <= 0) return null;
+    if (cfg.taxaTipo === 'rs') return { tipo: 'rs', valor };
+    return valor <= 100 ? { tipo: 'pct', valor } : null;
+}
+window._getTaxa      = getTaxa;
+window._taxaDaForma   = taxaDaFormaConfig;
+window._taxaLiquido  = taxaLiquido;
+window._taxaBruto    = taxaBruto;
+window._taxaTexto    = taxaTexto;
 
 // ── updateFlagDisplay ────────────────────────────────────────────
 function updateFlagDisplay(sectionNumber) {
@@ -1053,7 +1081,6 @@ function loadRates() {
         areRatesLoaded = true;
         window._rates          = rates;
         window._areRatesLoaded = true;
-        window._getRate        = getRate;
 
         // Notifica módulos dependentes
         if (typeof window._fvOnRatesLoaded === 'function') window._fvOnRatesLoaded();

@@ -3,13 +3,16 @@
 // Registra: window._initConfigTaxas()
 //
 // Importante sobre onde cada coisa é gravada no Firebase:
-//   - rates/{maquina}/{bandeira} = {debito, credito:[...]}
+//   - rates/{maquina}/{bandeira} = {debito, credito:[...], debitoTipo?, creditoTipo?}
 //     ESSA estrutura é a mesma que o CTW (sistema original) usa e
 //     depende — NUNCA muda de formato aqui, só os valores. Maquininha
 //     SEM bandeira (lista vazia) usa rates/{maquina} = {debito,
 //     credito:[...]} direto na raiz, sem sub-chave (mesmo formato que
 //     o PagBank sempre usou — agora generalizado pra qualquer
 //     maquininha, não só ele).
+//     Os números são % por padrão. 'debitoTipo' / 'creditoTipo' = 'rs' (opcionais,
+//     ao lado dos números) dizem que aquele valor é R$ FIXO por transação em vez de %
+//     (ex: a máquina cobra R$ 0,50 no débito, qualquer que seja a venda). Ausente = %.
 //   - maquininhasConfig/{maquina} = {nome, maxParcelas, oculta, padrao,
 //     bandeiras:[{id,nome}, ...]}
 //     Node NOVO, só do VortexSmart. O CTW não sabe que existe.
@@ -18,10 +21,11 @@
 //     cadastrar). Máquina antiga sem esse campo ainda: window
 //     ._getBandeirasDaMaquina (core.js) infere a partir de 'rates' e
 //     cura sozinha na primeira leitura.
-//   - formasPagamentoConfig/{forma} = {oculta, taxa?}
+//   - formasPagamentoConfig/{forma} = {oculta, taxa?, taxaTipo?}
 //     Idem, só pro VortexSmart (Dinheiro/Pix e as formas cadastradas
-//     pela loja). 'taxa' é opcional: % que essa forma desconta do que a
-//     loja recebe (ex: Pix recebido na maquininha). Ausente = sem taxa.
+//     pela loja). 'taxa' é opcional: o que essa forma desconta do que a
+//     loja recebe (ex: Pix recebido na maquininha) — % por padrão, ou R$ fixo
+//     por pagamento quando taxaTipo = 'rs'. Ausente = sem taxa.
 //     Vale só pras vendas NOVAS — cada pagamento guarda o próprio líquido.
 // ================================================================
 (function () {
@@ -32,24 +36,24 @@
     const dbRoot  = () => window._lojaRef();
     const pathRef = p => window._lojaRef(p);
     const getBandeirasDaMaquina = id => typeof window._getBandeirasDaMaquina === 'function' ? window._getBandeirasDaMaquina(id) : [];
+    const brl     = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const semAcento = t => String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const idDe    = nome => semAcento(nome).replace(/[^a-z0-9]+/g, '');
 
     const FORMAS_BASE = [
-        { v: 'dinheiro', l: 'Dinheiro', emoji: '💵', grad: 'linear-gradient(135deg,#4ade80,#16a34a)' },
-        { v: 'pix', l: 'Pix', emoji: '⚡', grad: 'linear-gradient(135deg,#5eead4,#0891b2)' }
+        { v: 'dinheiro', l: 'Dinheiro', icone: 'cash-stack', verde: true },
+        { v: 'pix', l: 'Pix', icone: 'lightning-charge-fill' }
     ];
     // Parcelado (promissória): antes era uma forma "fixa" — aparecia sempre ao fechar a venda e nem existia
     // nesta lista. Agora entra como as outras: dá pra DESATIVAR e RENOMEAR (ex: "Promissória", "Venda a
     // prazo"). Não tem taxa (é uma promessa de pagamento em parcelas, sem maquininha).
     // Guardado em formasPagamentoConfig/parcelado = { nome?, oculta? }. Sem nome salvo = "Parcelado".
-    const FORMA_PARCELADO = { v: 'parcelado', l: 'Parcelado', emoji: '🗓️', grad: 'linear-gradient(135deg,#fbbf24,#d97706)', semTaxa: true };
+    const FORMA_PARCELADO = { v: 'parcelado', l: 'Parcelado', icone: 'calendar3', semTaxa: true };
     const NOME_FORMA_MAX = 24;
     function getFormasSemTaxa() {
         const cfg = window._formasPagamentoConfig || {};
         const customIds = Object.keys(cfg).filter(id => cfg[id]?.custom && !FORMAS_BASE.find(f => f.v === id) && id !== FORMA_PARCELADO.v);
-        const customs = customIds.map(id => ({
-            v: id, l: cfg[id].nome || id, emoji: cfg[id].emoji || '💳',
-            grad: 'linear-gradient(135deg,#94a3b8,#475569)'
-        }));
+        const customs = customIds.map(id => ({ v: id, l: cfg[id].nome || id, emoji: cfg[id].emoji || '💳', custom: true }));
         const nomeParcelado = String(cfg[FORMA_PARCELADO.v]?.nome || '').trim();
         return [...FORMAS_BASE, ...customs, { ...FORMA_PARCELADO, l: nomeParcelado || FORMA_PARCELADO.l }];
     }
@@ -60,50 +64,80 @@
         if (id === FORMA_PARCELADO.v && (!nome || nome === FORMA_PARCELADO.l)) return { ok: true, nome: null };
         if (!nome) return { ok: false, erro: 'Dá um nome pra forma de pagamento.' };
         if (nome.length > NOME_FORMA_MAX) return { ok: false, erro: `Nome muito grande — use até ${NOME_FORMA_MAX} letras.` };
-        const norm = t => String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+        const norm = t => semAcento(t).replace(/\s+/g, ' ');
         const usados = [...getFormasSemTaxa().filter(f => f.v !== id).map(f => f.l), 'Cartão'].map(norm);
         if (usados.includes(norm(nome))) return { ok: false, erro: 'Já existe uma forma de pagamento com esse nome.' };
         return { ok: true, nome };
     }
-    // Taxa % de uma forma sem maquininha (0 = sem taxa). Só aceita número
-    // entre 0 e 100 — qualquer outra coisa gravada vira "sem taxa".
-    function taxaDaFormaCfg(id) {
-        const t = Number((window._formasPagamentoConfig || {})[id]?.taxa);
-        return Number.isFinite(t) && t > 0 && t <= 100 ? t : 0;
-    }
-    const fmtTaxa = n => n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-    // Campo de taxa: vazio/0 = sem taxa (null); aceita vírgula; 0 a 100, até 2 casas.
-    function lerTaxaDigitada(texto) {
-        const bruto = String(texto || '').trim();
-        if (bruto === '') return { ok: true, valor: null };
-        if (!/^\d+([.,]\d+)?$/.test(bruto)) return { ok: false };
+
+    // ── Taxa: % ou R$ fixo ─────────────────────────────────────────
+    // Tipos: 'pct' (% sobre a venda) e 'rs' (R$ fixo por transação). Os campos da tela guardam o TEXTO
+    // digitado; só no salvar viram número (lerNumero) e passam pela faixa válida (naFaixa).
+    const LIMITE_RS = 10000;
+    const TEXTO_FAIXA = { pct: 'use um número de 0 a 100 (ex: 0,99)', rs: 'use um valor em reais de 0 a 10.000 (ex: 0,50)' };
+    // '' → null (em branco); texto que não é número → NaN; senão o número com até 2 casas.
+    function lerNumero(texto) {
+        const bruto = String(texto ?? '').trim();
+        if (bruto === '') return null;
+        if (!/^(\d+([.,]\d*)?|[.,]\d+)$/.test(bruto)) return NaN;
         const n = Number(bruto.replace(',', '.'));
-        if (!Number.isFinite(n) || n > 100) return { ok: false };
-        return { ok: true, valor: n === 0 ? null : Math.round(n * 100) / 100 };
+        return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN;
     }
-    const CORES_MAQUINA = [
-        'linear-gradient(135deg,#4f8cff,#2563eb)', 'linear-gradient(135deg,#fbbf24,#c2410c)',
-        'linear-gradient(135deg,#a78bfa,#5b3df5)', 'linear-gradient(135deg,#5eead4,#0f766e)',
-        'linear-gradient(135deg,#f472b6,#be185d)', 'linear-gradient(135deg,#94a3b8,#475569)'
-    ];
+    // Maquininha: % tem que ser menor que 100 (100% não deixaria nada pra loja e quebra o "quanto cobrar").
+    const naFaixa = (n, tipo) => n >= 0 && (tipo === 'rs' ? n <= LIMITE_RS : n < 100);
+    const paraTexto = (n, tipo) => (n == null || !Number.isFinite(Number(n))) ? '' : (tipo === 'rs' ? Number(n).toFixed(2) : String(Number(n))).replace('.', ',');
+    // Digitação: só dígitos e uma vírgula/ponto, até 2 casas.
+    function limparDigitacao(inp) {
+        let v = inp.value.replace(/[^\d.,]/g, '');
+        const i = v.search(/[.,]/);
+        if (i >= 0) v = v.slice(0, i + 1) + v.slice(i + 1).replace(/[.,]/g, '');
+        v = v.replace(/([.,]\d{2})\d+/, '$1');
+        if (v !== inp.value) inp.value = v;
+        return v;
+    }
+    // "Venda de R$ 100,00 no débito: a loja recebe … Pra receber R$ 100,00, o cliente paga …"
+    function linhaSimulacao(onde, taxa) {
+        const liquido = window._taxaLiquido(100, taxa), bruto = window._taxaBruto(100, taxa);
+        return `<div>Numa venda de <b>${brl(100)}</b> ${onde}, a loja recebe <b>${brl(liquido)}</b>. Pra receber ${brl(100)}, o cliente paga <b>${brl(bruto)}</b>.</div>`;
+    }
+    function segHtml(grupo, tipo) {
+        return `<div class="tx-seg" role="group">${[['pct', 'Porcentagem %'], ['rs', 'Valor fixo R$']].map(([t, rotulo]) =>
+            `<button type="button" class="${t === tipo ? 'on' : ''}" data-seg="${grupo}" data-u="${t}" aria-pressed="${t === tipo}">${rotulo}</button>`).join('')}</div>`;
+    }
+    function campoHtml(attrs, valor, tipo, classe = '') {
+        return `<div class="tx-campo ${classe}">${tipo === 'rs' ? '<span class="tx-un">R$</span>' : ''}<input type="text" inputmode="decimal" autocomplete="off" placeholder="${tipo === 'rs' ? '0,00' : '0'}" value="${esc(valor)}" ${attrs}>${tipo === 'pct' ? '<span class="tx-un">%</span>' : ''}</div>`;
+    }
+    const dicaTaxa = (tipo, onde) => tipo === 'rs'
+        ? `Valor fixo descontado em toda venda ${onde}, seja qual for o valor da venda (ex: a máquina cobra R$ 0,50 por transação).`
+        : `Percentual descontado do valor de cada venda ${onde}.`;
 
     let mounted = false;
-    let tela = 'lista';          // 'lista' | 'form' | 'form-forma'
+    let tela = 'lista';          // 'lista' | 'maquina' | 'forma'
     let maquinaEmEdicao = null;  // id da máquina sendo editada (null = cadastro novo)
-    let formaEmEdicao = null;    // id da forma cuja taxa está sendo editada (null = cadastro de forma nova)
+    let formaEmEdicao = null;    // id da forma sendo editada (null = cadastro de forma nova)
 
-    // ── Estado da seção "Bandeiras" (cadastro E edição) ────────────
-    let bandeirasAtuais   = [];   // [{id, nome}, ...] — lista sendo montada/editada nesse form
-    let bandeiraAtiva     = null; // id da bandeira cujo campo de taxa tá visível agora (null = taxa única, sem bandeira)
-    let bandeirasRemovidas = [];  // ids removidos NESSA sessão de edição (precisa apagar a taxa deles ao salvar)
-    let rascunhoPorBandeira = {}; // guarda em memória o que foi digitado, por bandeira (chave '_unica' = sem bandeira), até salvar
+    // ── Estado do formulário da maquininha (cadastro E edição) ─────
+    // sets[chave] guarda o que foi digitado (texto) por bandeira; chave '_unica' = maquininha sem bandeira.
+    // Nada é lido de volta do DOM: os campos atualizam este objeto a cada digitação.
+    let fm = null;   // { nome, max, bandeiras:[{id,nome}], ativa, removidas:[ids], adicionando, sets:{} }
+    let ff = null;   // formulário da forma: { nome, emoji, taxa, tipo }
+
+    const novoSet = () => ({ deb: '', debTipo: 'pct', cred: [], credTipo: 'pct' });
+    function setDeRates(o) {
+        if (!o) return novoSet();
+        const debTipo = o.debitoTipo === 'rs' ? 'rs' : 'pct', credTipo = o.creditoTipo === 'rs' ? 'rs' : 'pct';
+        const cred = Array.isArray(o.credito) ? o.credito : Object.values(o.credito || {});
+        return { deb: paraTexto(o.debito, debTipo), debTipo, cred: cred.map(v => paraTexto(v, credTipo)), credTipo };
+    }
+    const chaveAtual = () => fm.ativa || '_unica';
+    function setAtivo() { return fm.sets[chaveAtual()] || (fm.sets[chaveAtual()] = novoSet()); }
 
     function todasAsMaquinas() {
         const cfg = window._maquininhasConfig || {};
         const idsComTaxa = window._rates ? Object.keys(window._rates) : [];
         // Config sem taxa E sem nome = resíduo "só bandeiras" (máquina fantasma de versões antigas): não listar.
         const idsSoConfig = Object.keys(cfg).filter(id => !idsComTaxa.includes(id) && cfg[id]?.nome);
-        return [...idsComTaxa, ...idsSoConfig].map((id, i) => {
+        return [...idsComTaxa, ...idsSoConfig].map(id => {
             const maxReal = cfg[id]?.maxParcelas || (typeof window._inferirMaxParcelas === 'function' ? window._inferirMaxParcelas(id) : null) || 12;
             // Cura sozinho: se 'maquininhasConfig' não tinha esse campo (máquina
             // antiga, de antes dessa tela existir), grava o valor real agora —
@@ -116,8 +150,7 @@
                 l: cfg[id]?.nome || (id.charAt(0).toUpperCase() + id.slice(1)),
                 maxParcelas: maxReal,
                 oculta: !!cfg[id]?.oculta,
-                padrao: !!cfg[id]?.padrao,
-                cor: CORES_MAQUINA[i % CORES_MAQUINA.length]
+                padrao: !!cfg[id]?.padrao
             };
         });
     }
@@ -134,630 +167,590 @@
             <div class="content-card w-100" id="ctxBody"></div>
         `;
         el('ctxBack')?.addEventListener('click', () => {
-            if (tela !== 'lista') { tela = 'lista'; renderTudo(); }
+            if (tela !== 'lista') { voltarParaLista(); }
             else history.back();
         });
         mounted = true;
     }
 
+    function voltarParaLista() {
+        tela = 'lista';
+        maquinaEmEdicao = null;
+        formaEmEdicao = null;
+        fm = null;
+        ff = null;
+        renderTudo();
+    }
+
     function renderTudo() {
         ensureSkeleton();
         el('ctxTitulo').textContent = tela === 'lista' ? 'Taxas & Máquinas'
-            : tela === 'form-forma' ? (formaEmEdicao ? 'Taxa da Forma de Pagamento' : 'Nova Forma de Pagamento')
-            : (maquinaEmEdicao ? 'Editar Maquininha' : 'Nova Maquininha');
-        if (tela === 'lista') renderLista(); else renderForm();
+            : tela === 'forma' ? (formaEmEdicao ? (getFormasSemTaxa().find(f => f.v === formaEmEdicao)?.l || 'Forma de pagamento') : 'Nova forma')
+            : (maquinaEmEdicao ? (fm?.nome || 'Maquininha') : 'Nova maquininha');
+        if (tela === 'lista') renderLista();
+        else if (tela === 'forma') renderForma();
+        else renderMaquina();
+    }
+
+    // Troca de tela: volta pro topo (a tela nova começa do começo).
+    function irPara(nova) {
+        tela = nova;
+        renderTudo();
+        window.scrollTo(0, 0);
+        el('ctxTitulo')?.scrollIntoView({ block: 'nearest' });
     }
 
     // ══════════════════════ TELA: LISTA ══════════════════════
+    function subtituloForma(f) {
+        if (f.semTaxa) return 'Promessa de pagamento';
+        const t = window._taxaDaForma(f.v);
+        if (!t) return 'Sem taxa';
+        return t.tipo === 'rs' ? `Taxa de ${window._taxaTexto(t)} por venda` : `Taxa de ${window._taxaTexto(t)}`;
+    }
+
+    function iconeForma(f) {
+        return f.emoji ? esc(f.emoji) : `<i class="bi bi-${f.icone || 'credit-card-2-front'}"></i>`;
+    }
+
+    function chipsMaquina(m) {
+        const b0 = getBandeirasDaMaquina(m.v)[0]?.id;
+        const taxa = i => (typeof window._getTaxa === 'function' ? window._getTaxa(m.v, b0, i) : undefined);
+        const itens = [['Débito', taxa(0)], ['1x', taxa(1)]];
+        if (m.maxParcelas > 1) itens.push([`${m.maxParcelas}x`, taxa(m.maxParcelas)]);
+        const chips = itens.filter(([, t]) => t).map(([rotulo, t]) =>
+            `<span class="tx-chip">${rotulo} <b>${window._taxaTexto(t)}</b>${t.tipo === 'rs' ? ' <small>por venda</small>' : ''}</span>`);
+        return chips.join('') || '<span class="tx-chip tx-chip-vazio">Sem taxa cadastrada ainda</span>';
+    }
+
+    function subtituloMaquina(m) {
+        const bs = getBandeirasDaMaquina(m.v);
+        const nomes = bs.length ? bs.slice(0, 3).map(b => esc(b.nome)).join(', ') + (bs.length > 3 ? ` +${bs.length - 3}` : '') : 'Sem bandeira';
+        return `${nomes} · até ${m.maxParcelas}x`;
+    }
+
     function renderLista() {
         const formasCfg = window._formasPagamentoConfig || {};
         const maquinas = todasAsMaquinas();
 
         el('ctxBody').innerHTML = `
-            <div class="cfg-section-title">Formas de Pagamento</div>
-            <div class="cfgA-card mb-2" id="ctxFormasList">
-                ${getFormasSemTaxa().map(f => {
-                    const oculta = !!formasCfg[f.v]?.oculta;
-                    const ehCustom = !!formasCfg[f.v]?.custom;
-                    const taxa = f.semTaxa ? 0 : taxaDaFormaCfg(f.v);
-                    return `
-                    <div class="cfgA-row" style="cursor:default;">
-                        <div class="cfgA-icon" style="background:${f.grad};">${f.emoji}</div>
-                        <div class="cfgA-name">${esc(f.l)}${f.semTaxa ? ` <span class="ctx-badge-default" style="margin-left:6px;">parcelas</span>` : (taxa > 0 ? ` <span class="ctx-badge-default" style="margin-left:6px;">taxa ${fmtTaxa(taxa)}%</span>` : '')}</div>
-                        <button type="button" class="ctx-icon-btn" data-taxa-forma="${f.v}" aria-label="${f.semTaxa ? 'Editar nome' : 'Editar taxa'}" style="margin-right:6px;">✏️</button>
-                        <button type="button" class="ctx-switch ${oculta ? '' : 'on'}" data-forma="${f.v}" aria-label="Mostrar/ocultar"></button>
-                        ${ehCustom ? `<button type="button" class="ctx-icon-btn" data-excluir-forma="${f.v}" aria-label="Excluir" style="margin-left:6px;">🗑️</button>` : ''}
-                    </div>`;
-                }).join('')}
+            <div class="tx-sec">Formas de pagamento</div>
+            <div class="tx-card" id="txFormas">
+                ${getFormasSemTaxa().map(f => `
+                    <div class="tx-lin">
+                        <button type="button" class="tx-lin-main" data-forma-abrir="${f.v}">
+                            <span class="tx-ic ${f.verde ? 'v' : ''}">${iconeForma(f)}</span>
+                            <span class="tx-t"><span class="tx-n">${esc(f.l)}</span><span class="tx-s">${esc(subtituloForma(f))}</span></span>
+                        </button>
+                        <button type="button" class="tx-sw ${formasCfg[f.v]?.oculta ? '' : 'on'}" role="switch" aria-checked="${!formasCfg[f.v]?.oculta}" data-forma-oculta="${f.v}" aria-label="Mostrar ${esc(f.l)} nas vendas"></button>
+                        <i class="bi bi-chevron-right tx-chev" aria-hidden="true"></i>
+                    </div>`).join('')}
             </div>
-            <button type="button" class="ctx-add-btn mb-3" id="ctxNovaFormaBtn"><i class="bi bi-plus-lg"></i> Cadastrar Nova Forma de Pagamento</button>
+            <button type="button" class="tx-add" id="txNovaForma"><i class="bi bi-plus-lg"></i> Nova forma de pagamento</button>
 
-            <div class="cfg-section-title">Maquininhas de Cartão</div>
-            <div id="ctxMaquinasList"></div>
-            <button type="button" class="ctx-add-btn" id="ctxNovaMaquinaBtn"><i class="bi bi-plus-lg"></i> Cadastrar Nova Maquininha</button>
+            <div class="tx-sec">Maquininhas de cartão</div>
+            <div id="txMaquinas">
+                ${maquinas.map(m => `
+                    <div class="tx-card tx-maq ${m.oculta ? 'tx-off' : ''}">
+                        <button type="button" class="tx-maq-cab" data-maq-abrir="${m.v}">
+                            <span class="tx-ic tx-ic-maq"><i class="bi bi-credit-card-2-front"></i></span>
+                            <span class="tx-t"><span class="tx-n">${esc(m.l)}${m.padrao ? '<span class="tx-pill">Padrão</span>' : ''}</span><span class="tx-s">${subtituloMaquina(m)}</span></span>
+                            <i class="bi bi-chevron-right tx-chev" aria-hidden="true"></i>
+                        </button>
+                        <div class="tx-chips">${chipsMaquina(m)}</div>
+                        <div class="tx-rod">
+                            <span>Aparece nas vendas e calculadoras</span>
+                            <button type="button" class="tx-sw ${m.oculta ? '' : 'on'}" role="switch" aria-checked="${!m.oculta}" data-maq-oculta="${m.v}" aria-label="Mostrar ${esc(m.l)} nas vendas e calculadoras"></button>
+                        </div>
+                        ${m.padrao ? '' : `<button type="button" class="tx-txt tx-padrao" data-maq-padrao="${m.v}">★ Definir como padrão</button>`}
+                    </div>`).join('') || '<div class="tx-vazio">Nenhuma maquininha cadastrada ainda.</div>'}
+            </div>
+            <button type="button" class="tx-add" id="txNovaMaquina"><i class="bi bi-plus-lg"></i> Nova maquininha</button>
         `;
 
-        el('ctxMaquinasList').innerHTML = maquinas.map(m => `
-            <div class="ctx-machine-card ${m.oculta ? 'ctx-hidden' : ''}" data-m="${m.v}">
-                <div class="ctx-machine-top">
-                    <div class="ctx-machine-ic" style="background:${m.cor};">💳</div>
-                    <div class="ctx-machine-name-row">
-                        <div class="ctx-machine-name">${esc(m.l)}</div>
-                        ${m.padrao ? `<span class="ctx-badge-default">PADRÃO</span>` : ''}
-                    </div>
-                    <div class="ctx-machine-actions">
-                        <button type="button" class="ctx-icon-btn" data-toggle-oculta="${m.v}" aria-label="Ocultar/mostrar">${m.oculta ? '🙈' : '👁️'}</button>
-                        <button type="button" class="ctx-icon-btn" data-editar="${m.v}" aria-label="Editar">✏️</button>
-                        <button type="button" class="ctx-icon-btn" data-excluir-maquina="${m.v}" aria-label="Excluir">🗑️</button>
-                    </div>
-                </div>
-                <div class="ctx-machine-summary">${resumoTaxa(m)}</div>
-                ${!m.padrao ? `<div class="ctx-machine-footer"><button type="button" class="ctx-foot-btn ctx-foot-primary" data-padrao="${m.v}">★ Definir como padrão</button></div>` : ''}
-            </div>
-        `).join('') || `<div class="stq-hist-sub text-center py-3">Nenhuma maquininha cadastrada ainda.</div>`;
+        el('txFormas').querySelectorAll('[data-forma-abrir]').forEach(b => b.addEventListener('click', () => abrirForma(b.dataset.formaAbrir)));
+        el('txFormas').querySelectorAll('[data-forma-oculta]').forEach(b => b.addEventListener('click', () => {
+            const forma = b.dataset.formaOculta;
+            const atual = !!(window._formasPagamentoConfig || {})[forma]?.oculta;
+            window._dbUpdate(pathRef(`formasPagamentoConfig/${forma}`), { oculta: !atual })
+                .catch(e => modal({ message: `Erro ao salvar: ${e.message}` }));
+        }));
 
-        el('ctxFormasList').querySelectorAll('[data-forma]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const forma = btn.dataset.forma;
-                const atual = !!(window._formasPagamentoConfig || {})[forma]?.oculta;
-                window._dbUpdate(pathRef(`formasPagamentoConfig/${forma}`), { oculta: !atual })
-                    .catch(e => modal({ message: `Erro ao salvar: ${e.message}` }));
-            });
-        });
-
-        el('ctxFormasList').querySelectorAll('[data-taxa-forma]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                formaEmEdicao = btn.dataset.taxaForma;
-                tela = 'form-forma';
-                renderTudo();
-            });
-        });
-
-        el('ctxFormasList').querySelectorAll('[data-excluir-forma]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.dataset.excluirForma;
-                const nome = getFormasSemTaxa().find(f => f.v === id)?.l || id;
-                modal({
-                    message: `Excluir a forma de pagamento "${nome}"? Isso não muda vendas já lançadas com ela — só some da lista pra novas vendas.`,
-                    confirmText: 'Excluir',
-                    cancelText: 'Cancelar',
-                    onConfirm: () => {
-                        window._dbRemove(pathRef(`formasPagamentoConfig/${id}`))
-                            .then(() => renderTudo())
-                            .catch(e => modal({ message: `Erro ao excluir: ${e.message}` }));
-                    }
-                });
-            });
-        });
-
-        el('ctxMaquinasList').querySelectorAll('[data-toggle-oculta]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.dataset.toggleOculta;
-                const atual = !!(window._maquininhasConfig || {})[id]?.oculta;
-                window._dbUpdate(pathRef(`maquininhasConfig/${id}`), { oculta: !atual })
-                    .catch(e => modal({ message: `Erro ao salvar: ${e.message}` }));
-            });
-        });
-
+        const lista = el('txMaquinas');
+        lista.querySelectorAll('[data-maq-abrir]').forEach(b => b.addEventListener('click', () => abrirEdicao(b.dataset.maqAbrir)));
+        lista.querySelectorAll('[data-maq-oculta]').forEach(b => b.addEventListener('click', () => {
+            const id = b.dataset.maqOculta;
+            const atual = !!(window._maquininhasConfig || {})[id]?.oculta;
+            window._dbUpdate(pathRef(`maquininhasConfig/${id}`), { oculta: !atual })
+                .catch(e => modal({ message: `Erro ao salvar: ${e.message}` }));
+        }));
         // Definir como padrão — update multi-path atômico (limpa os outros)
-        el('ctxMaquinasList').querySelectorAll('[data-padrao]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.dataset.padrao;
-                const updates = {};
-                maquinas.forEach(m => { updates[`maquininhasConfig/${m.v}/padrao`] = (m.v === id); });
-                window._dbUpdate(dbRoot(), updates)
-                    .catch(e => modal({ message: `Erro ao definir padrão: ${e.message}` }));
-            });
-        });
+        lista.querySelectorAll('[data-maq-padrao]').forEach(b => b.addEventListener('click', () => {
+            const id = b.dataset.maqPadrao;
+            const updates = {};
+            maquinas.forEach(m => { updates[`maquininhasConfig/${m.v}/padrao`] = (m.v === id); });
+            window._dbUpdate(dbRoot(), updates)
+                .catch(e => modal({ message: `Erro ao definir padrão: ${e.message}` }));
+        }));
 
-        el('ctxMaquinasList').querySelectorAll('[data-editar]').forEach(btn => {
-            btn.addEventListener('click', () => abrirEdicao(btn.dataset.editar));
-        });
-
-        // Excluir máquina de verdade — ação sem volta, por isso pede confirmação.
-        el('ctxMaquinasList').querySelectorAll('[data-excluir-maquina]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.dataset.excluirMaquina;
-                const m = maquinas.find(x => x.v === id);
-                const nome = m?.l || id;
-                const temTaxa = !!(window._rates && window._rates[id]);
-                const aviso = `Excluir "${nome}"? Essa ação não tem volta.`;
-                modal({
-                    message: aviso,
-                    confirmText: 'Excluir',
-                    cancelText: 'Cancelar',
-                    onConfirm: () => {
-                        const updates = { [`maquininhasConfig/${id}`]: null };
-                        if (temTaxa) updates[`rates/${id}`] = null;
-                        window._dbUpdate(dbRoot(), updates)
-                            .then(() => renderTudo())
-                            .catch(e => modal({ message: `Erro ao excluir: ${e.message}` }));
-                    }
-                });
-            });
-        });
-
-        el('ctxNovaMaquinaBtn')?.addEventListener('click', abrirCadastro);
-        el('ctxNovaFormaBtn')?.addEventListener('click', abrirCadastroForma);
+        el('txNovaMaquina')?.addEventListener('click', abrirCadastro);
+        el('txNovaForma')?.addEventListener('click', () => abrirForma(null));
     }
 
-    function resumoTaxa(m) {
-        const rt = (window._rates || {})[m.v];
-        if (!rt) return 'Sem taxa cadastrada ainda.';
-        const bandeiras = getBandeirasDaMaquina(m.v);
-        const base = bandeiras.length ? (rt[bandeiras[0].id] || rt[Object.keys(rt)[0]]) : rt;
-        if (!base || base.debito == null) return 'Sem taxa cadastrada ainda.';
-        const debito = `${String(base.debito).replace('.', ',')}%`;
-        return `Débito ${debito} · Crédito 1x a <b>${m.maxParcelas}x</b>`;
-    }
-
-    // ══════════════════════ TELA: FORM (cadastro/edição) ══════════════════════
+    // ══════════════════════ TELA: MAQUININHA (cadastro/edição) ══════════════════════
     function abrirCadastro() {
         maquinaEmEdicao = null;
-        bandeirasAtuais = [];
-        bandeiraAtiva = null;
-        bandeirasRemovidas = [];
-        rascunhoPorBandeira = {};
-        tela = 'form';
-        renderTudo();
+        fm = { nome: '', max: 12, bandeiras: [], ativa: null, removidas: [], adicionando: false, sets: {} };
+        irPara('maquina');
     }
 
     function abrirEdicao(id) {
+        const cfg = (window._maquininhasConfig || {})[id] || {};
+        const rt = (window._rates || {})[id] || {};
+        const bandeiras = getBandeirasDaMaquina(id).map(b => ({ ...b }));
+        const sets = {};
+        if (bandeiras.length) bandeiras.forEach(b => { if (rt[b.id]) sets[b.id] = setDeRates(rt[b.id]); });
+        else sets._unica = setDeRates(rt);
         maquinaEmEdicao = id;
-        bandeirasAtuais = getBandeirasDaMaquina(id).map(b => ({ ...b }));
-        bandeiraAtiva = bandeirasAtuais[0]?.id || null;
-        bandeirasRemovidas = [];
-        rascunhoPorBandeira = {};
-        tela = 'form';
-        renderTudo();
-    }
-
-    function renderForm() {
-        if (tela === 'form-forma') { renderFormForma(); return; }
-        if (!maquinaEmEdicao) renderFormCadastro(); else renderFormEdicao();
-    }
-
-    // ── Cadastro de nova Forma de Pagamento (tipo Dinheiro/Pix; taxa opcional) e
-    //    edição da taxa de uma forma existente (Dinheiro, Pix ou cadastrada) ──
-    function abrirCadastroForma() {
-        formaEmEdicao = null;
-        tela = 'form-forma';
-        renderTudo();
-    }
-
-    function renderFormForma() {
-        const editando = formaEmEdicao ? getFormasSemTaxa().find(f => f.v === formaEmEdicao) : null;
-        if (formaEmEdicao && !editando) { // a forma foi excluída enquanto a tela estava aberta
-            formaEmEdicao = null;
-            tela = 'lista';
-            renderTudo();
-            return;
-        }
-        const taxaAtual = editando && !editando.semTaxa ? taxaDaFormaCfg(editando.v) : 0;
-        // Parcelado e as formas cadastradas têm nome editável; Dinheiro e Pix têm nome fixo.
-        const nomeEditavel = !!editando && (editando.semTaxa || !!(window._formasPagamentoConfig || {})[editando.v]?.custom);
-        el('ctxBody').innerHTML = `
-            <div class="cfgA-card" style="padding:14px;margin-bottom:14px;">
-                ${editando && nomeEditavel ? `
-                <label class="ctx-field-label">Nome que aparece na venda</label>
-                <input class="ctx-field-input" id="ctxFormaNomeEditar" maxlength="${NOME_FORMA_MAX}" value="${esc(editando.l)}" placeholder="Ex: Promissória">
-                ${editando.semTaxa ? `<div class="stq-hist-sub mt-1">Ex: Promissória, Venda a prazo. Deixe vazio pra voltar a "${esc(FORMA_PARCELADO.l)}". Vale só pras vendas novas — as vendas antigas continuam com o nome que tinham.</div>` : ''}
-                ` : editando ? `
-                <label class="ctx-field-label">Forma de pagamento</label>
-                <div class="ctx-field-input" style="opacity:.75;">${editando.emoji} ${esc(editando.l)}</div>
-                ` : `
-                <label class="ctx-field-label">Nome</label>
-                <input class="ctx-field-input" id="ctxFormaNome" placeholder="Ex: Vale Alimentação">
-                <label class="ctx-field-label mt-2">Emoji (opcional)</label>
-                <input class="ctx-field-input" id="ctxFormaEmoji" placeholder="💳" maxlength="2">
-                `}
-                ${editando && editando.semTaxa ? '' : `
-                <label class="ctx-field-label mt-2">Taxa descontada (%) — opcional</label>
-                <input class="ctx-field-input" id="ctxFormaTaxa" inputmode="decimal" placeholder="0" value="${taxaAtual ? String(taxaAtual).replace('.', ',') : ''}">
-                <div class="stq-hist-sub mt-2">Quanto a máquina/banco desconta quando o cliente paga nessa forma (ex: 0,99). Deixe vazio se não tem taxa. Vale só pras vendas novas — as já lançadas não mudam.</div>
-                `}
-            </div>
-            <button type="button" class="ctx-add-btn ctx-add-btn-solid" id="ctxSalvarFormaBtn"><i class="bi bi-check-lg"></i> ${editando ? (nomeEditavel ? 'Salvar' : 'Salvar taxa') : 'Cadastrar Forma de Pagamento'}</button>
-        `;
-        el('ctxSalvarFormaBtn')?.addEventListener('click', editando ? (nomeEditavel ? salvarEdicaoForma : salvarTaxaForma) : salvarNovaForma);
-    }
-
-    // Parcelado e formas cadastradas: grava o NOME (e a taxa, nas que têm). Só mexe nos campos que mudaram —
-    // o update não toca em oculta/custom/emoji. Nome do Parcelado vazio/padrão apaga o campo (volta a "Parcelado").
-    function salvarEdicaoForma() {
-        const id = formaEmEdicao;
-        const forma = getFormasSemTaxa().find(f => f.v === id);
-        if (!forma) return;
-        const nome = validarNomeDaForma(el('ctxFormaNomeEditar')?.value, id);
-        if (!nome.ok) { modal({ message: nome.erro }); return; }
-        const nomeMudou = (nome.nome || FORMA_PARCELADO.l) !== forma.l;
-        const alteracoes = {};
-        if (nomeMudou) alteracoes.nome = nome.nome; // null = apaga (só o Parcelado chega aqui com null)
-        let taxa = null;
-        if (!forma.semTaxa) {
-            taxa = lerTaxaDigitada(el('ctxFormaTaxa')?.value);
-            if (!taxa.ok) { modal({ message: 'Taxa inválida — use um número de 0 a 100 (ex: 0,99).' }); return; }
-            if (taxa.valor !== (taxaDaFormaCfg(id) || null)) alteracoes.taxa = taxa.valor;
-        }
-        const msgSucesso = () => {
-            if (forma.semTaxa) return nome.nome ? `✅ Agora aparece como "${nome.nome}" na hora de fechar a venda. Vale pras vendas novas.` : `✅ Voltou ao nome padrão "${FORMA_PARCELADO.l}". Vale pras vendas novas.`;
-            if (nomeMudou) return `✅ Agora se chama "${nome.nome}". Vale pras vendas novas.`;
-            return taxa && taxa.valor ? `✅ Taxa de ${fmtTaxa(taxa.valor)}% salva. Vale pras próximas vendas.` : '✅ Taxa removida. Vale pras próximas vendas.';
+        fm = {
+            nome: cfg.nome || (id.charAt(0).toUpperCase() + id.slice(1)),
+            max: Math.min(24, cfg.maxParcelas || (typeof window._inferirMaxParcelas === 'function' ? window._inferirMaxParcelas(id) : null) || 12),
+            bandeiras, ativa: bandeiras[0]?.id || null, removidas: [], adicionando: false, sets
         };
-        const voltar = () => { formaEmEdicao = null; tela = 'lista'; renderTudo(); };
-        if (!Object.keys(alteracoes).length) { voltar(); return; } // nada mudou: só volta
-        const btn = el('ctxSalvarFormaBtn');
-        window._setBtnLoading && window._setBtnLoading(btn, true, 'Salvando...');
-        window._dbUpdate(pathRef(`formasPagamentoConfig/${id}`), alteracoes)
-            .then(() => {
-                window._setBtnLoading && window._setBtnLoading(btn, false);
-                voltar();
-                modal({ message: msgSucesso() });
-            })
-            .catch(e => {
-                window._setBtnLoading && window._setBtnLoading(btn, false);
-                modal({ message: `Erro ao salvar: ${e.message}` });
-            });
+        irPara('maquina');
     }
 
-    function salvarTaxaForma() {
-        const taxa = lerTaxaDigitada(el('ctxFormaTaxa')?.value);
-        if (!taxa.ok) { modal({ message: 'Taxa inválida — use um número de 0 a 100 (ex: 0,99).' }); return; }
-        const id = formaEmEdicao;
-        const btn = el('ctxSalvarFormaBtn');
-        window._setBtnLoading && window._setBtnLoading(btn, true, 'Salvando...');
-        // taxa null remove o campo (= sem taxa); update não mexe em nome/oculta/custom.
-        window._dbUpdate(pathRef(`formasPagamentoConfig/${id}`), { taxa: taxa.valor })
-            .then(() => {
-                window._setBtnLoading && window._setBtnLoading(btn, false);
-                formaEmEdicao = null;
-                tela = 'lista';
-                renderTudo();
-                modal({ message: taxa.valor ? `✅ Taxa de ${fmtTaxa(taxa.valor)}% salva. Vale pras próximas vendas.` : '✅ Taxa removida. Vale pras próximas vendas.' });
-            })
-            .catch(e => {
-                window._setBtnLoading && window._setBtnLoading(btn, false);
-                modal({ message: `Erro ao salvar: ${e.message}` });
-            });
-    }
-
-    function salvarNovaForma() {
-        const nome = el('ctxFormaNome')?.value.trim();
-        const emoji = el('ctxFormaEmoji')?.value.trim() || '💳';
-        if (!nome) { modal({ message: 'Dá um nome pra forma de pagamento.' }); return; }
-        const id = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
-        if (!id) { modal({ message: 'Nome inválido — usa letras ou números.' }); return; }
-        if (getFormasSemTaxa().find(f => f.v === id)) { modal({ message: 'Já existe uma forma de pagamento com esse nome.' }); return; }
-        const taxa = lerTaxaDigitada(el('ctxFormaTaxa')?.value);
-        if (!taxa.ok) { modal({ message: 'Taxa inválida — use um número de 0 a 100 (ex: 0,99).' }); return; }
-
-        const btn = el('ctxSalvarFormaBtn');
-        window._setBtnLoading && window._setBtnLoading(btn, true, 'Salvando...');
-        window._dbUpdate(pathRef(`formasPagamentoConfig/${id}`), { nome, emoji, oculta: false, custom: true, ...(taxa.valor ? { taxa: taxa.valor } : {}) })
-            .then(() => {
-                window._setBtnLoading && window._setBtnLoading(btn, false);
-                tela = 'lista';
-                renderTudo();
-                modal({ message: `✅ ${nome} cadastrada!` });
-            })
-            .catch(e => {
-                window._setBtnLoading && window._setBtnLoading(btn, false);
-                modal({ message: `Erro ao cadastrar: ${e.message}` });
-            });
-    }
-
-    // ── Seção "Bandeiras" — compartilhada entre cadastro e edição ──
-    // Chave usada em rascunhoPorBandeira: o id da bandeira ativa, ou
-    // '_unica' quando a maquininha não tem NENHUMA bandeira (taxa única,
-    // igual o PagBank sempre funcionou — agora vale pra qualquer uma).
-    function chaveAtual() { return bandeiraAtiva || '_unica'; }
-
-    function htmlSecaoBandeiras() {
-        return `
-            <div class="cfgA-card mb-3" style="padding:14px;">
-                <div class="cfg-section-title" style="margin-top:0;">Bandeiras</div>
-                <div class="stq-hist-sub mb-2" style="font-size:.7rem;line-height:1.4;">Cada bandeira pode ter sua própria taxa. Sem nenhuma, é uma taxa única pra essa maquininha inteira.</div>
-                <div id="bandeirasChipsWrap" class="ctx-bandeira-chips-dyn"></div>
-                <div id="bandeirasEmptyMsg" class="ctx-bandeiras-empty">
-                    <i class="bi bi-info-circle"></i>
-                    <span>Sem bandeiras cadastradas — a taxa abaixo vale pra qualquer cartão nessa maquininha.</span>
-                </div>
-                <div id="bandeiraAddRow">
-                    <button type="button" class="ctx-add-btn" id="btnMostrarAddBandeira" style="margin-top:2px;"><i class="bi bi-plus-lg"></i> Adicionar bandeira</button>
-                </div>
-                <div id="bandeiraAddInline" class="ctx-bandeira-add-inline" style="display:none;">
-                    <input class="ctx-field-input" id="novaBandeiraNomeInput" placeholder="Ex: Visa, Elo, Ticket..." style="flex:1;">
-                    <button type="button" class="btn-icon-circle ctx-bandeira-add-ok" id="btnConfirmarAddBandeira" aria-label="Confirmar"><i class="bi bi-check-lg"></i></button>
-                    <button type="button" class="btn-icon-circle" id="btnCancelarAddBandeira" aria-label="Cancelar"><i class="bi bi-x-lg"></i></button>
-                </div>
-            </div>
-        `;
-    }
-
-    function wireSecaoBandeiras(onMudou) {
-        renderBandeirasChips(onMudou);
-        el('btnMostrarAddBandeira')?.addEventListener('click', () => {
-            el('bandeiraAddRow').style.display = 'none';
-            el('bandeiraAddInline').style.display = 'flex';
-            el('novaBandeiraNomeInput')?.focus();
-        });
-        el('btnCancelarAddBandeira')?.addEventListener('click', () => {
-            el('bandeiraAddInline').style.display = 'none';
-            el('bandeiraAddRow').style.display = 'block';
-            if (el('novaBandeiraNomeInput')) el('novaBandeiraNomeInput').value = '';
-        });
-        el('btnConfirmarAddBandeira')?.addEventListener('click', () => {
-            const nome = el('novaBandeiraNomeInput')?.value.trim();
-            if (!nome) return;
-            const id = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
-            if (!id) { modal({ message: 'Nome inválido — usa letras ou números.' }); return; }
-            if (bandeirasAtuais.find(b => b.id === id)) { modal({ message: 'Já tem uma bandeira com esse nome nessa maquininha.' }); return; }
-            salvarRascunhoAtual(); // guarda o que já tava digitado antes de trocar de aba
-            const primeira = bandeirasAtuais.length === 0;
-            bandeirasAtuais.push({ id, nome });
-            // Se era taxa única e essa é a primeira bandeira, aproveita o
-            // que já tinha sido digitado em vez de pedir de novo.
-            if (primeira && rascunhoPorBandeira._unica) rascunhoPorBandeira[id] = rascunhoPorBandeira._unica;
-            bandeiraAtiva = id;
-            onMudou();
-        });
-    }
-
-    function renderBandeirasChips(onMudou) {
-        const wrap = el('bandeirasChipsWrap');
-        const empty = el('bandeirasEmptyMsg');
-        if (!wrap || !empty) return;
-        if (!bandeirasAtuais.length) {
-            wrap.style.display = 'none';
-            empty.style.display = 'flex';
-            return;
-        }
-        wrap.style.display = 'flex';
-        empty.style.display = 'none';
-        if (!bandeirasAtuais.find(b => b.id === bandeiraAtiva)) bandeiraAtiva = bandeirasAtuais[0].id;
-        wrap.innerHTML = bandeirasAtuais.map(b => `
-            <div class="ctx-bandeira-chip-dyn ${b.id === bandeiraAtiva ? 'on' : ''}" data-id="${b.id}">
-                <span>${esc(b.nome)}</span>
-                <span class="ctx-bandeira-chip-x" data-remover="${b.id}"><i class="bi bi-x"></i></span>
-            </div>
-        `).join('');
-        wrap.querySelectorAll('.ctx-bandeira-chip-dyn').forEach(chip => {
-            chip.addEventListener('click', e => {
-                if (e.target.closest('[data-remover]')) return;
-                salvarRascunhoAtual();
-                bandeiraAtiva = chip.dataset.id;
-                onMudou();
-            });
-        });
-        wrap.querySelectorAll('[data-remover]').forEach(x => {
-            x.addEventListener('click', e => {
-                e.stopPropagation();
-                const id = x.dataset.remover;
-                bandeirasAtuais = bandeirasAtuais.filter(b => b.id !== id);
-                delete rascunhoPorBandeira[id];
-                if (maquinaEmEdicao && !bandeirasRemovidas.includes(id)) bandeirasRemovidas.push(id);
-                bandeiraAtiva = bandeirasAtuais[0]?.id || null;
-                onMudou();
-            });
-        });
-    }
-
-    // ── Cadastro: uma taxa (ou uma por bandeira) ────────────────────
-    function renderFormCadastro() {
-        const setAtual = rascunhoPorBandeira[chaveAtual()] || {};
-        const nomeAtiva = bandeiraAtiva ? bandeirasAtuais.find(b => b.id === bandeiraAtiva)?.nome : null;
-
+    function renderMaquina() {
         el('ctxBody').innerHTML = `
-            <div class="cfgA-card mb-3" style="padding:14px;">
-                <label class="ctx-field-label">Nome da Maquininha</label>
-                <input class="ctx-field-input" id="ctxNovoNome" placeholder="Ex: GetNet" value="${esc(el('ctxNovoNome')?.value || '')}">
-                <label class="ctx-field-label mt-2">Máximo de parcelas no crédito</label>
-                <input class="ctx-field-input" id="ctxNovoMax" type="number" min="1" max="24" value="${el('ctxNovoMax')?.value || 12}">
+            <div class="tx-sec">Dados</div>
+            <div class="tx-card">
+                <div class="tx-pad">
+                    <label class="tx-lbl" for="txNome">Nome da maquininha</label>
+                    <div class="tx-campo"><input type="text" id="txNome" maxlength="30" autocomplete="off" placeholder="Ex: GetNet" value="${esc(fm.nome)}"></div>
+                </div>
+                <div class="tx-pad tx-linha">
+                    <div><div class="tx-forte">Máximo de parcelas</div><div class="tx-dica tx-dica-s">no crédito</div></div>
+                    <div class="tx-step"><button type="button" id="txMenos" aria-label="Menos uma parcela">−</button><span id="txMax">${fm.max}</span><button type="button" id="txMais" aria-label="Mais uma parcela">+</button></div>
+                </div>
             </div>
 
-            ${htmlSecaoBandeiras()}
+            <div class="tx-sec">Bandeiras</div>
+            <div class="tx-card"><div class="tx-pad" id="txBandeiras"></div></div>
 
-            <div class="cfgA-card mb-3" style="padding:14px;">
-                <label class="ctx-field-label">Taxa Débito${nomeAtiva ? ` · ${esc(nomeAtiva)}` : ''} (%)</label>
-                <input class="ctx-field-input" id="ctxNovoDebito" type="number" step="0.01" placeholder="Ex: 1,99" value="${setAtual.debito ?? ''}">
-                <label class="ctx-field-label mt-2">Taxa Crédito 1x${nomeAtiva ? ` · ${esc(nomeAtiva)}` : ''} (%)</label>
-                <input class="ctx-field-input" id="ctxNovoCred1" type="number" step="0.01" placeholder="Ex: 3,19" value="${(setAtual.credito && setAtual.credito[0]) ?? ''}">
-                <div class="stq-hist-sub mt-2" style="font-size:.68rem;"><i class="bi bi-info-circle"></i> As demais parcelas (2x até o máximo) começam com uma progressão simples entre essas duas taxas — dá pra ajustar parcela por parcela depois, no lápis de editar.</div>
-            </div>
-            <button type="button" class="ctx-add-btn ctx-add-btn-solid" id="ctxSalvarNovoBtn"><i class="bi bi-check-lg"></i> Cadastrar Maquininha</button>
+            <div id="txTaxas"></div>
+
+            ${maquinaEmEdicao ? '<button type="button" class="tx-perigo" id="txExcluir">Excluir maquininha</button>' : ''}
+            <div class="tx-salvar"><button type="button" id="txSalvar">${maquinaEmEdicao ? 'Salvar maquininha' : 'Cadastrar maquininha'}</button></div>
         `;
+        renderBandeiras();
+        renderTaxas();
 
-        wireSecaoBandeiras(renderFormCadastro);
-        el('ctxSalvarNovoBtn')?.addEventListener('click', salvarNovaMaquina);
+        el('txNome').addEventListener('input', e => { fm.nome = e.target.value; });
+        const passo = delta => {
+            fm.max = Math.min(24, Math.max(1, fm.max + delta));
+            el('txMax').textContent = fm.max;
+            renderTaxas();
+        };
+        el('txMenos').addEventListener('click', () => passo(-1));
+        el('txMais').addEventListener('click', () => passo(1));
+        el('txSalvar').addEventListener('click', salvarMaquina);
+        el('txExcluir')?.addEventListener('click', excluirMaquina);
     }
 
-    function salvarRascunhoAtual() {
-        const debitoEl = el('ctxNovoDebito') || el('ctxEditDebito');
-        if (!debitoEl) return; // form ainda não montou os campos de taxa
-        const debito = parseFloat(debitoEl.value);
-        const cred1El = el('ctxNovoCred1');
-        const credito = cred1El ? [isNaN(parseFloat(cred1El.value)) ? undefined : parseFloat(cred1El.value)] : coletarCreditoAtual();
-        if (isNaN(debito) && (!credito.length || credito[0] === undefined)) return; // nada digitado ainda, não grava rascunho vazio
-        rascunhoPorBandeira[chaveAtual()] = { debito: isNaN(debito) ? undefined : debito, credito };
+    // ── Bandeiras ────────────────────────────────────────────────
+    // Ids que a própria estrutura de rates já usa como chave: uma bandeira com esse id se misturaria
+    // com os números da maquininha sem bandeira.
+    const IDS_RESERVADOS = ['debito', 'credito', 'debitotipo', 'creditotipo'];
+
+    function renderBandeiras() {
+        const box = el('txBandeiras');
+        if (!box) return;
+        box.innerHTML = `
+            <div class="tx-bchips">
+                ${fm.bandeiras.map(b => `
+                    <div class="tx-bch ${b.id === fm.ativa ? 'on' : ''}">
+                        <button type="button" class="tx-bch-nome" data-b="${b.id}">${esc(b.nome)}</button>
+                        <button type="button" class="tx-bch-x" data-rem="${b.id}" aria-label="Remover ${esc(b.nome)}"><i class="bi bi-x"></i></button>
+                    </div>`).join('')}
+                ${fm.adicionando ? '' : '<button type="button" class="tx-bch novo" id="txAddB"><i class="bi bi-plus-lg"></i> Adicionar</button>'}
+            </div>
+            ${fm.adicionando ? `
+            <div class="tx-add-row">
+                <div class="tx-campo"><input type="text" id="txNovaB" maxlength="20" autocomplete="off" placeholder="Ex: Visa, Elo, Ticket..."></div>
+                <button type="button" class="tx-iconbtn ok" id="txOkB" aria-label="Confirmar"><i class="bi bi-check-lg"></i></button>
+                <button type="button" class="tx-iconbtn" id="txCancB" aria-label="Cancelar"><i class="bi bi-x-lg"></i></button>
+            </div>` : ''}
+            <div class="tx-dica">${fm.bandeiras.length
+                ? 'Toque numa bandeira para editar as taxas dela. Bandeira sem taxa preenchida usa a da primeira que tiver.'
+                : 'Sem bandeiras: a taxa vale pra qualquer cartão nessa maquininha. Cadastre bandeiras só se cada uma tiver taxa diferente.'}</div>`;
+
+        box.querySelectorAll('[data-b]').forEach(b => b.addEventListener('click', () => {
+            fm.ativa = b.dataset.b;
+            renderBandeiras();
+            renderTaxas();
+        }));
+        box.querySelectorAll('[data-rem]').forEach(x => x.addEventListener('click', () => removerBandeira(x.dataset.rem)));
+        el('txAddB')?.addEventListener('click', () => { fm.adicionando = true; renderBandeiras(); el('txNovaB')?.focus(); });
+        el('txCancB')?.addEventListener('click', () => { fm.adicionando = false; renderBandeiras(); });
+        el('txOkB')?.addEventListener('click', confirmarNovaBandeira);
+        el('txNovaB')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); confirmarNovaBandeira(); } });
     }
 
-    function gerarCreditoLinear(debito, cred1, max) {
-        const tetoEstimado = debito + (cred1 - debito) * 3 + (max - 1) * 1.1;
-        return Array.from({ length: max }, (_, i) => {
-            if (max === 1) return +cred1.toFixed(2);
-            const t = i / (max - 1);
-            return +(cred1 + (tetoEstimado - cred1) * t).toFixed(2);
+    function confirmarNovaBandeira() {
+        const nome = el('txNovaB')?.value.trim().replace(/\s+/g, ' ');
+        if (!nome) return;
+        const id = idDe(nome);
+        if (!id || IDS_RESERVADOS.includes(id)) { modal({ message: 'Nome inválido — use letras ou números (e não "Débito" ou "Crédito").' }); return; }
+        if (fm.bandeiras.find(b => b.id === id)) { modal({ message: 'Já tem uma bandeira com esse nome nessa maquininha.' }); return; }
+        // Primeira bandeira de uma maquininha que tinha taxa única: aproveita o que já foi digitado.
+        if (!fm.bandeiras.length && fm.sets._unica) fm.sets[id] = JSON.parse(JSON.stringify(fm.sets._unica));
+        fm.bandeiras.push({ id, nome });
+        fm.removidas = fm.removidas.filter(r => r !== id);
+        fm.ativa = id;
+        fm.adicionando = false;
+        renderBandeiras();
+        renderTaxas();
+    }
+
+    function removerBandeira(id) {
+        const set = fm.sets[id];
+        fm.bandeiras = fm.bandeiras.filter(b => b.id !== id);
+        delete fm.sets[id];
+        if (maquinaEmEdicao && !fm.removidas.includes(id)) fm.removidas.push(id);
+        // Sobrou nenhuma: volta a ser taxa única, aproveitando as taxas da bandeira que saiu.
+        if (!fm.bandeiras.length && !fm.sets._unica) fm.sets._unica = set || novoSet();
+        fm.ativa = fm.bandeiras[0]?.id || null;
+        renderBandeiras();
+        renderTaxas();
+    }
+
+    // ── Taxas (débito + crédito por parcela) da bandeira ativa ─────
+    function renderTaxas() {
+        const box = el('txTaxas');
+        if (!box) return;
+        const st = setAtivo();
+        const nomeB = fm.ativa ? fm.bandeiras.find(b => b.id === fm.ativa)?.nome : null;
+        const sufixo = nomeB ? ` · ${esc(nomeB)}` : '';
+        box.innerHTML = `
+            <div class="tx-sec">Débito${sufixo}</div>
+            <div class="tx-card"><div class="tx-pad">
+                ${segHtml('deb', st.debTipo)}
+                ${campoHtml('data-deb', st.deb, st.debTipo)}
+                <div class="tx-dica">${dicaTaxa(st.debTipo, 'no débito')}</div>
+            </div></div>
+
+            <div class="tx-sec">Crédito por parcela${sufixo}</div>
+            <div class="tx-card">
+                <div class="tx-pad">
+                    ${segHtml('cre', st.credTipo)}
+                    <div class="tx-dica tx-dica-s">${dicaTaxa(st.credTipo, 'no crédito')}</div>
+                </div>
+                <div class="tx-parcs">
+                    ${Array.from({ length: fm.max }, (_, i) => `
+                    <div class="tx-parc"><span class="tx-parc-n">${i + 1}x</span>${campoHtml(`data-p="${i}"`, st.cred[i] ?? '', st.credTipo, 'tx-campo-sm')}</div>`).join('')}
+                </div>
+            </div>
+            <div class="tx-acoes">
+                <button type="button" class="tx-txt" id="txCopiar">Copiar a 1x para todas</button>
+                <span>Parcelas em branco são completadas a partir da 1x ao salvar.</span>
+            </div>
+            <div class="tx-simu" id="txSimu"></div>`;
+
+        box.querySelectorAll('[data-seg]').forEach(b => b.addEventListener('click', () => {
+            const u = b.dataset.u;
+            if (b.dataset.seg === 'deb') { if (st.debTipo === u) return; st.debTipo = u; st.deb = ''; }
+            else { if (st.credTipo === u) return; st.credTipo = u; st.cred = []; }
+            renderTaxas(); // mudou a unidade: os números digitados na unidade antiga não valem mais
+        }));
+        box.querySelector('[data-deb]').addEventListener('input', e => { st.deb = limparDigitacao(e.target); atualizarSimulacao(); });
+        box.querySelectorAll('[data-p]').forEach(inp => inp.addEventListener('input', e => { st.cred[Number(inp.dataset.p)] = limparDigitacao(e.target); atualizarSimulacao(); }));
+        el('txCopiar').addEventListener('click', () => {
+            const primeira = lerNumero(st.cred[0]);
+            if (primeira === null || Number.isNaN(primeira)) { modal({ message: 'Preencha a taxa da 1x primeiro.' }); return; }
+            st.cred = Array.from({ length: fm.max }, () => st.cred[0]);
+            renderTaxas();
         });
+        atualizarSimulacao();
     }
 
-    function salvarNovaMaquina() {
-        salvarRascunhoAtual();
-        const nome = el('ctxNovoNome')?.value.trim();
-        const max = parseInt(el('ctxNovoMax')?.value, 10) || 12;
-        if (!nome) { modal({ message: 'Dá um nome pra maquininha.' }); return; }
+    function atualizarSimulacao() {
+        const box = el('txSimu');
+        if (!box) return;
+        const st = setAtivo();
+        const linhas = [];
+        const deb = lerNumero(st.deb), c1 = lerNumero(st.cred[0]);
+        if (deb !== null && !Number.isNaN(deb) && naFaixa(deb, st.debTipo)) linhas.push(linhaSimulacao('no débito', { tipo: st.debTipo, valor: deb }));
+        if (c1 !== null && !Number.isNaN(c1) && naFaixa(c1, st.credTipo)) linhas.push(linhaSimulacao('em 1x no crédito', { tipo: st.credTipo, valor: c1 }));
+        box.innerHTML = linhas.join('');
+        box.style.display = linhas.length ? '' : 'none';
+    }
 
-        const id = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
+    // Converte o que foi digitado numa bandeira (ou na taxa única) no objeto gravado em rates/.
+    // Devolve { erro } | { incompleto } | { set }. Parcelas em branco depois da 1x são completadas:
+    // % sobe 1,1 ponto por parcela a partir da anterior; R$ repete o valor da anterior.
+    function montarSet(st, max, rotulo) {
+        const onde = rotulo ? ` (${rotulo})` : '';
+        const deb = lerNumero(st.deb);
+        if (deb !== null && !(naFaixa(deb, st.debTipo))) return { erro: `Taxa de débito inválida${onde} — ${TEXTO_FAIXA[st.debTipo]}.` };
+        const cred = [];
+        for (let i = 0; i < max; i++) {
+            const n = lerNumero(st.cred[i]);
+            if (n !== null && !naFaixa(n, st.credTipo)) return { erro: `Taxa de crédito ${i + 1}x inválida${onde} — ${TEXTO_FAIXA[st.credTipo]}.` };
+            cred.push(n);
+        }
+        if (deb === null || cred[0] === null) return { incompleto: true };
+        for (let i = 1; i < max; i++) {
+            if (cred[i] === null) cred[i] = st.credTipo === 'rs' ? cred[i - 1] : Math.min(Math.round((cred[i - 1] + 1.1) * 100) / 100, 99.99);
+        }
+        return { set: { debito: deb, credito: cred, ...(st.debTipo === 'rs' ? { debitoTipo: 'rs' } : {}), ...(st.credTipo === 'rs' ? { creditoTipo: 'rs' } : {}) } };
+    }
+
+    function salvarMaquina() {
+        const nome = fm.nome.trim().replace(/\s+/g, ' ');
+        const max = fm.max;
+        if (!nome) { modal({ message: 'Dá um nome pra maquininha.' }); return; }
+        const id = maquinaEmEdicao || idDe(nome);
         if (!id) { modal({ message: 'Nome inválido — usa letras ou números.' }); return; }
-        if ((window._rates || {})[id] || (window._maquininhasConfig || {})[id]) {
+        if (!maquinaEmEdicao && ((window._rates || {})[id] || (window._maquininhasConfig || {})[id])) {
             modal({ message: 'Já existe uma maquininha com esse nome.' }); return;
         }
-
-        const btn = el('ctxSalvarNovoBtn');
-        const updates = { [`maquininhasConfig/${id}`]: { nome, maxParcelas: max, oculta: false, padrao: false, bandeiras: bandeirasAtuais } };
-
-        if (!bandeirasAtuais.length) {
-            const draft = rascunhoPorBandeira._unica || {};
-            if (draft.debito == null || draft.credito?.[0] == null) { modal({ message: 'Preenche a taxa de débito e a de crédito 1x.' }); return; }
-            updates[`rates/${id}`] = { debito: draft.debito, credito: gerarCreditoLinear(draft.debito, draft.credito[0], max) };
-        } else {
-            // Bandeira sem taxa preenchida herda da primeira que foi
-            // preenchida (não obriga digitar uma por uma). Checa
-            // debito/credito de verdade, não só "existe uma entrada" —
-            // clicar numa bandeira sem preencher nada já cria uma
-            // entrada em rascunhoPorBandeira (com os campos vazios), e
-            // achar que isso conta como "preenchida" gerava taxa NaN
-            // (Firebase recusa o update inteiro com NaN, sem aviso
-            // claro do motivo).
-            const estaPreenchida = bid => rascunhoPorBandeira[bid]?.debito != null && rascunhoPorBandeira[bid]?.credito?.[0] != null;
-            const preenchidas = bandeirasAtuais.filter(b => estaPreenchida(b.id));
-            if (!preenchidas.length) { modal({ message: 'Preenche ao menos a taxa de uma bandeira.' }); return; }
-            const referencia = rascunhoPorBandeira[preenchidas[0].id];
-            bandeirasAtuais.forEach(b => {
-                const draft = estaPreenchida(b.id) ? rascunhoPorBandeira[b.id] : referencia;
-                updates[`rates/${id}/${b.id}`] = { debito: draft.debito, credito: gerarCreditoLinear(draft.debito, draft.credito[0], max) };
-            });
+        if (maquinaEmEdicao && todasAsMaquinas().some(m => m.v !== id && semAcento(m.l).replace(/\s+/g, ' ') === semAcento(nome))) {
+            modal({ message: 'Já existe outra maquininha com esse nome.' }); return;
         }
 
-        window._setBtnLoading && window._setBtnLoading(btn, true, 'Salvando...');
-        window._dbUpdate(dbRoot(), updates)
-            .then(() => {
-                window._setBtnLoading && window._setBtnLoading(btn, false);
-                tela = 'lista';
-                renderTudo();
-                modal({ message: `✅ ${nome} cadastrada!` });
-            })
-            .catch(e => {
-                window._setBtnLoading && window._setBtnLoading(btn, false);
-                modal({ message: `Erro ao cadastrar: ${e.message}` });
-            });
-    }
+        // Taxas de cada bandeira (ou a única). Bandeira sem taxa preenchida herda da primeira que tem.
+        const chaves = fm.bandeiras.length ? fm.bandeiras.map(b => ({ k: b.id, rotulo: b.nome })) : [{ k: '_unica', rotulo: null }];
+        const prontos = {};
+        let referencia = null;
+        for (const c of chaves) {
+            const r = montarSet(fm.sets[c.k] || novoSet(), max, c.rotulo);
+            if (r.erro) { modal({ message: r.erro }); return; }
+            prontos[c.k] = r.set || null;
+            if (r.set && !referencia) referencia = r.set;
+        }
+        if (!referencia) {
+            modal({ message: fm.bandeiras.length ? 'Preencha as taxas de ao menos uma bandeira (débito e crédito 1x).' : 'Preencha a taxa de débito e a de crédito 1x.' });
+            return;
+        }
+        chaves.forEach(c => { if (!prontos[c.k]) prontos[c.k] = referencia; });
 
-    // ── Edição ───────────────────────────────────────────────────
-    function renderFormEdicao() {
-        const cfg = (window._maquininhasConfig || {})[maquinaEmEdicao] || {};
-        const nome = cfg.nome || maquinaEmEdicao;
-        const max = cfg.maxParcelas || (typeof window._inferirMaxParcelas === 'function' ? window._inferirMaxParcelas(maquinaEmEdicao) : null) || 12;
-        const rt = (window._rates || {})[maquinaEmEdicao] || {};
-        const setSalvo = bandeiraAtiva ? (rt[bandeiraAtiva] || {}) : rt;
-        const setAtual = rascunhoPorBandeira[chaveAtual()] || setSalvo;
-        const nomeAtiva = bandeiraAtiva ? bandeirasAtuais.find(b => b.id === bandeiraAtiva)?.nome : null;
-
-        el('ctxBody').innerHTML = `
-            <div class="cfgA-card mb-3" style="padding:14px;">
-                <label class="ctx-field-label">Nome da Maquininha</label>
-                <input class="ctx-field-input" id="ctxEditNome" value="${esc(nome)}">
-                <label class="ctx-field-label mt-2">Máximo de parcelas no crédito</label>
-                <input class="ctx-field-input" id="ctxEditMax" type="number" min="1" max="24" value="${max}">
-            </div>
-
-            ${htmlSecaoBandeiras()}
-
-            <div class="cfg-section-title" id="ctxEditDebitoTitulo">Taxa Débito${nomeAtiva ? ` · ${esc(nomeAtiva)}` : ''}</div>
-            <div class="cfgA-card mb-2" style="padding:12px 14px;">
-                <input class="ctx-field-input" id="ctxEditDebito" type="number" step="0.01" value="${setAtual.debito ?? ''}">
-            </div>
-
-            <div class="cfg-section-title">Taxa de crédito por parcela</div>
-            <div class="cfgA-card" id="ctxParcelasList"></div>
-
-            <button type="button" class="ctx-add-btn ctx-add-btn-solid" id="ctxSalvarEdicaoBtn" style="margin-top:14px;"><i class="bi bi-check-lg"></i> Salvar Maquininha</button>
-        `;
-
-        renderParcelasList(setAtual.credito || []);
-        el('ctxEditMax')?.addEventListener('input', () => renderParcelasList(coletarCreditoAtual()));
-        wireSecaoBandeiras(renderFormEdicao);
-        el('ctxSalvarEdicaoBtn')?.addEventListener('click', salvarEdicaoCompleta);
-    }
-
-    function coletarCreditoAtual() {
-        const inputs = el('ctxParcelasList')?.querySelectorAll('.ctx-parc-input');
-        return inputs ? Array.from(inputs).map(i => parseFloat(i.value) || 0) : [];
-    }
-
-    function renderParcelasList(creditoAtual) {
-        const max = parseInt(el('ctxEditMax')?.value, 10) || creditoAtual.length || 12;
-        el('ctxParcelasList').innerHTML = Array.from({ length: max }, (_, i) => `
-            <div class="ctx-parc-row">
-                <div class="ctx-parc-n">${i + 1}x</div>
-                <input class="ctx-parc-input" type="number" step="0.01" value="${creditoAtual[i] ?? ''}">
-                <span class="ctx-parc-pct">%</span>
-            </div>
-        `).join('');
-    }
-
-    function salvarEdicaoCompleta() {
-        salvarRascunhoAtual();
-        const nome = el('ctxEditNome')?.value.trim() || maquinaEmEdicao;
-        const max = parseInt(el('ctxEditMax')?.value, 10) || 12;
-
-        const btn = el('ctxSalvarEdicaoBtn');
-        window._setBtnLoading && window._setBtnLoading(btn, true, 'Salvando...');
-
-        const updates = {
-            [`maquininhasConfig/${maquinaEmEdicao}/nome`]: nome,
-            [`maquininhasConfig/${maquinaEmEdicao}/maxParcelas`]: max,
-            [`maquininhasConfig/${maquinaEmEdicao}/bandeiras`]: bandeirasAtuais
-        };
-
-        if (!bandeirasAtuais.length) {
-            // Nota: não apaga bandeira individual aqui (rates/{id}/{bandeira})
-            // — substituir o node 'rates/{id}' inteiro já limpa qualquer
-            // sub-chave antiga sozinho. Incluir os dois no mesmo update()
-            // (um caminho e um caminho FILHO dele) faria o Firebase recusar
-            // a operação inteira (caminhos ancestrais não podem conviver
-            // num update multi-path).
-            const only = rascunhoPorBandeira._unica;
-            if (only && only.debito != null && only.credito?.[0] != null) {
-                updates[`rates/${maquinaEmEdicao}`] = { debito: only.debito, credito: only.credito };
+        const bandeiras = fm.bandeiras.map(b => ({ id: b.id, nome: b.nome }));
+        const updates = {};
+        if (maquinaEmEdicao) {
+            updates[`maquininhasConfig/${id}/nome`] = nome;
+            updates[`maquininhasConfig/${id}/maxParcelas`] = max;
+            updates[`maquininhasConfig/${id}/bandeiras`] = bandeiras;
+        } else {
+            updates[`maquininhasConfig/${id}`] = { nome, maxParcelas: max, oculta: false, padrao: false, bandeiras };
+        }
+        if (!bandeiras.length) {
+            // Substituir o node 'rates/{id}' inteiro já limpa qualquer sub-chave de bandeira antiga. Não dá pra
+            // apagar a bandeira individual no mesmo update (caminho e caminho FILHO dele): o Firebase recusaria tudo.
+            updates[`rates/${id}`] = prontos._unica;
+        } else {
+            // Se essa maquininha ERA achatada (taxa única, debito/credito direto na raiz) e ganhou bandeira,
+            // limpa os campos antigos — senão os dois formatos ficam misturados e getTaxa() (core.js) acha que
+            // ainda é achatada, já que ela checa debito/credito antes de olhar a bandeira.
+            if (maquinaEmEdicao) {
+                ['debito', 'credito', 'debitoTipo', 'creditoTipo'].forEach(k => { updates[`rates/${id}/${k}`] = null; });
+                fm.removidas.forEach(r => { updates[`rates/${id}/${r}`] = null; });
             }
-        } else {
-            // Se essa maquininha ERA achatada (taxa única, debito/credito
-            // direto na raiz) e ganhou bandeira agora, limpa os campos
-            // antigos — senão os dois formatos ficam misturados e
-            // getRate() (core.js) acha que ainda é achatada, já que ela
-            // checa debito/credito antes de olhar bandeira.
-            updates[`rates/${maquinaEmEdicao}/debito`] = null;
-            updates[`rates/${maquinaEmEdicao}/credito`] = null;
-            bandeirasRemovidas.forEach(id => { updates[`rates/${maquinaEmEdicao}/${id}`] = null; });
-            bandeirasAtuais.forEach(b => {
-                const draft = rascunhoPorBandeira[b.id];
-                if (draft && draft.debito != null && draft.credito?.[0] != null) updates[`rates/${maquinaEmEdicao}/${b.id}`] = draft;
-            });
+            bandeiras.forEach(b => { updates[`rates/${id}/${b.id}`] = prontos[b.id]; });
         }
 
+        const btn = el('txSalvar');
+        window._setBtnLoading && window._setBtnLoading(btn, true, 'Salvando...');
         window._dbUpdate(dbRoot(), updates)
             .then(() => {
                 window._setBtnLoading && window._setBtnLoading(btn, false);
-                rascunhoPorBandeira = {};
-                tela = 'lista';
-                renderTudo();
-                modal({ message: '✅ Maquininha atualizada!' });
+                const editou = !!maquinaEmEdicao;
+                voltarParaLista();
+                modal({ message: editou ? '✅ Maquininha atualizada!' : `✅ ${nome} cadastrada!` });
             })
             .catch(e => {
                 window._setBtnLoading && window._setBtnLoading(btn, false);
                 modal({ message: `Erro ao salvar: ${e.message}` });
             });
+    }
+
+    // Excluir máquina de verdade — ação sem volta, por isso pede confirmação.
+    function excluirMaquina() {
+        const id = maquinaEmEdicao;
+        modal({
+            message: `Excluir "${fm.nome}"? Essa ação não tem volta.`,
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            onConfirm: () => {
+                const updates = { [`maquininhasConfig/${id}`]: null };
+                if ((window._rates || {})[id]) updates[`rates/${id}`] = null;
+                window._dbUpdate(dbRoot(), updates)
+                    .then(() => voltarParaLista())
+                    .catch(e => modal({ message: `Erro ao excluir: ${e.message}` }));
+            }
+        });
+    }
+
+    // ══════════════════════ TELA: FORMA DE PAGAMENTO ══════════════════════
+    // Cadastro de nova forma (tipo Dinheiro/Pix; taxa opcional) e edição de uma existente
+    // (Dinheiro, Pix, Parcelado ou cadastrada).
+    function abrirForma(id) {
+        const forma = id ? getFormasSemTaxa().find(f => f.v === id) : null;
+        if (id && !forma) return;
+        const t = id ? window._taxaDaForma(id) : null;
+        formaEmEdicao = id;
+        ff = { nome: forma ? forma.l : '', emoji: '', taxa: t ? paraTexto(t.valor, t.tipo) : '', tipo: t ? t.tipo : 'pct' };
+        irPara('forma');
+    }
+
+    const nomeEditavelDaForma = f => !!f && (f.semTaxa || !!f.custom);
+
+    function renderForma() {
+        const editando = formaEmEdicao ? getFormasSemTaxa().find(f => f.v === formaEmEdicao) : null;
+        if (formaEmEdicao && !editando) { voltarParaLista(); return; } // a forma foi excluída enquanto a tela estava aberta
+        const nomeEditavel = !editando || nomeEditavelDaForma(editando);
+
+        el('ctxBody').innerHTML = `
+            <div class="tx-sec">Dados</div>
+            <div class="tx-card"><div class="tx-pad">
+                ${nomeEditavel ? `
+                <label class="tx-lbl" for="txFormaNome">${editando ? 'Nome que aparece na venda' : 'Nome'}</label>
+                <div class="tx-campo"><input type="text" id="txFormaNome" maxlength="${NOME_FORMA_MAX}" autocomplete="off" placeholder="${editando ? 'Ex: Promissória' : 'Ex: Vale Alimentação'}" value="${esc(ff.nome)}"></div>
+                ${editando && editando.semTaxa ? `<div class="tx-dica">Ex: Promissória, Venda a prazo. Deixe vazio pra voltar a "${esc(FORMA_PARCELADO.l)}". Vale só pras vendas novas — as vendas antigas continuam com o nome que tinham.</div>` : ''}
+                ` : `
+                <label class="tx-lbl">Forma de pagamento</label>
+                <div class="tx-campo tx-fixo">${esc(editando.l)}</div>
+                `}
+                ${!editando ? `
+                <label class="tx-lbl tx-lbl-2" for="txFormaEmoji">Emoji (opcional)</label>
+                <div class="tx-campo"><input type="text" id="txFormaEmoji" maxlength="2" autocomplete="off" placeholder="💳"></div>` : ''}
+            </div></div>
+
+            ${editando && editando.semTaxa ? '' : `
+            <div class="tx-sec">Taxa · opcional</div>
+            <div class="tx-card"><div class="tx-pad" id="txFormaTaxa"></div></div>
+            <div class="tx-simu" id="txFormaSimu"></div>`}
+
+            ${editando && editando.custom ? '<button type="button" class="tx-perigo" id="txExcluirForma">Excluir forma de pagamento</button>' : ''}
+            <div class="tx-salvar"><button type="button" id="txSalvarForma">${editando ? 'Salvar' : 'Cadastrar forma de pagamento'}</button></div>
+        `;
+        if (!(editando && editando.semTaxa)) renderTaxaForma();
+
+        el('txFormaNome')?.addEventListener('input', e => { ff.nome = e.target.value; });
+        el('txFormaEmoji')?.addEventListener('input', e => { ff.emoji = e.target.value; });
+        el('txSalvarForma').addEventListener('click', salvarForma);
+        el('txExcluirForma')?.addEventListener('click', excluirForma);
+    }
+
+    function renderTaxaForma() {
+        const box = el('txFormaTaxa');
+        if (!box) return;
+        box.innerHTML = `
+            ${segHtml('forma', ff.tipo)}
+            ${campoHtml('data-taxa-forma', ff.taxa, ff.tipo)}
+            <div class="tx-dica">${ff.tipo === 'rs'
+                ? 'Valor fixo que a máquina/banco desconta em cada pagamento nessa forma, seja qual for o valor (ex: 0,36).'
+                : 'Quanto a máquina/banco desconta quando o cliente paga nessa forma (ex: 0,99).'} Deixe vazio se não tem taxa. Vale só pras vendas novas — as já lançadas não mudam.</div>`;
+        box.querySelectorAll('[data-seg]').forEach(b => b.addEventListener('click', () => {
+            if (ff.tipo === b.dataset.u) return;
+            ff.tipo = b.dataset.u;
+            ff.taxa = '';
+            renderTaxaForma();
+        }));
+        box.querySelector('[data-taxa-forma]').addEventListener('input', e => { ff.taxa = limparDigitacao(e.target); atualizarSimulacaoForma(); });
+        atualizarSimulacaoForma();
+    }
+
+    function atualizarSimulacaoForma() {
+        const box = el('txFormaSimu');
+        if (!box) return;
+        const n = lerNumero(ff.taxa);
+        const ok = n !== null && !Number.isNaN(n) && n > 0 && n <= (ff.tipo === 'rs' ? LIMITE_RS : 100);
+        box.innerHTML = ok ? linhaSimulacao('nessa forma', { tipo: ff.tipo, valor: n }) : '';
+        box.style.display = ok ? '' : 'none';
+    }
+
+    // Campo de taxa da forma: vazio/0 = sem taxa (valor null); aceita vírgula, até 2 casas; faixa conforme a unidade.
+    function lerTaxaForma() {
+        const n = lerNumero(ff.taxa);
+        if (n === null) return { ok: true, valor: null };
+        if (Number.isNaN(n) || n < 0 || n > (ff.tipo === 'rs' ? LIMITE_RS : 100)) return { ok: false };
+        return { ok: true, valor: n === 0 ? null : n };
+    }
+
+    function salvarForma() {
+        const id = formaEmEdicao;
+        const forma = id ? getFormasSemTaxa().find(f => f.v === id) : null;
+        const comTaxa = !forma || !forma.semTaxa;
+        const taxa = comTaxa ? lerTaxaForma() : { ok: true, valor: null };
+        const nomeEditavel = !forma || nomeEditavelDaForma(forma);
+        const nome = nomeEditavel ? validarNomeDaForma(ff.nome, id) : { ok: true, nome: null };
+        if (!nome.ok) { modal({ message: nome.erro }); return; }
+        if (!taxa.ok) { modal({ message: `Taxa inválida — ${TEXTO_FAIXA[ff.tipo]}.` }); return; }
+        const taxaTipo = taxa.valor && ff.tipo === 'rs' ? 'rs' : null;
+
+        let destino, valor, msgSucesso;
+        if (!forma) {
+            // Forma nova: o id vem do nome (sem acento/espaço) e não pode repetir.
+            const novoId = idDe(nome.nome);
+            if (!novoId) { modal({ message: 'Nome inválido — usa letras ou números.' }); return; }
+            if (getFormasSemTaxa().find(f => f.v === novoId)) { modal({ message: 'Já existe uma forma de pagamento com esse nome.' }); return; }
+            const emoji = String(ff.emoji || '').trim() || '💳';
+            destino = novoId;
+            valor = { nome: nome.nome, emoji, oculta: false, custom: true, ...(taxa.valor ? { taxa: taxa.valor, ...(taxaTipo ? { taxaTipo } : {}) } : {}) };
+            msgSucesso = `✅ ${nome.nome} cadastrada!`;
+        } else {
+            // Só mexe nos campos que mudaram — o update não toca em oculta/custom/emoji. Nome do Parcelado
+            // vazio/padrão apaga o campo (volta a "Parcelado"); nome null só chega aqui pro Parcelado.
+            const alteracoes = {};
+            const nomeMudou = nomeEditavel && (nome.nome || FORMA_PARCELADO.l) !== forma.l;
+            if (nomeMudou) alteracoes.nome = nome.nome;
+            if (comTaxa) {
+                const atual = window._taxaDaForma(id);
+                if ((taxa.valor || null) !== (atual ? atual.valor : null) || (taxa.valor && ff.tipo !== (atual ? atual.tipo : 'pct'))) {
+                    alteracoes.taxa = taxa.valor;
+                    alteracoes.taxaTipo = taxaTipo;
+                }
+            }
+            if (!Object.keys(alteracoes).length) { voltarParaLista(); return; } // nada mudou: só volta
+            destino = id;
+            valor = alteracoes;
+            msgSucesso = forma.semTaxa
+                ? (nome.nome ? `✅ Agora aparece como "${nome.nome}" na hora de fechar a venda. Vale pras vendas novas.` : `✅ Voltou ao nome padrão "${FORMA_PARCELADO.l}". Vale pras vendas novas.`)
+                : nomeMudou ? `✅ Agora se chama "${nome.nome}". Vale pras vendas novas.`
+                : taxa.valor ? `✅ Taxa de ${window._taxaTexto({ tipo: ff.tipo, valor: taxa.valor })} salva. Vale pras próximas vendas.` : '✅ Taxa removida. Vale pras próximas vendas.';
+        }
+
+        const btn = el('txSalvarForma');
+        window._setBtnLoading && window._setBtnLoading(btn, true, 'Salvando...');
+        window._dbUpdate(pathRef(`formasPagamentoConfig/${destino}`), valor)
+            .then(() => {
+                window._setBtnLoading && window._setBtnLoading(btn, false);
+                voltarParaLista();
+                modal({ message: msgSucesso });
+            })
+            .catch(e => {
+                window._setBtnLoading && window._setBtnLoading(btn, false);
+                modal({ message: `Erro ao salvar: ${e.message}` });
+            });
+    }
+
+    function excluirForma() {
+        const id = formaEmEdicao;
+        const nome = getFormasSemTaxa().find(f => f.v === id)?.l || id;
+        modal({
+            message: `Excluir a forma de pagamento "${nome}"? Isso não muda vendas já lançadas com ela — só some da lista pra novas vendas.`,
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            onConfirm: () => {
+                window._dbRemove(pathRef(`formasPagamentoConfig/${id}`))
+                    .then(() => voltarParaLista())
+                    .catch(e => modal({ message: `Erro ao excluir: ${e.message}` }));
+            }
+        });
     }
 
     // ── Ponto de entrada chamado pelo router ao abrir a tela ──────
     window._initConfigTaxas = function () {
-        tela = 'lista';
-        maquinaEmEdicao = null;
-        bandeirasAtuais = [];
-        bandeiraAtiva = null;
-        bandeirasRemovidas = [];
-        rascunhoPorBandeira = {};
-        renderTudo();
+        voltarParaLista();
     };
 
     // core.js chama isso toda vez que window._maquininhasConfig muda em
@@ -765,9 +758,9 @@
     // Firebase confirma e o onValue do core.js dispara de volta aqui).
     // Só re-renderiza se estiver na lista (não interrompe edição aberta).
     window._ctxOnMaquininhasLoaded = function () {
-        if (mounted && tela === 'lista' && !maquinaEmEdicao) renderTudo();
+        if (mounted && tela === 'lista') renderTudo();
     };
     window._ctxOnFormasPagamentoLoaded = function () {
-        if (mounted && tela === 'lista' && !maquinaEmEdicao) renderTudo();
+        if (mounted && tela === 'lista') renderTudo();
     };
 })();

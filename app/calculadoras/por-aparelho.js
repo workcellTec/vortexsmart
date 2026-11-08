@@ -1,7 +1,7 @@
 // ================================================================
 // calculadoras/por-aparelho.js — VortexSmart · Calcular por Aparelho
 // Depende de (via window.*):
-//   _areRatesLoaded, _getRate, safeStorage, showCustomModal, escapeHtml,
+//   _areRatesLoaded, _getTaxa/_taxaBruto, safeStorage, showCustomModal, escapeHtml,
 //   products, _fuse, updateFlagDisplay, openFlagSelector, openCalculatorSection,
 //   _lojaRef, _dbUpdate
 // Expõe via window.*:
@@ -12,7 +12,8 @@
     'use strict';
 
     const ratesOk = () => !!window._areRatesLoaded;
-    const getRate = (m, b, i) => typeof window._getRate === 'function' ? window._getRate(m, b, i) : undefined;
+    const getTaxa  = (m, b, i) => typeof window._getTaxa === 'function' ? window._getTaxa(m, b, i) : undefined;
+    const taxaBruto = (liquido, t) => window._taxaBruto(liquido, t);
     const storage = () => window.safeStorage || { getItem: k => { try { return localStorage.getItem(k); } catch (e) { return null; } } };
     const modal   = opts => typeof window.showCustomModal === 'function' && window.showCustomModal(opts);
     const esc     = t  => typeof window.escapeHtml === 'function' ? window.escapeHtml(t) : String(t);
@@ -168,12 +169,12 @@
         const arredond = storage().getItem('ctwArredondarEnabled') === 'true';
 
         let rows = '';
-        const debitTax = getRate(machine, brand, 0);
-        if (debitTax != null) { const bruto = base / (1 - debitTax / 100); rows += `<tr class="apr-row debit-row" data-debit="1" data-total="${bruto.toFixed(2)}"><td>Débito</td><td>-</td><td>${fmt(bruto)}</td></tr>`; }
+        const debitTax = getTaxa(machine, brand, 0);
+        if (debitTax) { const bruto = taxaBruto(base, debitTax); rows += `<tr class="apr-row debit-row" data-debit="1" data-total="${bruto.toFixed(2)}"><td>Débito</td><td>-</td><td>${fmt(bruto)}</td></tr>`; }
         for (let i = 1; i <= maxInst; i++) {
-            const tax = getRate(machine, brand, i);
-            if (tax === undefined) continue;
-            let bruto = base / (1 - tax / 100);
+            const tax = getTaxa(machine, brand, i);
+            if (!tax) continue;
+            let bruto = taxaBruto(base, tax);
             let parcela = bruto / i;
             if (arredond) { parcela = Math.floor(parcela) + 0.90; bruto = parcela * i; }
             rows += `<tr class="apr-row" data-installments="${i}" data-parcela="${parcela.toFixed(2)}" data-total="${bruto.toFixed(2)}"><td>${i}x</td><td>${fmt(parcela)}</td><td>${fmt(bruto)}</td></tr>`;
@@ -315,14 +316,14 @@
         if (base <= 0) { modal({ message: 'Nenhum valor para exportar.' }); return; }
 
         const linhas = [];
-        const debitTax = getRate(machine, brand, 0);
-        if (debitTax != null) {
-            linhas.push({ inst: 'Débito', parcela: null, total: base / (1 - debitTax / 100), debit: true });
+        const debitTax = getTaxa(machine, brand, 0);
+        if (debitTax) {
+            linhas.push({ inst: 'Débito', parcela: null, total: taxaBruto(base, debitTax), debit: true });
         }
         for (let i = 1; i <= maxInst; i++) {
-            const tax = getRate(machine, brand, i);
-            if (tax === undefined) continue;
-            const bruto   = base / (1 - tax / 100);
+            const tax = getTaxa(machine, brand, i);
+            if (!tax) continue;
+            const bruto   = taxaBruto(base, tax);
             const parcela = bruto / i;
             linhas.push({ inst: i + 'x', parcela, total: bruto, debit: false });
         }
