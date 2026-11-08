@@ -166,6 +166,7 @@
                         </div>
                         <div class="scan-input-principal">
                             <input class="form-control" id="vendaCodigoBarrasPrincipal" placeholder="🔫 Ler código de barras..." autocomplete="off"/>
+                            <button type="button" class="vs-scan-btn" id="vendaLerCameraBtn"><i class="bi bi-upc-scan"></i> Ler código de barras</button>
                         </div>
                         <div id="vendaCarrinhoList"></div>
                         <button type="button" class="venda-add-item-btn" id="vendaAddItemBtn"><i class="bi bi-plus-circle-fill"></i> Adicionar Produto</button>
@@ -217,6 +218,7 @@
         el('clienteModalBackdrop')?.addEventListener('click', e => { if (e.target.id === 'clienteModalBackdrop') fecharModalCliente(); });
 
         el('vendaAddItemBtn')?.addEventListener('click', abrirModalProdutoBusca);
+        el('vendaLerCameraBtn')?.addEventListener('click', lerCodigoPelaCamera);
         el('vendaCodigoBarrasPrincipal')?.addEventListener('keydown', e => {
             if (e.key !== 'Enter') return;
             e.preventDefault();
@@ -508,6 +510,20 @@
     function processarLeituraCodigoBarras(inputEl) {
         const codigo = inputEl.value.trim().toUpperCase();
         inputEl.value = '';
+        processarCodigoLido(codigo);
+    }
+
+    // Celular: a câmera lê UM código e fecha (leitor-camera.js); o resultado entra pelo mesmo caminho da pistola.
+    let lendoPelaCamera = false;
+    function lerCodigoPelaCamera() {
+        if (lendoPelaCamera || typeof window._vsLerCodigoCamera !== 'function') return;
+        lendoPelaCamera = true;
+        window._vsLerCodigoCamera()
+            .then(codigo => { if (codigo) processarCodigoLido(String(codigo).trim().toUpperCase()); })
+            .finally(() => { lendoPelaCamera = false; });
+    }
+
+    function processarCodigoLido(codigo) {
         if (!codigo) return;
         // Mesma leitura repetida em menos de 250 ms = disparo duplo da
         // pistola (uma pessoa não consegue ler o mesmo item 2x nesse
@@ -552,6 +568,7 @@
         bodyEl.innerHTML = `
             <div class="mb-2">
                 <input class="form-control" id="produtoCodigoBarras" placeholder="🔫 Ler código de barras..." autocomplete="off"/>
+                <button type="button" class="vs-scan-btn" id="produtoLerCameraBtn"><i class="bi bi-upc-scan"></i> Ler código de barras</button>
             </div>
             <input class="form-control mb-2" id="produtoBusca" placeholder="Buscar produto..."/>
             <div class="d-flex align-items-center justify-content-between mb-2" style="padding:2px 2px;">
@@ -570,6 +587,7 @@
             e.preventDefault();
             processarLeituraCodigoBarras(el('produtoCodigoBarras'));
         });
+        el('produtoLerCameraBtn')?.addEventListener('click', lerCodigoPelaCamera);
         // Mantém o foco nesse campo sempre que o modal reabre — pistola
         // de verdade precisa que o cursor já esteja aqui pra "digitar"
         // certo, sem o usuário precisar clicar antes de cada leitura.

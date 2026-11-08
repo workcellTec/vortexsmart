@@ -2777,6 +2777,48 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 }
 .scan-input-principal input::placeholder { color: rgba(217,119,6,.75); }
 .scan-input-principal input:focus { outline: none; border-color: #d97706; background: rgba(217,119,6,.12); }
+
+/* Celular não tem pistola: o campo some e entra o botão que abre a câmera (leitor-camera.js). */
+#vendaCodigoBarrasPrincipal, #produtoCodigoBarras { display: none !important; }
+.vs-scan-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; min-height: 48px; padding: 0 16px;
+    background: var(--primary-soft); color: var(--primary);
+    border: none; border-radius: 14px;
+    font-size: .92rem; font-weight: 700; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.vs-scan-btn i { font-size: 1.15rem; }
+.vs-scan-btn:active { opacity: .75; }
+
+/* Leitor de código de barras pela câmera — tela cheia */
+.vs-cam { position: fixed; inset: 0; z-index: 100000; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.vs-cam-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.vs-cam-topo {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+    display: flex; align-items: center; gap: 12px;
+    padding: max(12px, env(safe-area-inset-top, 0px)) 14px 12px;
+    background: rgba(0,0,0,.55); color: #fff;
+}
+.vs-cam-fechar {
+    width: 44px; height: 44px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,.18); color: #fff; font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.vs-cam-titulo { font-size: 1rem; font-weight: 700; }
+.vs-cam-moldura {
+    position: relative; z-index: 1; width: min(82vw, 340px); height: 150px;
+    border: 3px solid #fff; border-radius: 16px; box-shadow: 0 0 0 100vmax rgba(0,0,0,.45);
+}
+.vs-cam-linha { position: absolute; left: 10px; right: 10px; top: 50%; height: 2px; background: #FF3B30; transform: translateY(-50%); }
+.vs-cam-status {
+    position: absolute; left: 16px; right: 16px; z-index: 2;
+    bottom: max(28px, env(safe-area-inset-bottom, 0px));
+    text-align: center; color: #fff; font-size: .95rem; font-weight: 600;
+    padding: 12px 16px; border-radius: 14px; background: rgba(0,0,0,.6);
+}
+.vs-cam-erro .vs-cam-moldura, .vs-cam-erro .vs-cam-video { display: none; }
+.vs-cam-erro .vs-cam-status { position: static; max-width: 320px; margin: 0 16px; background: transparent; font-size: 1rem; line-height: 1.4; }
 .fl { max-width: 1240px; margin: 0 auto; padding: 22px 32px 44px; }
 .fl, .fl *, .fin-pd, .fin-pd * { box-sizing: border-box; }
 .fl .section-header { padding: 0; margin-bottom: 20px; gap: 16px; }

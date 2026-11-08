@@ -785,7 +785,8 @@ function appInacessivel() {
 const _VS_LIBS = {
     html2canvas: { arquivos: ['https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'], pronto: () => typeof window.html2canvas === 'function' },
     jspdf:       { arquivos: ['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'],     pronto: () => !!(window.jspdf && window.jspdf.jsPDF) },
-    jsbarcode:   { arquivos: ['lib/jsbarcode.min.js'],                                                    pronto: () => typeof window.JsBarcode === 'function' }
+    jsbarcode:   { arquivos: ['lib/jsbarcode.min.js'],                                                    pronto: () => typeof window.JsBarcode === 'function' },
+    zxing:       { arquivos: ['lib/zxing.min.js'],                                                        pronto: () => !!(window.ZXing && window.ZXing.MultiFormatReader) }
 };
 const _VS_MODULOS = {
     calculadoras: {
