@@ -1567,7 +1567,10 @@ function loadProducts() {
 }
 
 // ── Auth + Boot ──────────────────────────────────────────────────
+// Fecha a tela de abertura (abertura.js): o redemoinho mergulha e o app aparece por dentro.
+// Sem o abertura.js (falha ao carregar), só esconde.
 function hideLoading() {
+    if (window._vsAbertura) { window._vsAbertura.fechar(); return; }
     const ov = document.getElementById('loadingOverlay');
     if (ov) ov.classList.add('d-none');
 }

@@ -71,7 +71,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_VERSION = 'vortexsmart-v38';
+const CACHE_VERSION = 'vortexsmart-v39';
 
 const APP_SHELL = [
   './',
@@ -83,6 +83,7 @@ const APP_SHELL = [
   './lib/bootstrap-icons.subset.css',
   './lib/bootstrap-icons.subset.woff2',
   './lib/plus-jakarta-sans.woff2',
+  './abertura.js',
   './acesso-loja.js',
   './core.js',
   './diagnostico-sistema.js',
