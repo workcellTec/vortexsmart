@@ -1847,6 +1847,35 @@ button.vs-linha { width: 100%; background: none; border-top: 0; border-left: 0; 
 .stq-card-wrap.expanded .stq-card-chev { transform:rotate(90deg); color:var(--primary); }
 .stq-card-wrap.oculto .stq-card-main { opacity:.5; }
 
+/* ── Estoque · Produtos — ordem da lista e "Organizar prateleira" ─────────── */
+.stq-svg { width:1em; height:1em; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+.stq-ordem-btn { display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 13px; margin-right:auto; min-width:0; max-width:100%; border-radius:19px; border:1px solid var(--border); background:var(--surface); color:var(--text-strong); font:inherit; font-size:12.5px; font-weight:800; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.stq-ordem-btn .stq-svg { font-size:16px; color:var(--text-secondary); }
+.stq-ordem-btn span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stq-ordem-btn.org-on { border-color:var(--primary); }
+.stq-ordem-corpo { overflow-y:auto; padding-top:4px; scrollbar-width:none; }
+.stq-ordem-corpo::-webkit-scrollbar { display:none; }
+.stq-ordem-op { display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:12px; margin-bottom:8px; border-radius:16px; border:1px solid var(--border); background:var(--surface-raised); color:var(--text-strong); font:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.stq-ordem-op.on { border-color:var(--primary); background:color-mix(in srgb, var(--primary) 10%, var(--surface-raised)); }
+.stq-ordem-ic { width:36px; height:36px; flex:none; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:17px; background:var(--surface); color:var(--text-secondary); }
+.stq-ordem-op.on .stq-ordem-ic { background:var(--primary); color:var(--on-primary); }
+.stq-ordem-tx b { display:block; font-size:14px; }
+.stq-ordem-tx small { display:block; margin-top:1px; font-size:12px; font-weight:600; color:var(--text-secondary); }
+.stq-ordem-dir { margin-left:auto; font-size:12px; font-weight:800; white-space:nowrap; color:var(--primary); }
+.stq-org-btn { width:100%; height:46px; margin-top:2px; border-radius:15px; border:0; background:var(--primary); color:var(--on-primary); font:inherit; font-size:14px; font-weight:800; cursor:pointer; }
+.stq-org-btn:disabled { background:var(--surface-raised); color:var(--text-muted); cursor:not-allowed; }
+.stq-org-faixa { display:none; align-items:center; gap:10px; margin:0 12px 10px; padding:10px 12px; border-radius:16px; background:color-mix(in srgb, var(--primary) 14%, var(--surface)); border:1px solid color-mix(in srgb, var(--primary) 40%, var(--border)); color:var(--text-strong); font-size:12.5px; font-weight:800; }
+.stq-org-faixa small { display:block; font-size:11.5px; font-weight:600; color:var(--text-secondary); }
+.stq-org-faixa button { flex:none; margin-left:auto; height:34px; padding:0 14px; border-radius:12px; border:0; background:var(--primary); color:var(--on-primary); font:inherit; font-size:13px; font-weight:800; cursor:pointer; }
+.stq-org .stq-org-faixa { display:flex; }
+.stq-org .stq-ordem-btn, .stq-org .btn-header-action, .stq-org #stqBusca, .stq-org .stq-cats { opacity:.45; pointer-events:none; }
+.stq-grip { width:34px; height:40px; flex:none; display:flex; align-items:center; justify-content:center; border-radius:10px; font-size:20px; color:var(--text-secondary); cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.stq-org .stq-card-main { cursor:default; padding-right:6px; }
+.stq-card-wrap.arrastando { position:relative; z-index:5; background:var(--surface-raised); border-color:var(--primary); box-shadow:0 14px 30px rgba(0,0,0,.45); transition:none; }
+.stq-card-wrap.arrastando .stq-grip { cursor:grabbing; }
+.stq-card-wrap.flash { animation:stqPiscar .6s; }
+@keyframes stqPiscar { 0% { background:color-mix(in srgb, var(--primary) 28%, var(--surface)); } }
+
 /* Painel — 4 botões numa linha só (Editar / Adicionar / Histórico / Apagar) */
 .stq-row-panel { padding:2px 10px 12px; }
 

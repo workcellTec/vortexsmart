@@ -156,7 +156,12 @@
     let filtroCategoria = null;
     const ESTOQUE_PAGINA = 40;       // cards desenhados por vez na lista (o resto vem em "Ver mais")
     let limiteExibicao = ESTOQUE_PAGINA;
-    let assinaturaFiltro = '';       // busca+categoria da última renderização — mudou, volta pra primeira página
+    let assinaturaFiltro = '';       // busca+categoria+ordem da última renderização — mudou, volta pra primeira página
+    let ordemLocal = null;           // { modo: 'custom'|'nome'|'qtd', dir: { nome, qtd } } — escolha do usuário nesta sessão
+    let organizando = false;         // modo "Organizar prateleira" (alças pra arrastar, lista inteira)
+    let arraste = null;              // arraste em andamento: { el, box, y, pegada, rolador, v, raf, id }
+    let renderAdiado = false;        // chegou atualização do Firebase durante o arraste — redesenha quando soltar
+    let idPiscar = null;             // produto recém-solto: pisca quando a lista é redesenhada
     let fornecedoresCache = [];
     let catTela = null;  // 'lista' | 'form' enquanto o modal de Categorias está aberto
     let catForm = null;  // rascunho do formulário de categoria
@@ -165,6 +170,16 @@
     const esc = t  => typeof window.escapeHtml === 'function' ? window.escapeHtml(t) : t;
     const fmt = v  => typeof window._fmt === 'function' ? window._fmt(v) : `R$ ${Number(v || 0).toFixed(2)}`;
 
+    // Ícones da ordenação: a fonte de ícones do app é um subconjunto fechado, então estes vão em SVG.
+    const ICONES_ORDEM = {
+        ordem: '<path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/>',
+        alca: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
+        mao: '<path d="M7 11V6a2 2 0 014 0v4M11 10V4a2 2 0 014 0v6M15 10V6a2 2 0 014 0v8a7 7 0 01-7 7h-1a6 6 0 01-5-3l-3-5a2 2 0 013-2l2 2"/>',
+        nome: '<path d="M4 7h7M4 12h5M4 17h3M16 5v14M16 19l-3-3M16 19l3-3"/>',
+        qtd: '<path d="M5 19V9M12 19V5M19 19v-7"/>'
+    };
+    const icOrdem = n => `<svg class="stq-svg" viewBox="0 0 24 24" aria-hidden="true">${ICONES_ORDEM[n]}</svg>`;
+
     // ── Skeleton (montado 1x) ────────────────────────────────────
     function ensureSkeleton() {
         const container = el('estoqueProdutos');
@@ -172,17 +187,28 @@
         container.classList.add('stq-neon');
         const podeCriar = typeof window._temPermissao === 'function' ? window._temPermissao('estoque_criar_produto') : true;
         const podeRepor = typeof window._temPermissao === 'function' ? window._temPermissao('estoque_editar_produto') : true;
+        const pc = document.documentElement.getAttribute('data-shell') === 'pc';
+        const botaoOrdem = `<button type="button" class="stq-ordem-btn" id="stqOrdemBtn" aria-haspopup="true" aria-label="Ordenar produtos">${icOrdem('ordem')}<span id="stqOrdemRotulo"></span></button>`;
+        const campoBusca = `<input class="form-control" id="stqBusca" type="text" placeholder="Buscar produto cadastrado..."/>`;
         container.innerHTML = `
             <div class="section-header">
                 <button type="button" class="btn-back" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
                 <h3>Produtos</h3>
+                ${pc ? '' : botaoOrdem}
                 <div style="display:flex;gap:6px;">
                     ${podeRepor ? `<button class="btn-header-action" id="stqReporBtn" aria-label="Repor estoque por leitura" title="Repor estoque"><i class="bi bi-upc-scan"></i></button>` : ''}
                     ${podeCriar ? `<button class="btn-header-action" id="stqNewBtn" aria-label="Novo produto"><i class="bi bi-plus-lg"></i></button>` : '<div style="width:36px;"></div>'}
                 </div>
             </div>
-            <div class="mb-2 w-100 max-width-400-margin-1rem">
-                <input class="form-control" id="stqBusca" type="text" placeholder="Buscar produto cadastrado..."/>
+            ${pc ? `
+            <div class="stq-barra">
+                <div class="stq-ordem-wrap">${botaoOrdem}<div class="stq-ordem-menu" id="stqOrdemMenu" hidden></div></div>
+                <div class="stq-barra-busca">${campoBusca}</div>
+            </div>` : `
+            <div class="mb-2 w-100 max-width-400-margin-1rem">${campoBusca}</div>`}
+            <div class="stq-org-faixa" id="stqOrgFaixa">
+                <div>Organizando a prateleira<small>Segure a alça e arraste. Mostrando todos os produtos.</small></div>
+                <button type="button" id="stqOrgConcluir">Concluir</button>
             </div>
             <div class="stq-cats" id="stqCats"></div>
             <div class="stq-list" id="stqList"></div>
@@ -203,6 +229,14 @@
         el('stqNewBtn')?.addEventListener('click', openFormForNew);
         el('stqReporBtn')?.addEventListener('click', abrirReposicaoPorLeitura);
         el('stqBusca')?.addEventListener('input', renderLista);
+        el('stqOrdemBtn')?.addEventListener('click', e => { e.stopPropagation(); abrirOrdem(); });
+        el('stqOrdemMenu')?.addEventListener('click', aoClicarOrdem);
+        el('stqOrgConcluir')?.addEventListener('click', () => sairDoOrganizar(true));
+        el('stqList')?.addEventListener('touchstart', iniciarArraste, { passive: false });
+        el('stqList')?.addEventListener('mousedown', iniciarArraste);
+        el('stqList')?.addEventListener('contextmenu', e => { if (e.target.closest('.stq-grip')) e.preventDefault(); });
+        document.addEventListener('click', e => { if (!e.target.closest('.stq-ordem-wrap')) fecharMenuOrdem(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharMenuOrdem(); });
         el('stqModalClose')?.addEventListener('click', fecharModal);
         el('stqModalBackdrop')?.addEventListener('click', e => { if (e.target.id === 'stqModalBackdrop') fecharModal(); });
 
@@ -2458,6 +2492,293 @@
         });
     }
 
+    // ── Ordem da lista ─────────────────────────────────────────────
+    // Três ordens: Personalizada (a da prateleira — vale pra loja toda e fica no campo `posicao`
+    // de cada produto), Nome (natural: "iPhone 9" antes de "iPhone 15") e Quantidade (menos
+    // estoque primeiro). Só a ESCOLHA da ordem é pessoal (preferências do usuário); a posição é da loja.
+    // Produto sem `posicao` (novo, ou de antes desse recurso) vem depois dos posicionados, na ordem de cadastro.
+    const colador = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
+    const ORDEM_PADRAO = { modo: 'custom', dir: { nome: 'asc', qtd: 'asc' } };
+    const ehPc = () => document.documentElement.getAttribute('data-shell') === 'pc';
+    const temPosicao = p => typeof p.posicao === 'number' && isFinite(p.posicao);
+    const compararId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    const podeOrganizar = () => typeof window._temPermissao === 'function' ? window._temPermissao('estoque_editar_produto') : true;
+
+    function ordemAtual() {
+        if (ordemLocal) return ordemLocal;
+        const m = /^(nome|qtd)-(asc|desc)$/.exec(String((window._configCustomizacoes || {}).estoqueOrdem || ''));
+        return m ? { modo: m[1], dir: { ...ORDEM_PADRAO.dir, [m[1]]: m[2] } } : ORDEM_PADRAO;
+    }
+    const ordemComoTexto = o => (o.modo === 'custom' ? 'personalizada' : `${o.modo}-${o.dir[o.modo]}`);
+    const rotuloOrdem = o => (o.modo === 'custom' ? 'Personalizada'
+        : o.modo === 'nome' ? `Nome ${o.dir.nome === 'asc' ? 'A–Z' : 'Z–A'}`
+        : `Quantidade ${o.dir.qtd === 'asc' ? '↑' : '↓'}`);
+
+    // A ordem da prateleira — também usada pela Conferência, pra contar na sequência em que o estoque está arrumado.
+    function ordenarPrateleira(lista) {
+        return lista.slice().sort((a, b) => {
+            const pa = temPosicao(a), pb = temPosicao(b);
+            if (pa && pb && a.posicao !== b.posicao) return a.posicao - b.posicao;
+            if (pa !== pb) return pa ? -1 : 1;
+            return compararId(a, b);
+        });
+    }
+    window._estoqueOrdenarPrateleira = ordenarPrateleira;
+
+    function ordenarLista(lista, o) {
+        if (o.modo === 'custom') return ordenarPrateleira(lista);
+        const porNome = (a, b) => colador.compare(a.nome || '', b.nome || '') || compararId(a, b);
+        const r = o.modo === 'nome'
+            ? lista.slice().sort(porNome)
+            : lista.slice().sort((a, b) => ((a.quantidade || 0) - (b.quantidade || 0)) || porNome(a, b));
+        return o.dir[o.modo] === 'desc' ? r.reverse() : r;
+    }
+
+    function atualizarBotaoOrdem() {
+        const rotulo = el('stqOrdemRotulo');
+        if (rotulo) rotulo.textContent = rotuloOrdem(ordemAtual());
+        el('stqOrdemBtn')?.classList.toggle('org-on', organizando);
+    }
+
+    function opcoesOrdemHtml() {
+        const o = ordemAtual();
+        const op = (modo, icone, titulo, sub, dir) => `
+            <button type="button" class="stq-ordem-op ${o.modo === modo ? 'on' : ''}" data-ordem="${modo}">
+                <span class="stq-ordem-ic">${icOrdem(icone)}</span>
+                <span class="stq-ordem-tx"><b>${titulo}</b><small>${sub}</small></span>
+                ${dir && o.modo === modo ? `<span class="stq-ordem-dir">${dir}</span>` : ''}
+            </button>`;
+        const custom = o.modo === 'custom';
+        return op('custom', 'mao', 'Personalizada', 'Do seu jeito, igual à prateleira', '')
+            + op('nome', 'nome', 'Nome', 'Ordem alfabética. Toque de novo pra inverter', o.dir.nome === 'asc' ? 'A–Z' : 'Z–A')
+            + op('qtd', 'qtd', 'Quantidade', 'Menos estoque primeiro. Toque de novo pra inverter', o.dir.qtd === 'asc' ? 'menor → maior' : 'maior → menor')
+            + (podeOrganizar() ? `<button type="button" class="stq-org-btn" data-organizar ${custom ? '' : 'disabled'}>${custom ? 'Organizar prateleira' : 'Organizar só na ordem Personalizada'}</button>` : '');
+    }
+
+    function desenharOpcoes() {
+        const alvo = ehPc() ? el('stqOrdemMenu') : document.querySelector('#stqOrdemFolha .stq-ordem-corpo');
+        if (alvo) alvo.innerHTML = opcoesOrdemHtml();
+    }
+
+    function escolherOrdem(modo) {
+        const atual = ordemAtual();
+        const dir = { ...atual.dir };
+        if (atual.modo === modo && modo !== 'custom') dir[modo] = dir[modo] === 'asc' ? 'desc' : 'asc';
+        ordemLocal = { modo, dir };
+        try {
+            window._dbUpdate(window._usuarioPrefRef(), { estoqueOrdem: ordemComoTexto(ordemLocal) }).catch(() => {});
+        } catch (_) { /* sem login ainda: vale só nesta sessão */ }
+        atualizarBotaoOrdem();
+        desenharOpcoes();
+        renderLista();
+    }
+
+    function aoClicarOrdem(e) {
+        const op = e.target.closest('[data-ordem]');
+        if (op) { e.stopPropagation(); escolherOrdem(op.dataset.ordem); return; }
+        const org = e.target.closest('[data-organizar]');
+        if (org && !org.disabled) { e.stopPropagation(); fecharOrdem(); entrarNoOrganizar(); }
+    }
+
+    function fecharMenuOrdem() {
+        const m = el('stqOrdemMenu');
+        if (m && !m.hidden) m.hidden = true;
+    }
+
+    // Celular: folha que sobe de baixo (mesmo padrão do app). PC: menu logo abaixo do botão.
+    function abrirOrdem() {
+        if (organizando) return;
+        if (ehPc()) {
+            const m = el('stqOrdemMenu');
+            if (!m) return;
+            if (!m.hidden) { m.hidden = true; return; }
+            desenharOpcoes();
+            m.hidden = false;
+            return;
+        }
+        let f = el('stqOrdemFolha');
+        if (!f) {
+            f = document.createElement('div');
+            f.id = 'stqOrdemFolha';
+            f.className = 'vs-folha-overlay';
+            f.innerHTML = `
+                <div class="vs-folha" role="dialog" aria-label="Ordenar produtos">
+                    <div class="vs-folha-alca"></div>
+                    <div class="vs-folha-titulo">Ordenar produtos</div>
+                    <div class="stq-ordem-corpo"></div>
+                </div>`;
+            document.body.appendChild(f);
+            f.addEventListener('click', e => { if (e.target === f) fecharOrdem(); else aoClicarOrdem(e); });
+        }
+        desenharOpcoes();
+        void f.offsetWidth;
+        f.classList.add('active');
+        if (typeof window._vsAbrirModal === 'function') window._vsAbrirModal(fecharOrdem);
+    }
+    function fecharOrdem() {
+        fecharMenuOrdem();
+        const f = el('stqOrdemFolha');
+        if (f && f.classList.contains('active')) {
+            f.classList.remove('active');
+            if (typeof window._vsFecharModal === 'function') window._vsFecharModal();
+        }
+    }
+
+    // ── Organizar a prateleira (arrastar) ──────────────────────────
+    function entrarNoOrganizar() {
+        if (!podeOrganizar() || ordemAtual().modo !== 'custom') return;
+        organizando = true;
+        expandedId = null;
+        el('estoqueProdutos')?.classList.add('stq-org');
+        atualizarBotaoOrdem();
+        renderLista();
+    }
+    // Sai do modo organizar sem redesenhar (quem chama decide); cancela arraste em andamento.
+    function encerrarOrganizar() {
+        if (arraste) finalizarArraste();
+        organizando = false;
+        renderAdiado = false;
+        el('estoqueProdutos')?.classList.remove('stq-org');
+        atualizarBotaoOrdem();
+    }
+    function sairDoOrganizar(avisar) {
+        if (!organizando) return;
+        encerrarOrganizar();
+        limiteExibicao = ESTOQUE_PAGINA;
+        renderLista();
+        if (avisar) window.showCustomModal({ message: 'Ordem da prateleira salva.' });
+    }
+
+    function roladorDe(no) {
+        for (let n = no.parentElement; n && n !== document.body; n = n.parentElement) {
+            const oy = getComputedStyle(n).overflowY;
+            if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+        }
+        return document.scrollingElement || document.documentElement;
+    }
+
+    function iniciarArraste(e) {
+        if (!organizando || arraste) return;
+        const alca = e.target.closest('.stq-grip');
+        if (!alca) return;
+        if (e.type === 'mousedown' && e.button !== 0) return;
+        const card = alca.closest('.stq-card-wrap');
+        const box = el('stqList');
+        if (!card || !box) return;
+        const t = e.touches ? e.touches[0] : e;
+        arraste = { card, alca, box, id: card.dataset.id, y: t.clientY, pegada: t.clientY - card.getBoundingClientRect().top, rolador: roladorDe(box), v: 0, raf: 0 };
+        card.classList.add('arrastando');
+        try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) { /* sem vibração: tudo bem */ }
+        e.preventDefault();
+        // Toque: os eventos vão sempre pro elemento onde o dedo pousou (a alça) — o card troca de lugar na lista
+        // durante o arraste, então é nela, e não no document, que se escuta.
+        alca.addEventListener('touchmove', moverArraste, { passive: false });
+        alca.addEventListener('touchend', soltarArraste);
+        alca.addEventListener('touchcancel', cancelarArraste);
+        document.addEventListener('mousemove', moverArraste);
+        document.addEventListener('mouseup', soltarArraste);
+        atualizarArraste();
+    }
+
+    // O card troca de lugar com o vizinho quando o centro dele passa do meio do vizinho; o resto do tempo
+    // acompanha o dedo por transform. Roda também a cada quadro da rolagem automática.
+    function atualizarArraste() {
+        const A = arraste;
+        if (!A) return;
+        const { card, box } = A;
+        card.style.transform = 'none';
+        const centro = A.y - A.pegada + card.getBoundingClientRect().height / 2;
+        const meio = n => { const r = n.getBoundingClientRect(); return r.top + r.height / 2; };
+        let antes = card.previousElementSibling, depois = card.nextElementSibling;
+        while (antes && centro < meio(antes)) { box.insertBefore(card, antes); antes = card.previousElementSibling; }
+        while (depois && centro > meio(depois)) { box.insertBefore(card, depois.nextElementSibling); depois = card.nextElementSibling; }
+        card.style.transform = `translateY(${A.y - A.pegada - card.getBoundingClientRect().top}px)`;
+
+        const r = A.rolador;
+        const area = (r === document.scrollingElement || r === document.documentElement) ? { top: 0, bottom: window.innerHeight } : r.getBoundingClientRect();
+        A.v = A.y < area.top + 70 ? -10 : A.y > area.bottom - (ehPc() ? 60 : 110) ? 10 : 0;
+        if (A.v && !A.raf) A.raf = requestAnimationFrame(rolarArraste);
+    }
+    function rolarArraste() {
+        const A = arraste;
+        if (!A) return;
+        if (!A.v) { A.raf = 0; return; }
+        A.rolador.scrollTop += A.v;
+        atualizarArraste();
+        if (arraste) arraste.raf = requestAnimationFrame(rolarArraste);
+    }
+    function moverArraste(e) {
+        if (!arraste) return;
+        const t = e.touches ? e.touches[0] : e;
+        arraste.y = t.clientY;
+        atualizarArraste();
+        e.preventDefault();
+    }
+    function finalizarArraste() {
+        const A = arraste;
+        if (!A) return;
+        if (A.raf) cancelAnimationFrame(A.raf);
+        A.card.style.transform = '';
+        A.card.classList.remove('arrastando');
+        A.alca.removeEventListener('touchmove', moverArraste);
+        A.alca.removeEventListener('touchend', soltarArraste);
+        A.alca.removeEventListener('touchcancel', cancelarArraste);
+        document.removeEventListener('mousemove', moverArraste);
+        document.removeEventListener('mouseup', soltarArraste);
+        arraste = null;
+    }
+    function soltarArraste() {
+        const A = arraste;
+        if (!A) return;
+        const ids = [...A.box.querySelectorAll('.stq-card-wrap')].map(c => c.dataset.id);
+        finalizarArraste();
+        gravarPosicao(A.id, ids);
+    }
+    function cancelarArraste() {
+        if (!arraste) return;
+        finalizarArraste();
+        renderAdiado = false;
+        renderLista();
+    }
+
+    // Grava só a posição do produto movido: um número entre os dois vizinhos dele na ordem COMPLETA
+    // (mesmo com busca/categoria ligada). Se os vizinhos não têm número, ou ficaram sem espaço entre eles,
+    // renumera a loja inteira (1000, 2000, …) numa gravação só — atômica, ninguém vê a lista pela metade.
+    function gravarPosicao(id, idsVisiveis) {
+        const redesenhar = () => { renderAdiado = false; renderLista(); };
+        const todos = ordenarPrateleira(getProdutos());
+        const movido = todos.find(p => p.id === id);
+        if (!movido) { redesenhar(); return; }
+        const i = idsVisiveis.indexOf(id);
+        const refAnt = idsVisiveis[i - 1], refProx = idsVisiveis[i + 1];
+        const resto = todos.filter(p => p.id !== id);
+        let destino = todos.indexOf(movido);
+        if (refAnt) destino = resto.findIndex(p => p.id === refAnt) + 1 || -1;
+        else if (refProx) destino = resto.findIndex(p => p.id === refProx);
+        if (destino < 0) { redesenhar(); return; }          // o vizinho sumiu (arquivado/apagado por outra pessoa): a lista se refaz
+        if (destino === todos.indexOf(movido)) { if (renderAdiado) redesenhar(); return; }
+
+        resto.splice(destino, 0, movido);
+        const upd = {};
+        const ant = resto[destino - 1], prox = resto[destino + 1];
+        let novo = null;
+        if (resto.every(p => p === movido || temPosicao(p))) {
+            const lo = ant ? ant.posicao : null, hi = prox ? prox.posicao : null;
+            if (lo === null && hi === null) novo = 1000;
+            else if (lo === null) novo = hi - 1000;
+            else if (hi === null) novo = lo + 1000;
+            else if (hi - lo > 1e-6) novo = (lo + hi) / 2;
+        }
+        if (novo !== null) upd[`${id}/posicao`] = novo;
+        else resto.forEach((p, k) => { if (p.posicao !== (k + 1) * 1000) upd[`${p.id}/posicao`] = (k + 1) * 1000; });
+
+        idPiscar = id;
+        window._dbUpdate(window._lojaRef('products'), upd)
+            .then(() => window.showCustomModal({ message: 'Posição salva.' }))
+            .catch(e => { window.showCustomModal({ message: `Não foi possível salvar a posição: ${e.message}` }); redesenhar(); });
+        if (renderAdiado) redesenhar();
+    }
+
     // ── Lista (visual Neon) ────────────────────────────────────────
     function getProdutos() {
         // Arquivados somem da lista/estoque, mas continuam no Firebase —
@@ -2483,9 +2804,11 @@
                             ${cores.map(c => `<span><span class="stq-card-cor-dot" style="background:${esc(c.hex || '#666')};"></span> ${esc(c.nome)}</span>`).join('')}
                         </div>
                     </div>
-                    <i class="bi bi-chevron-right stq-card-chev"></i>
+                    ${organizando
+                        ? `<span class="stq-grip" aria-label="Segure e arraste para mudar a posição">${icOrdem('alca')}</span>`
+                        : '<i class="bi bi-chevron-right stq-card-chev"></i>'}
                 </div>
-                ${alertaCustoHtml(p)}
+                ${organizando ? '' : alertaCustoHtml(p)}
                 <div class="stq-row-panel" style="display:none;"></div>
             </div>`;
     }
@@ -2499,8 +2822,10 @@
         let produtos = getProdutos();
         if (termos.length) produtos = produtos.filter(p => { const nome = normalizarTexto(p.nome); return termos.every(t => nome.includes(t)); });
         if (filtroCategoria) produtos = produtos.filter(p => detectarCategoria(p.nome) === filtroCategoria);
+        const ordem = ordemAtual();
+        produtos = ordenarLista(produtos, ordem);
 
-        const assinatura = termos.join(' ') + '|' + (filtroCategoria || '');
+        const assinatura = termos.join(' ') + '|' + (filtroCategoria || '') + '|' + ordemComoTexto(ordem);
         if (assinatura !== assinaturaFiltro) { assinaturaFiltro = assinatura; limiteExibicao = ESTOQUE_PAGINA; }
 
         if (!produtos.length) {
@@ -2518,7 +2843,8 @@
         const idxAberto = expandedId ? produtos.findIndex(p => p.id === expandedId) : -1;
         if (idxAberto >= limiteExibicao) limiteExibicao = idxAberto + 1;
 
-        const visiveis = produtos.slice(0, limiteExibicao);
+        // Organizando, a lista vem inteira: não dá pra arrastar um produto por cima de um "Ver mais".
+        const visiveis = organizando ? produtos : produtos.slice(0, limiteExibicao);
         const restantes = produtos.length - visiveis.length;
         const porId = new Map(visiveis.map(p => [p.id, p]));
         listEl.innerHTML = visiveis.map(renderCard).join('') + (restantes > 0
@@ -2530,7 +2856,7 @@
             const produto = porId.get(wrapEl.dataset.id);
             if (!produto) return;
 
-            wrapEl.querySelector('.stq-card-main').addEventListener('click', () => toggleExpand(produto, wrapEl));
+            wrapEl.querySelector('.stq-card-main').addEventListener('click', () => { if (!organizando) toggleExpand(produto, wrapEl); });
             wrapEl.querySelector('[data-action="ajustar-alerta"]')?.addEventListener('click', e => {
                 e.stopPropagation();
                 openFormForEdit(produto, true);
@@ -2546,13 +2872,20 @@
                 panel.style.display = 'block';
                 renderPainelAcoes(panel, produto);
             }
+            if (idPiscar === produto.id) { wrapEl.classList.add('flash'); idPiscar = null; }
         });
+        idPiscar = null;
     }
 
     // ── Entrada pública ──────────────────────────────────────────
     function renderEstoqueProdutos() {
         ensureSkeleton();
         fecharModal();
+        fecharOrdem();
+        // Abrir a tela de novo sai do "Organizar". Exceção: fechar a folha de ordem pelo histórico (popstate)
+        // reabre esta mesma tela por baixo (_vsNavRestoring) — isso não é "voltar pra tela".
+        if (!window._vsNavRestoring) encerrarOrganizar();
+        atualizarBotaoOrdem();
         limiteExibicao = ESTOQUE_PAGINA;
         renderCategoriaChips();   // refaz também o botão "Categorias" (só Gestor)
         renderLista();
@@ -2573,7 +2906,9 @@
 
     // Re-renderiza quando /products mudar no Firebase (hook do core.js)
     window._onProductsUpdated = function () {
-        if (mounted) renderLista();
+        if (!mounted) return;
+        if (arraste) { renderAdiado = true; return; }   // não troca a lista debaixo do dedo
+        renderLista();
     };
 
 })();

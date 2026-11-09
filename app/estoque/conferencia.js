@@ -107,7 +107,9 @@
             // Arquivados nem entram na conferência — são tratados como
             // "fora de circulação", diferente de ignorarContagem (que
             // ainda aparece na lista, só marcado como oculto).
-            const produtos = (window.products || []).filter(p => !p.arquivado);
+            // Na ordem da prateleira (Produtos › Organizar), pra contar na sequência em que o estoque está arrumado.
+            const ativos = (window.products || []).filter(p => !p.arquivado);
+            const produtos = typeof window._estoqueOrdenarPrateleira === 'function' ? window._estoqueOrdenarPrateleira(ativos) : ativos;
             itens = produtos.map(p => {
                 const d = draftItens[p.id];
                 const cores = Array.isArray(p.cores) ? p.cores.map(c => ({ nome: c.nome, hex: c.hex || '#666666' })) : [];
