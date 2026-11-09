@@ -242,6 +242,12 @@ public class MainActivity extends Activity {
             return true;
         }
 
+        // Sem isso o WebView desenha um ícone de "play" gigante no lugar do vídeo enquanto a câmera abre.
+        @Override
+        public Bitmap getDefaultVideoPoster() {
+            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
+        }
+
         // Câmera (leitor de código de barras): só pro endereço do próprio sistema.
         @Override
         public void onPermissionRequest(PermissionRequest req) {
