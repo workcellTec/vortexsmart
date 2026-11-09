@@ -138,12 +138,21 @@
             .sort((a, b) => (a.ts || 0) - (b.ts || 0));
     }
 
+    // Fotos de cada etapa do histórico: na primeira (cadastro) entram também as de chegada.
+    // OS antiga sem histórico mas com fotos de chegada ganha uma entrada só pra elas (índice -1).
+    function fotosDaEntrada(os, entradas, i) {
+        const chegada = Array.isArray(os.fotosChegada) ? os.fotosChegada : [];
+        const urls = (i <= 0 ? chegada : []).concat(i >= 0 && entradas[i] && entradas[i].fotoUrl ? [entradas[i].fotoUrl] : []);
+        return urls.filter((u, k) => urls.indexOf(u) === k);
+    }
+
     let mounted = false;
     let todasOS = [];
     let carregado = false;   // já chegou o primeiro retrato da lista (antes disso "vazio" seria mentira)
     let erroCarga = false;
     let filtroAtivo = 'ativos';
     let expandedId = null;
+    const abaPorOS = {}; // { [repairId]: 'info' | 'hist' } — aba aberta no card do celular (zera ao abrir de novo)
     // Setado quando a tela abre vinda de uma notificação (ver
     // renderReparosLista) — assim que o card daquela OS aparecer no
     // DOM (pode levar um instante extra se os dados ainda não tinham
@@ -533,7 +542,11 @@
         const atendente = os.criadoPorNome || (entradas[0] && entradas[0].nome) || '—';
         const tel = os.cliente && os.cliente.telefone;
 
-        const tl = entradas.map(t => {
+        const botaoFotos = (i, titulo) => {
+            const n = fotosDaEntrada(os, entradas, i).length;
+            return n ? `<button type="button" class="rep-vf" data-ver-fotos="${i}" data-titulo="${esc(titulo)}">${ic('img')}${n === 1 ? 'Ver foto' : `Ver ${n} fotos`}</button>` : '';
+        };
+        const tl = entradas.map((t, i) => {
             const x = czEtapa(os.modo, t.etapa);
             return `
             <div class="rep-tl-it" style="--c:${x.cor}">
@@ -541,10 +554,14 @@
                 <div class="rep-tl-tx">
                     <div class="rep-tl-t">${esc(x.ver)}</div>
                     <div class="rep-tl-d">${t.ts ? fmtDiaHora(t.ts) : '—'}${t.nome ? ' · ' + esc(t.nome) : ''}</div>
-                    ${t.fotoUrl ? `<button type="button" class="rep-vf" data-ver-foto="${esc(t.fotoUrl)}" data-titulo="${esc(x.ver)}">${ic('img')}Ver foto</button>` : ''}
+                    ${botaoFotos(i, x.ver)}
                 </div>
             </div>`;
-        }).join('');
+        }).join('') || (fotos.length ? `
+            <div class="rep-tl-it" style="--c:var(--text-muted)">
+                <span class="rep-tl-dot">${ic('cam')}</span>
+                <div class="rep-tl-tx"><div class="rep-tl-t">Fotos de chegada</div>${botaoFotos(-1, 'Chegada')}</div>
+            </div>` : '');
         const nx = proxima ? (() => {
             const x = czEtapa(os.modo, proxima.k);
             return `
@@ -553,6 +570,8 @@
                 <div class="rep-tl-tx"><div class="rep-tl-t">Próxima: ${esc(x.label)}</div></div>
             </div>`;
         })() : '';
+        const totalFotos = (entradas.length ? entradas.map((_, i) => fotosDaEntrada(os, entradas, i).length) : [fotos.length]).reduce((a, b) => a + b, 0);
+        const aba = abaPorOS[os.id] === 'hist' ? 'hist' : 'info';
 
         const ferramentas = [];
         if (podeAvancar && etapaAnterior(os)) ferramentas.push(`<button type="button" class="rep-tb" data-action="desfazer">${ic('undo')}Desfazer</button>`);
@@ -571,23 +590,25 @@
 
         panel.innerHTML = `
         <div class="rep-painel">
-            <div class="rep-defeito"><span class="rep-lbl">Defeito</span><p>${esc(os.defeito || '—')}</p></div>
-            <div class="rep-info-grid">
-                ${cel('', 'cal', 'Cadastro', os.criadoEm ? new Date(os.criadoEm).toLocaleDateString('pt-BR') : '—')}
-                ${celEntrega}
-                ${cel('', 'money', 'Valor', os.valorCobrado ? fmtDinheiro(os.valorCobrado) : '—')}
-                ${cel('', 'user', 'Atendente', esc(atendente))}
+            <div class="rep-abas" role="tablist">
+                <button type="button" class="rep-aba${aba === 'info' ? ' on' : ''}" role="tab" data-aba="info">${ic('doc')}Informações</button>
+                <button type="button" class="rep-aba${aba === 'hist' ? ' on' : ''}" role="tab" data-aba="hist">${ic('clock')}Histórico${totalFotos ? `<b>${totalFotos}</b>` : ''}</button>
             </div>
-            <div class="rep-senha" id="repSenhaMini-${os.id}"><span class="rep-senha-txt">Carregando senha...</span></div>
-            <div class="rep-fotos-bloco">
-                <div class="rep-lbl">Fotos de chegada · ${fotos.length}</div>
-                ${fotos.length
-                    ? `<div class="rep-fotos" data-galeria="chegada">${fotos.map((url, i) => `<button type="button" data-ver-foto="${esc(url)}" data-titulo="Chegada" aria-label="Foto ${i + 1}"><img src="${esc(url)}" loading="lazy" alt=""/></button>`).join('')}</div>`
-                    : `<div class="rep-sem-foto">Nenhuma foto</div>`}
+            <div class="rep-pg${aba === 'info' ? ' on' : ''}" data-pg="info">
+                <div class="rep-defeito"><span class="rep-lbl">Defeito</span><p>${esc(os.defeito || '—')}</p></div>
+                <div class="rep-info-grid">
+                    ${cel('', 'cal', 'Cadastro', os.criadoEm ? new Date(os.criadoEm).toLocaleDateString('pt-BR') : '—')}
+                    ${celEntrega}
+                    ${cel('', 'money', 'Valor', os.valorCobrado ? fmtDinheiro(os.valorCobrado) : '—')}
+                    ${cel('', 'user', 'Atendente', esc(atendente))}
+                </div>
+                <div class="rep-senha" id="repSenhaMini-${os.id}"><span class="rep-senha-txt">Carregando senha...</span></div>
+                ${(botaoPrincipal || botaoManual) ? `<div class="rep-acts">${botaoPrincipal}${botaoManual}</div>` : ''}
+                ${ferramentas.length ? `<div class="rep-tools" style="--n:${ferramentas.length}">${ferramentas.join('')}</div>` : ''}
             </div>
-            ${(tl || nx) ? `<div><div class="rep-lbl">Linha do tempo</div><div class="rep-tl${nx ? '' : ' sem-prox'}">${tl}${nx}</div>${entradas.length > 1 ? `<button type="button" class="rep-tl-mais" data-action="toggle-tl">Ver histórico completo · ${entradas.length} etapas</button>` : ''}</div>` : ''}
-            ${(botaoPrincipal || botaoManual) ? `<div class="rep-acts">${botaoPrincipal}${botaoManual}</div>` : ''}
-            ${ferramentas.length ? `<div class="rep-tools" style="--n:${ferramentas.length}">${ferramentas.join('')}</div>` : ''}
+            <div class="rep-pg${aba === 'hist' ? ' on' : ''}" data-pg="hist">
+                ${(tl || nx) ? `<div class="rep-tl">${tl}${nx}</div>` : `<div class="rep-sem-foto">Nenhum histórico registrado ainda.</div>`}
+            </div>
         </div>`;
         carregarSenha(os);
     }
@@ -977,6 +998,7 @@
                 const panel = card.querySelector('.rep-row-panel');
                 const abrindo = expandedId !== os.id;
                 expandedId = abrindo ? os.id : null;
+                if (abrindo) delete abaPorOS[os.id];
                 listEl.querySelectorAll('.rep-card').forEach(c => {
                     c.classList.remove('expanded');
                     if (MOB) c.querySelector('.rep-card-main').setAttribute('aria-expanded', 'false');
@@ -998,8 +1020,23 @@
 
             const panel = card.querySelector('.rep-row-panel');
             panel.addEventListener('click', e => {
+                const aba = e.target.closest('[data-aba]');
+                if (aba) {
+                    e.stopPropagation();
+                    abaPorOS[os.id] = aba.dataset.aba;
+                    panel.querySelectorAll('[data-aba]').forEach(b => b.classList.toggle('on', b === aba));
+                    panel.querySelectorAll('[data-pg]').forEach(pg => pg.classList.toggle('on', pg.dataset.pg === aba.dataset.aba));
+                    return;
+                }
+                const verFotos = e.target.closest('[data-ver-fotos]');
+                if (verFotos) {
+                    e.stopPropagation();
+                    const entradas = entradasTimeline(os);
+                    abrirLightbox(fotosDaEntrada(os, entradas, +verFotos.dataset.verFotos), 0, verFotos.dataset.titulo || '');
+                    return;
+                }
                 const verFoto = e.target.closest('[data-ver-foto]');
-                if (verFoto) { e.stopPropagation(); abrirFotoDoBotao(verFoto); return; }
+                if (verFoto) { e.stopPropagation(); abrirLightbox([verFoto.dataset.verFoto]); return; }
                 const opcaoEtapa = e.target.closest('[data-etapa-opcao]');
                 if (opcaoEtapa) {
                     e.stopPropagation();
@@ -1020,7 +1057,6 @@
                 else if (acao === 'editar') { if (typeof window.openReparosSection === 'function') window.openReparosSection('reparosForm', { repairId: os.id }); }
                 else if (acao === 'apagar') apagarOS(os);
                 else if (acao === 'timeline') abrirTimeline(os);
-                else if (acao === 'toggle-tl') { const aberto = btn.previousElementSibling.classList.toggle('completa'); btn.textContent = aberto ? 'Mostrar só a última etapa' : `Ver histórico completo · ${entradasTimeline(os).length} etapas`; }
             });
 
             // Card que já estava expandido antes desse refresh de dados
@@ -1154,50 +1190,61 @@
     }
 
     // ── Lightbox (ver foto em tamanho grande) ────────────────────
-    // No celular abre com legenda e setas quando o grupo tem mais de uma foto.
+    // Celular: galeria que se arrasta pro lado (uma etapa pode ter até 5 fotos), com legenda e
+    // bolinhas. Computador: só a foto. O voltar do Android fecha a galeria.
     let lightboxBackdrop = null;
-    let lbUrls = [], lbIdx = 0, lbTitulo = '';
-    function desenharLightbox() {
-        el('repLightboxImg').src = lbUrls[lbIdx];
-        if (!MOB) return;
-        el('repLightboxCap').textContent = lbTitulo ? `${lbTitulo} · ${lbIdx + 1}/${lbUrls.length}` : '';
-        el('repLightboxNav').style.display = lbUrls.length > 1 ? '' : 'none';
+    function marcarFotoAtual(n, total, titulo) {
+        el('repLightboxCap').textContent = total > 1 ? `${titulo ? titulo + ' · ' : ''}${n + 1}/${total}` : titulo;
+        el('repLightboxDots').innerHTML = total > 1 ? Array.from({ length: total }, (_, k) => `<i${k === n ? ' class="on"' : ''}></i>`).join('') : '';
+    }
+    function fecharLightbox() {
+        if (!lightboxBackdrop || !lightboxBackdrop.classList.contains('show')) return;
+        lightboxBackdrop.classList.remove('show');
+        window._vsDestravarScroll && window._vsDestravarScroll();
+        const sl = el('repLightboxSl');
+        if (sl) sl.innerHTML = '';
+        if (typeof window._vsFecharModal === 'function') window._vsFecharModal();
     }
     function abrirLightbox(urls, idx, titulo) {
-        lbUrls = Array.isArray(urls) ? urls : [urls];
-        lbIdx = idx || 0;
-        lbTitulo = titulo || '';
+        urls = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
+        if (!urls.length) return;
+        const inicio = Math.min(Math.max(idx || 0, 0), urls.length - 1);
+        const legenda = titulo || '';
         if (!lightboxBackdrop) {
             document.body.insertAdjacentHTML('beforeend', MOB
                 ? `<div class="rep-lightbox-backdrop" id="repLightbox">
-                       <button type="button" class="rep-lb-x" data-lb="x" aria-label="Fechar">${ic('x')}</button>
-                       <img id="repLightboxImg" alt=""/>
-                       <div class="rep-lb-cap" id="repLightboxCap"></div>
-                       <div class="rep-lb-nav" id="repLightboxNav">
-                           <button type="button" data-lb="p" aria-label="Anterior"><span style="display:inline-flex;transform:scaleX(-1)">${ic('chev')}</span></button>
-                           <button type="button" data-lb="n" aria-label="Próxima">${ic('chev')}</button>
-                       </div>
+                       <div class="rep-lb-top"><div class="rep-lb-cap" id="repLightboxCap"></div><button type="button" class="rep-lb-x" data-lb="x" aria-label="Fechar">${ic('x')}</button></div>
+                       <div class="rep-lb-sl" id="repLightboxSl"></div>
+                       <div class="rep-lb-dots" id="repLightboxDots"></div>
                    </div>`
-                : `<div class="rep-lightbox-backdrop" id="repLightbox"><img id="repLightboxImg"/></div>`);
+                : `<div class="rep-lightbox-backdrop" id="repLightbox"><img id="repLightboxImg" alt=""/></div>`);
             lightboxBackdrop = el('repLightbox');
             lightboxBackdrop.addEventListener('click', e => {
-                const b = e.target.closest('[data-lb]');
-                if (b && b.dataset.lb !== 'x') {
-                    lbIdx = (lbIdx + (b.dataset.lb === 'n' ? 1 : lbUrls.length - 1)) % lbUrls.length;
-                    desenharLightbox();
-                    return;
-                }
-                lightboxBackdrop.classList.remove('show');
+                if (MOB && e.target.closest('img')) return;   // tocar na foto não fecha: o toque é do arrastar
+                fecharLightbox();
             });
+            lightboxBackdrop._fechar = fecharLightbox;
+            if (MOB) {
+                const sl = el('repLightboxSl');
+                sl.addEventListener('scroll', () => {
+                    const total = sl.children.length;
+                    if (total) marcarFotoAtual(Math.min(total - 1, Math.round(sl.scrollLeft / sl.clientWidth)), total, lightboxBackdrop._titulo);
+                }, { passive: true });
+            }
         }
-        desenharLightbox();
-        lightboxBackdrop.classList.add('show');
-    }
-    // Foto tocada → abre a galeria do grupo dela (celular) ou só ela (computador).
-    function abrirFotoDoBotao(botao) {
-        const grupo = MOB ? botao.closest('[data-galeria]') : null;
-        const urls = grupo ? Array.from(grupo.querySelectorAll('[data-ver-foto]')).map(b => b.dataset.verFoto) : [botao.dataset.verFoto];
-        abrirLightbox(urls, Math.max(0, urls.indexOf(botao.dataset.verFoto)), botao.dataset.titulo || '');
+        lightboxBackdrop._titulo = legenda;
+        if (MOB) {
+            const sl = el('repLightboxSl');
+            sl.innerHTML = urls.map(u => `<div><img src="${esc(u)}" alt=""/></div>`).join('');
+            marcarFotoAtual(inicio, urls.length, legenda);
+            lightboxBackdrop.classList.add('show');
+            sl.scrollLeft = inicio * sl.clientWidth;
+        } else {
+            el('repLightboxImg').src = urls[inicio];
+            lightboxBackdrop.classList.add('show');
+        }
+        window._vsTravarScroll && window._vsTravarScroll();
+        if (typeof window._vsAbrirModal === 'function') window._vsAbrirModal(fecharLightbox);
     }
 
     // ── Lightbox do padrão desenhado (a caixinha compacta só mostra
