@@ -6,6 +6,8 @@
 //   config-produtos.js   → window._initConfigProdutos()
 //   config-taxas.js      → window._initConfigTaxas()
 //   config-clientes.js   → window._initConfigClientes()
+// Os config-*.js NÃO estão no index.html: o core.js os carrega sob demanda
+// (módulo 'configuracoes') e as _initConfig* viram atalhos até lá.
 // ================================================================
 (function () {
     'use strict';
@@ -103,8 +105,10 @@
         // da lista de clientes em segundo plano — se o usuário clicar em
         // "Clientes" na sequência, a lista já está pronta (ou quase),
         // sem parecer lento. Não bloqueia nada, roda em paralelo.
-        if (sectionId === 'configuracoesHome' && typeof window._preCarregarClientes === 'function') {
-            window._preCarregarClientes();
+        if (sectionId === 'configuracoesHome' && typeof window._vsCarregarModulo === 'function') {
+            window._vsCarregarModulo('configuracoes').then(() => {
+                if (typeof window._preCarregarClientes === 'function') window._preCarregarClientes();
+            }).catch(() => { /* sem rede: a seção carrega quando for aberta */ });
         }
         if (sectionId === 'configuracoesHome') atualizarNomesImpressoras();
     }

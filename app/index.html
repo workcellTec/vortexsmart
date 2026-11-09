@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-09.19';
+        window._VS_VERSAO = '2026-11-09.20';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -1238,8 +1238,6 @@
 <script src="atualizacao.js" defer></script>
 <script src="estoque/router.js" defer></script>
 <script src="estoque/produtos.js" defer></script>
-<script src="estoque/conferencia.js" defer></script>
-<script src="estoque/movimentacao.js" defer></script>
 <script src="venda/router.js" defer></script>
 <script src="venda/lancar.js" defer></script>
 <script src="venda/historico.js" defer></script>
@@ -1250,27 +1248,9 @@
 <script src="reparos/pattern-widget.js" defer></script>
 <script src="reparos/router.js" defer></script>
 <script src="reparos/lista.js" defer></script>
-<script src="reparos/form.js" defer></script>
 <script src="financeiro/router.js" defer></script>
-<script src="financeiro/painel-dinheiro.js" defer></script>
-<script src="financeiro/lancamentos.js" defer></script>
-<script src="financeiro/recorrentes.js" defer></script>
-<script src="financeiro/graficos.js" defer></script>
-<script src="reparos/documento.js" defer></script>
-<script src="reparos/finalizar-entrega.js" defer></script>
 <script src="reposicao/router.js" defer></script>
-<script src="reposicao/lista.js" defer></script>
 <script src="configuracoes/router.js" defer></script>
-<script src="configuracoes/config-documentos.js" defer></script>
-<script src="configuracoes/config-backup.js" defer></script>
-<script src="configuracoes/config-produtos.js" defer></script>
-<script src="configuracoes/config-taxas.js" defer></script>
-<script src="configuracoes/config-clientes.js" defer></script>
-<script src="configuracoes/config-usuarios.js" defer></script>
-<script src="configuracoes/config-customizacoes.js" defer></script>
-<script src="configuracoes/config-notificacoes.js" defer></script>
-<script src="configuracoes/config-reparos.js" defer></script>
-<script src="configuracoes/config-credscan.js" defer></script>
 <script src="notificacoes-central.js" defer></script>
 <script src="navegacao-mobile.js" defer></script>
 <script src="leitor-camera.js" defer></script>
@@ -1288,7 +1268,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v44';
+  const SW_VERSION = 'v45';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;

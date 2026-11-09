@@ -798,6 +798,13 @@ const _VS_MODULOS = {
             if (typeof window._calcOnRatesLoaded === 'function') window._calcOnRatesLoaded();
         }
     },
+    // Telas de Configurações: o router.js fica no boot e chama as _initConfig* (atalhos abaixo) ao abrir cada seção.
+    configuracoes: { arquivos: ['configuracoes/config-documentos.js', 'configuracoes/config-backup.js', 'configuracoes/config-produtos.js', 'configuracoes/config-taxas.js', 'configuracoes/config-clientes.js', 'configuracoes/config-usuarios.js', 'configuracoes/config-customizacoes.js', 'configuracoes/config-notificacoes.js', 'configuracoes/config-reparos.js', 'configuracoes/config-credscan.js'] },
+    // Telas secundárias de cada área: o router.js e a lista principal ficam no boot; estas entram quando a tela é aberta.
+    estoqueTelas: { arquivos: ['estoque/conferencia.js', 'estoque/movimentacao.js'] },
+    reposicao: { arquivos: ['reposicao/lista.js'] },
+    reparosTelas: { arquivos: ['reparos/form.js', 'reparos/documento.js', 'reparos/finalizar-entrega.js'] },
+    financeiro: { arquivos: ['financeiro/painel-dinheiro.js', 'financeiro/lancamentos.js', 'financeiro/recorrentes.js', 'financeiro/graficos.js'] },
     documentos: { arquivos: ['documentos/router.js', 'documentos/bookip.js', 'documentos/contrato.js', 'documentos/recibo.js', 'documentos/orcamento.js'] },
     credscan:   { arquivos: ['credscan/motor.js', 'credscan/router.js', 'credscan/lista.js', 'credscan/detalhe.js'] }
 };
@@ -889,13 +896,20 @@ function _vsAtalhosDoModulo(nome, funcoes, propaga) {
 _vsAtalhosDoModulo('documentos', ['openDocumentosSection', '_reciboAbrirEdicaoComDados', '_reciboCompartilharComDados'], false);
 _vsAtalhosDoModulo('documentos', ['_reciboGerarAutomatico'], true);
 _vsAtalhosDoModulo('credscan', ['openCredscanSection'], false);
+_vsAtalhosDoModulo('configuracoes', ['_initConfigDocumentos', '_initConfigBackup', '_initConfigProdutos', '_initConfigTaxas', '_initConfigClientes', '_initConfigUsuarios', '_initConfigCustomizacoes', '_initConfigNotificacoes', '_initConfigReparos', '_initConfigCredscan'], false);
+_vsAtalhosDoModulo('estoqueTelas', ['_renderEstoqueConferencia', '_renderEstoqueMovimentacao'], false);
+_vsAtalhosDoModulo('reposicao', ['_renderReposicaoLista'], false);
+_vsAtalhosDoModulo('reparosTelas', ['_renderReparosForm', '_reparosAbrirModalDoc', '_reparosAbrirWizardEntrega'], false);
+_vsAtalhosDoModulo('financeiro', ['_financeiroSincronizarAntigos', '_renderFinanceiroLancamentos', '_renderFinanceiroRecorrentes', '_renderFinanceiroGraficos'], false);
+// Carga silenciosa (sem aviso de erro) pra quem só quer adiantar o módulo.
+window._vsCarregarModulo = carregarModulo;
 
 let _vsPrecargaAgendada = false;
 function precarregarModulosOciosos() {
     if (_vsPrecargaAgendada) return;
     _vsPrecargaAgendada = true;
     if (navigator.connection && navigator.connection.saveData) return;
-    const ordem = ['calculadoras', 'documentos', 'credscan'];
+    const ordem = ['calculadoras', 'reparosTelas', 'estoqueTelas', 'financeiro', 'configuracoes', 'reposicao', 'documentos', 'credscan'];
     const quandoOcioso = cb => (window.requestIdleCallback ? window.requestIdleCallback(cb, { timeout: 8000 }) : setTimeout(cb, 3000));
     const proximo = () => {
         const nome = ordem.shift();
