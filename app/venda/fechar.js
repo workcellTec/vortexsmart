@@ -1015,13 +1015,14 @@
     function ensureModalFormaBackdrop() {
         if (el('fvModalFormaBackdrop')) return;
         document.body.insertAdjacentHTML('beforeend', `
-            <div class="stq-modal-backdrop" id="fvModalFormaBackdrop">
+            <div class="stq-modal-backdrop fv-folha" id="fvModalFormaBackdrop">
                 <div class="stq-modal-card">
+                    <div class="vs-folha-alca"></div>
                     <div class="stq-modal-header primary">
+                        <button type="button" class="stq-modal-close fv-voltar" id="fvWizardBackBtn" aria-label="Voltar" hidden><i class="bi bi-arrow-left"></i></button>
                         <div class="stq-modal-header-title" id="fvModalFormaTitulo">Forma de pagamento</div>
-                        <button class="stq-modal-close" id="fvModalFormaClose"><i class="bi bi-x-lg"></i></button>
+                        <button class="stq-modal-close" id="fvModalFormaClose" aria-label="Fechar"><i class="bi bi-x-lg"></i></button>
                     </div>
-                    <div class="fv-wiz-back-row" id="fvWizardBackRow"></div>
                     <div class="stq-modal-body" id="fvModalFormaBody"></div>
                 </div>
             </div>`);
@@ -1048,7 +1049,7 @@
         ensureModalFormaBackdrop();
         rascunho = null;
         el('fvModalFormaTitulo').textContent = 'Forma de pagamento';
-        el('fvWizardBackRow').innerHTML = '';
+        renderBackRow(null);
         el('fvModalFormaBody').innerHTML = opcoesTela1().map(f => `
             <div class="fv-modal-list-item" data-v="${esc(f.v)}">
                 <i class="bi ${ICONE_FORMA[f.v] || 'bi-cash-stack'}"></i>
@@ -1076,9 +1077,11 @@
         window._vsTravarScroll && window._vsTravarScroll();
     }
 
+    // Seta de voltar no cabeçalho (só na tela 2)
     function renderBackRow(onBack) {
-        el('fvWizardBackRow').innerHTML = onBack ? `<button type="button" class="fv-wiz-back-btn" id="fvWizardBackBtn"><i class="bi bi-arrow-left"></i> Voltar</button>` : '';
-        el('fvWizardBackBtn')?.addEventListener('click', onBack);
+        const btn = el('fvWizardBackBtn');
+        btn.hidden = !onBack;
+        btn.onclick = onBack || null;
     }
     // Tela 2: maquininha + bandeira (se variar) + parcelas (Crédito). Débito confirma ao tocar
     // na maquininha (ou na bandeira, quando ela é perguntada); Crédito, ao tocar na parcela.

@@ -2248,9 +2248,21 @@ body.vs-scroll-locked { overflow: hidden !important; touch-action: none; height:
 .fv-dica { margin:10px 0 8px; padding:9px 11px; border-radius:10px; background:rgba(var(--primary-rgb),.1); color:var(--text-secondary); font-size:.76rem; line-height:1.35; }
 .fv-mais { border:none; background:none; color:var(--primary); font-family:inherit; font-size:.82rem; font-weight:700; padding:8px 2px; cursor:pointer; }
 
-/* Botão "Voltar" da tela de cartão */
-.fv-wiz-back-row { padding:10px 18px 0; }
-.fv-wiz-back-btn { background:none; border:none; color:var(--text-secondary); font-family:inherit; font-size:.72rem; font-weight:700; display:flex; align-items:center; gap:5px; cursor:pointer; padding:4px 0; }
+/* Celular: o modal "Forma de pagamento" sobe de baixo como folha (mesmo visual do .vs-folha) */
+.stq-modal-backdrop.fv-folha { align-items:flex-end; padding:0; background:var(--scrim); }
+.fv-folha .stq-modal-card { max-width:none; max-height:88dvh; border-radius:28px 28px 0 0; background:var(--surface); box-shadow:none; transform:translateY(100%); transition:transform .28s cubic-bezier(.32,.72,0,1); padding-top:10px; }
+.stq-modal-backdrop.fv-folha.show .stq-modal-card { transform:translateY(0); }
+.fv-folha .vs-folha-alca { flex-shrink:0; }
+.fv-folha .stq-modal-header.primary { background:none; padding:14px 20px 6px; }
+.fv-folha .stq-modal-header-title, .fv-folha .stq-modal-header.primary .stq-modal-header-title { font-size:20px; letter-spacing:-0.02em; color:var(--text-strong); }
+.fv-folha .stq-modal-close, .fv-folha .stq-modal-header.primary .stq-modal-close { color:var(--text-secondary); font-size:1.15rem; padding:6px; }
+.fv-folha .stq-modal-body { padding:10px 20px calc(24px + env(safe-area-inset-bottom, 0px)); }
+.fv-folha .fv-modal-list-item { padding:12px; gap:14px; }
+.fv-folha .fv-modal-list-item i:first-child { width:40px; height:40px; display:grid; place-items:center; border-radius:11px; background:rgba(var(--primary-rgb),.14); font-size:1.15rem; }
+
+/* Cabeçalho do modal "Forma de pagamento": título ocupa o meio, seta de voltar à esquerda (tela 2) */
+#fvModalFormaTitulo { flex:1; }
+.fv-voltar { margin-right:6px; font-size:1.1rem; }
 
 .fv-pagamentos-title { font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin:18px 0 8px; }
 .fv-vazio { text-align:center; font-size:.72rem; color:var(--text-muted); padding:10px 0 4px; }
