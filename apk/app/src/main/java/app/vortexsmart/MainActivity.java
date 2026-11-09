@@ -8,12 +8,15 @@ import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Message;
 import android.provider.MediaStore;
 import android.util.Base64;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsetsController;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
@@ -43,6 +46,7 @@ public class MainActivity extends Activity {
 
     private static final int PEDIDO_ARQUIVO = 1;
     private static final int PEDIDO_CAMERA = 2;
+    private static final int PEDIDO_CAMERA_INICIAL = 3;
 
     /** Funções que o WebView do Android não tem: baixar blob, compartilhar arquivo, notificar. */
     private static final String JS_PONTE =
@@ -64,6 +68,9 @@ public class MainActivity extends Activity {
         + "if(d.files&&d.files.length){var f=d.files[0];"
         + "return b64(f).then(function(x){VortexAndroid.compartilhar(x,f.name||'arquivo',f.type||'application/octet-stream',d.title||'',texto)})}"
         + "VortexAndroid.compartilharTexto(d.title||'',texto);return Promise.resolve()};"
+        + "function cor(){var m=document.querySelectorAll('meta[name=\"theme-color\"]');var c=m.length?m[m.length-1].content:'';if(c)VortexAndroid.corBarras(c)}"
+        + "cor();new MutationObserver(cor).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['content']});"
+        + "document.addEventListener('DOMContentLoaded',cor);"
         + "})();";
 
     private WebView web;
@@ -75,6 +82,8 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle estado) {
         super.onCreate(estado);
         hostApp = Uri.parse(BuildConfig.START_URL).getHost();
+        String corGuardada = getPreferences(MODE_PRIVATE).getString("corBarras", null);
+        if (corGuardada != null) aplicarBarras(corGuardada, false);
 
         web = new WebView(this);
         web.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -99,6 +108,11 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new ClienteWeb());
         web.setWebChromeClient(new ClienteChrome());
         web.setDownloadListener((url, ua, disp, mime, tam) -> abrirFora(url));
+
+        // Pede a câmera já na 1ª abertura: assim o leitor de código de barras não depende de um pedido no meio do getUserMedia.
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.CAMERA}, PEDIDO_CAMERA_INICIAL);
+        }
 
         if (estado != null) web.restoreState(estado);
         else web.loadUrl(BuildConfig.START_URL);
@@ -134,6 +148,32 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (web.canGoBack()) web.goBack();
         else super.onBackPressed();
+    }
+
+    // ── Barras do sistema ─────────────────────────────────────────
+
+    /** Pinta barra de status e de navegação com a cor do tema do sistema (meta theme-color) e ajusta os ícones. */
+    @SuppressWarnings("deprecation")
+    private void aplicarBarras(String hex, boolean guardar) {
+        int cor;
+        try { cor = Color.parseColor(hex.trim()); } catch (IllegalArgumentException e) { return; }
+        cor |= 0xFF000000;
+        getWindow().setStatusBarColor(cor);
+        getWindow().setNavigationBarColor(cor);
+        boolean claro = (0.299 * Color.red(cor) + 0.587 * Color.green(cor) + 0.114 * Color.blue(cor)) > 160;
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            WindowInsetsController c = getWindow().getInsetsController();
+            if (c != null) {
+                int mascara = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                c.setSystemBarsAppearance(claro ? mascara : 0, mascara);
+            }
+        } else {
+            View d = getWindow().getDecorView();
+            int f = d.getSystemUiVisibility();
+            int mascara = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            d.setSystemUiVisibility(claro ? (f | mascara) : (f & ~mascara));
+        }
+        if (guardar) getPreferences(MODE_PRIVATE).edit().putString("corBarras", hex).apply();
     }
 
     // ── Navegação ─────────────────────────────────────────────────
@@ -246,10 +286,14 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int pedido, String[] perms, int[] res) {
         super.onRequestPermissionsResult(pedido, perms, res);
-        if (pedido != PEDIDO_CAMERA || pedidoPermissao == null) return;
+        if (pedido != PEDIDO_CAMERA && pedido != PEDIDO_CAMERA_INICIAL) return;
+        if (res.length == 0) return; // pedido cancelado por outro que já estava na tela: o resultado de verdade vem depois
+        boolean ok = res[0] == PackageManager.PERMISSION_GRANTED;
+        if (!ok) Toast.makeText(this, "Câmera bloqueada. Ative em Configurações do Android › Apps › VortexSmart › Permissões.", Toast.LENGTH_LONG).show();
+        if (pedidoPermissao == null) return;
         PermissionRequest req = pedidoPermissao;
         pedidoPermissao = null;
-        if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED) req.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+        if (ok) req.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
         else req.deny();
     }
 
@@ -261,6 +305,11 @@ public class MainActivity extends Activity {
     }
 
     private class Ponte {
+        @JavascriptInterface
+        public void corBarras(String hex) {
+            runOnUiThread(() -> aplicarBarras(hex, true));
+        }
+
         @JavascriptInterface
         public void recarregar() {
             runOnUiThread(() -> web.loadUrl(BuildConfig.START_URL));
