@@ -68,6 +68,8 @@
     }
 
     function render() {
+        // O celular só mostra o cabeçalho (nome do produto) no detalhe — ver style.mobile.css.
+        el('estoqueMovimentacao')?.classList.toggle('mov-detalhe', tela === 'detalhe');
         if (tela === 'detalhe') renderDetalhe();
         else renderLista();
     }

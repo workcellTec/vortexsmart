@@ -3283,9 +3283,12 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 
 /* Com a faixa de abas à vista, o título e a seta de voltar de cada tela são redundantes
    (a aba já nomeia a tela; sair do módulo é pela barra de baixo ou pelo gesto de voltar).
-   Sobram só os botões de ação da tela, alinhados à direita. A Movimentação fica de fora:
-   o título dela muda pro nome do produto escolhido. */
+   Sobram só os botões de ação da tela, alinhados à direita. A Movimentação é diferente:
+   na lista não tem cabeçalho nenhum (a aba já diz onde você está); no detalhe o título é
+   o nome do produto escolhido, sem a seta (voltar pra lista é pelo gesto de voltar). */
 .vs-com-abas .fv-hdr { display: none; }
+.vs-com-abas #estoqueMovimentacao:not(.mov-detalhe) .section-header,
+.vs-com-abas .section-header:has(#movTitulo) > .btn-back { display: none; }
 .vs-com-abas .section-header:not(:has(#movTitulo)) { padding: 0 14px 6px; justify-content: flex-end; }
 .vs-com-abas .section-header:not(:has(#movTitulo)) > .btn-back,
 .vs-com-abas .section-header:not(:has(#movTitulo)) > h3 { display: none; }
