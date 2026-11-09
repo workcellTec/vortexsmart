@@ -2,6 +2,7 @@
 // atualizacao.js — VortexSmart · Atualização automática do app
 // Registra: window._vsAtualizacao { verificar, aplicar, estado, setAuto }
 //           window._abrirAtualizacaoApp()   (Configurações → Atualização do app)
+// Também é chamado pelo index.html (swNovo) quando um Service Worker novo assume o controle.
 //
 // Como funciona: o app compara a versão que está rodando (window._VS_VERSAO, no
 // index.html) com a que o servidor tem AGORA (lê o index.html com cache desligado).
@@ -11,7 +12,8 @@
 // e o código do envio; no Firebase vale o número que está no index.html).
 //
 // Quando checa: ~8s depois de abrir, a cada 10 min com o app aberto, ao voltar pro app e
-// ao recuperar a internet. Nunca recarrega no meio de uma digitação; o aviso tem "Adiar".
+// ao recuperar a internet. Nunca recarrega no meio de uma digitação. "Ignorar" no aviso vale até
+// fechar o app (dos recentes) e abrir de novo: nada recarrega sozinho enquanto ele estiver aberto.
 // Não roda no programa instalado do computador (.exe): ele é uma cópia congelada de propósito.
 // ================================================================
 (function () {
@@ -22,7 +24,6 @@
     const INTERVALO_MS = 10 * 60 * 1000;
     const MINIMO_ENTRE_MS = 60 * 1000;
     const ESPERA_S = 6;
-    const ADIAR_MS = 15 * 60 * 1000;
 
     const el = id => document.getElementById(id);
     const lerLS = c => { try { return localStorage.getItem(c); } catch (e) { return null; } };
@@ -42,7 +43,7 @@
     let servidor = null;       // versão que o servidor tem, quando é diferente da instalada
     let checando = null;       // promessa da checagem em andamento (evita duas ao mesmo tempo)
     let contagem = null;       // intervalo da contagem regressiva do aviso
-    let adiadoAte = 0;
+    let ignorada = null;       // versão que a pessoa mandou ignorar; vale só até o app ser fechado (fica na memória da página)
 
     // ── Leitura da versão no servidor ───────────────────────────────────────
     // O Service Worker responde "rede primeiro" e grava a resposta no cache dele; usar sempre
@@ -59,7 +60,8 @@
         const manual = !!(opcoes && opcoes.manual);
         if (!ativo()) { resultado = 'Atualização automática não se aplica a este formato.'; return Promise.resolve(estado()); }
         if (checando) return checando;
-        if (!manual && Date.now() - ultimaChecagem < MINIMO_ENTRE_MS) return Promise.resolve(estado());
+        const forcar = !!(opcoes && opcoes.forcar);
+        if (!manual && !forcar && Date.now() - ultimaChecagem < MINIMO_ENTRE_MS) return Promise.resolve(estado());
         checando = versaoDoServidor().then(v => {
             ultimaChecagem = Date.now();
             if (v === instalada()) { servidor = null; resultado = 'Você está na versão mais recente.'; }
@@ -84,6 +86,7 @@
     }
 
     // ── Aviso na tela ───────────────────────────────────────────────────────
+    function ignorar() { ignorada = servidor; fecharAviso(); }
     function fecharAviso() { pararContagem(); const a = el('vsAtualizacaoAviso'); if (a) a.remove(); }
     function pararContagem() { if (contagem) { clearInterval(contagem); contagem = null; } }
 
@@ -128,17 +131,17 @@
             resultado = 'Há uma versão nova, mas este aparelho não conseguiu carregá-la. Feche o app por completo e abra de novo.';
             return;
         }
-        if (!manual && Date.now() < adiadoAte) return;
+        if (!manual && ignorada === servidor) return;
         if (document.visibilityState !== 'visible') return;   // volta a anunciar quando a pessoa voltar pro app
         if (el('vsAtualizacaoAviso')) return;
 
         if (!automatico()) {
-            desenharAviso(() => 'Atualização encontrada.', [['Atualizar agora', aplicar, true], ['Depois', () => { adiadoAte = Date.now() + ADIAR_MS; fecharAviso(); }]]);
+            desenharAviso(() => 'Atualização encontrada.', [['Atualizar agora', aplicar, true], ['Ignorar', ignorar]]);
             return;
         }
         let restante = ESPERA_S;
         const texto = n => 'Atualização encontrada · atualizando em ' + n + 's';
-        const t = desenharAviso(texto, [['Agora', aplicar, true], ['Adiar', () => { adiadoAte = Date.now() + ADIAR_MS; fecharAviso(); }]]);
+        const t = desenharAviso(texto, [['Agora', aplicar, true], ['Ignorar', ignorar]]);
         contagem = setInterval(() => {
             if (emUsoAgora()) { restante = ESPERA_S; t.textContent = 'Atualização encontrada · espero você terminar de digitar'; return; }
             restante -= 1;
@@ -228,5 +231,10 @@
         });
     });
 
-    window._vsAtualizacao = { verificar, aplicar, estado, setAuto };
+    // Chamado pelo index.html quando um Service Worker novo assume o controle de um app que já estava
+    // aberto. Antes ele recarregava a página na hora, sem avisar e sem respeitar "Ignorar"; agora
+    // confere a versão e segue o mesmo caminho do aviso (contagem, "Ignorar", não recarrega digitando).
+    function swNovo() { return verificar({ forcar: true }); }
+
+    window._vsAtualizacao = { verificar, aplicar, estado, setAuto, swNovo };
 })();

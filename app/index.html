@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-08.11';
+        window._VS_VERSAO = '2026-11-08.12';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -1281,7 +1281,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v36';
+  const SW_VERSION = 'v37';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;
@@ -1300,9 +1300,18 @@
     // aba que já tava aberta continuava rodando os arquivos antigos
     // que já tinha carregado na memória — só via a versão nova quem
     // fechasse e abrisse o app nas contas certas, ou em aba anônima.
+    //
+    // App que JÁ estava aberto (tinha Service Worker antes): quem decide quando recarregar
+    // é o atualizacao.js — avisa, conta 6s, respeita "Ignorar" e não recarrega com a pessoa
+    // digitando. Primeira instalação (sem Service Worker antes) recarrega direto como antes.
     let jaRecarregou = false;
+    const tinhaControlador = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (jaRecarregou) return;
+      if (tinhaControlador && window._vsAtualizacao && typeof window._vsAtualizacao.swNovo === 'function') {
+        window._vsAtualizacao.swNovo();
+        return;
+      }
       jaRecarregou = true;
       window.location.reload();
     });
