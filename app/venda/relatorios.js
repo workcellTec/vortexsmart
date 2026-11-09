@@ -1,9 +1,11 @@
 // ================================================================
-// venda/relatorios.js — VortexSmart · Venda · Relatórios (Vortex Pulse)
+// venda/relatorios.js — VortexSmart · Venda · Relatórios
 // Filtra vendas FECHADAS por período (hoje/semana/mês/personalizado)
 // e mostra: Lucro Real (bruto − taxa da maquininha − custo dos
-// produtos), a cascata de onde esse número veio, KPIs secundários,
-// gráfico de lucro por dia e produtos mais vendidos.
+// produtos) com o gráfico de lucro por dia, KPIs, o anel "pra onde foi
+// cada real vendido", produtos mais vendidos e as entradas de dinheiro
+// agrupadas por dia. A marcação é a mesma no celular e no PC (classes
+// rel-*); cada style.*.css dá a aparência com a paleta do próprio shell.
 //
 // Lucro Real = valorLiquidoTotal da venda (bruto já menos taxa da
 // maquininha) − custo dos produtos vendidos (quantidade × custoUnitario
@@ -62,40 +64,32 @@
                 <h3>Relatórios</h3>
             </div>
             <div class="content-card w-100">
-                <label class="form-label">Período</label>
-                <div class="stq-cats" id="relPeriodoPills">
-                    <button type="button" class="stq-cat-pill" data-v="hoje" style="color:var(--primary);">Hoje</button>
-                    <button type="button" class="stq-cat-pill" data-v="semana" style="color:var(--primary);">Semana</button>
-                    <button type="button" class="stq-cat-pill" data-v="mes" style="color:var(--primary);">Mês</button>
-                    <button type="button" class="stq-cat-pill" data-v="custom" style="color:var(--primary);">Personalizado</button>
-                </div>
-                <div id="relCustomRow" style="display:none;" class="venda-qtyval-row mb-2">
-                    <div>
-                        <label class="form-label">De</label>
-                        <input class="form-control" id="relDataDe" type="date"/>
+                <div class="rel">
+                    <div class="rel-topo">
+                        <div class="rel-seg" id="relPeriodoPills" role="tablist">
+                            <button type="button" data-v="hoje">Hoje</button>
+                            <button type="button" data-v="semana">Semana</button>
+                            <button type="button" data-v="mes">Mês</button>
+                            <button type="button" data-v="custom">Outro</button>
+                        </div>
+                        <div class="rel-custom" id="relCustomRow">
+                            <label>De<input class="form-control" id="relDataDe" type="date"/></label>
+                            <label>Até<input class="form-control" id="relDataAte" type="date"/></label>
+                        </div>
+                        <div class="rel-opt">
+                            <div>Ocultar taxas<small>Pra loja que já embute a taxa no preço: mostra o valor bruto direto, sem descontar nada. Não muda o valor final de nenhuma venda, só a forma de exibir aqui.</small></div>
+                            <button type="button" class="ctx-switch" id="relOcultarTaxaSwitch" aria-label="Ocultar taxas"></button>
+                        </div>
                     </div>
-                    <div>
-                        <label class="form-label">Até</label>
-                        <input class="form-control" id="relDataAte" type="date"/>
-                    </div>
+                    <div id="relConteudo"></div>
                 </div>
-                <div class="ctx-machine-card mb-2" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;">
-                    <div>
-                        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.78rem;">Ocultar taxas</div>
-                        <div class="stq-hist-sub" style="font-size:.64rem;margin-top:1px;">Pra loja que já embute a taxa no preço — mostra o valor bruto direto, sem descontar nada. Não muda o valor final de nenhuma venda, só a forma de exibir aqui.</div>
-                    </div>
-                    <button type="button" class="ctx-switch" id="relOcultarTaxaSwitch" style="flex-shrink:0;margin-left:10px;" aria-label="Ocultar taxas"></button>
-                </div>
-
-                <div id="relConteudo"></div>
             </div>
         `;
-        el('relPeriodoPills').querySelectorAll('.stq-cat-pill').forEach(btn => {
+        el('relPeriodoPills').querySelectorAll('button').forEach(btn => {
             btn.addEventListener('click', () => {
                 periodo = btn.dataset.v;
-                el('relPeriodoPills').querySelectorAll('.stq-cat-pill').forEach(p => p.classList.remove('active'));
-                btn.classList.add('active');
-                el('relCustomRow').style.display = periodo === 'custom' ? 'flex' : 'none';
+                el('relPeriodoPills').querySelectorAll('button').forEach(p => p.classList.toggle('on', p === btn));
+                el('relCustomRow').classList.toggle('on', periodo === 'custom');
                 if (periodo !== 'custom') calcularERenderizar();
             });
         });
@@ -315,29 +309,42 @@
             .then(() => resumirEntradas(inicio, fim));
     };
 
-    // Agrupa lucro por dia dentro do período, pro gráfico de barrinhas do hero
-    function lucroPorDia(vendas, limites) {
-        const porDia = {};
-        vendas.forEach(v => {
-            const chave = dataLocalISO(new Date(v.fechadaEm || v.criadoEm || 0));
-            const liquido = v.valorLiquidoTotal ?? v.valorTotal ?? 0;
-            const lucro = liquido - custoDaVenda(v);
-            porDia[chave] = (porDia[chave] || 0) + lucro;
-        });
-        const dias = [];
-        const cursor = new Date(limites.inicio);
-        const fimData = new Date(limites.fim);
-        while (cursor <= fimData && dias.length < 31) {
-            dias.push(dataLocalISO(cursor));
-            cursor.setDate(cursor.getDate() + 1);
+    // Barras do gráfico do topo: lucro (líquido − custo, a mesma conta do Lucro
+    // Real) por DIA dentro do período; num período de um dia só, por HORA em que
+    // a venda foi fechada (só as horas com venda). Devolve [{ l: rótulo, v: lucro }].
+    function barrasDoPeriodo(vendas, limites) {
+        const lucroDe = v => (v.valorLiquidoTotal ?? v.valorTotal ?? 0) - custoDaVenda(v);
+        const mesmoDia = dataLocalISO(new Date(limites.inicio)) === dataLocalISO(new Date(limites.fim));
+        if (mesmoDia) {
+            const porHora = {};
+            vendas.forEach(v => {
+                const h = new Date(v.fechadaEm || v.criadoEm || 0).getHours();
+                porHora[h] = (porHora[h] || 0) + lucroDe(v);
+            });
+            return Object.keys(porHora).map(Number).sort((a, b) => a - b).map(h => ({ l: `${h}h`, v: porHora[h] }));
         }
-        const valores = dias.map(d => porDia[d] || 0);
-        const max = Math.max(1, ...valores.map(v => Math.abs(v)));
-        return valores.map(v => Math.max(4, Math.round((Math.abs(v) / max) * 100))); // % de altura, mínimo 4% pra aparecer a barrinha
+        const dias = Math.round((limites.fim - limites.inicio) / 86400000) + 1;
+        const porMes = dias > 31; // período longo: uma barra por mês (31 barras já é o que cabe)
+        const chaveDe = d => porMes ? dataLocalISO(d).slice(0, 7) : dataLocalISO(d);
+        const soma = {};
+        vendas.forEach(v => {
+            const chave = chaveDe(new Date(v.fechadaEm || v.criadoEm || 0));
+            soma[chave] = (soma[chave] || 0) + lucroDe(v);
+        });
+        const barras = [];
+        const cursor = new Date(limites.inicio);
+        if (porMes) cursor.setDate(1);
+        const fimData = new Date(limites.fim);
+        while (cursor <= fimData && barras.length < 36) {
+            const chave = chaveDe(cursor);
+            barras.push({
+                l: porMes ? `${String(cursor.getMonth() + 1).padStart(2, '0')}/${String(cursor.getFullYear()).slice(2)}` : String(cursor.getDate()).padStart(2, '0'),
+                v: soma[chave] || 0
+            });
+            if (porMes) cursor.setMonth(cursor.getMonth() + 1); else cursor.setDate(cursor.getDate() + 1);
+        }
+        return barras;
     }
-
-    // Conta parcelas pagas/total — usado no ranking, fora do escopo da timeline
-    // (função já existente mais abaixo, ver contagemProdutos)
 
     // ── Timeline de entradas de dinheiro ────────────────────────────
     // Cada evento é uma entrada individual: um pagamento lançado (Débito,
@@ -417,59 +424,104 @@
 
     const FORMAS_LABEL_TIMELINE = { dinheiro: 'Dinheiro', pix: 'Pix', debito: 'Débito', credito: 'Crédito', parcelado: 'Parcelado' };
     const ICONE_FORMA_TIMELINE = { dinheiro: 'bi-cash-coin', pix: 'bi-qr-code', debito: 'bi-credit-card', credito: 'bi-credit-card-2-front', parcelado: 'bi-calendar3-range' };
+    const SEMANA_CURTA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
     let timelineLimite = 20; // "ver mais" incrementa isso
 
-    function renderTimelineEvento(ev) {
-        const dataStr = new Date(ev.ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-        const horaStr = new Date(ev.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        const riscado = ev.cancelado;
+    // R$ sem centavos (anel, KPIs, total do dia). Negativo vira "− R$ 5".
+    const fmt0 = v => `${v < 0 ? '− ' : ''}R$ ${Math.round(Math.abs(v)).toLocaleString('pt-BR')}`;
 
-        let icone, titulo, subtitulo;
+    function renderTimelineEvento(ev) {
+        const horaStr = new Date(ev.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        let icone, titulo;
         if (ev.tipo === 'pagamento') {
             icone = ICONE_FORMA_TIMELINE[ev.forma] || 'bi-cash-stack';
             titulo = `${FORMAS_LABEL_TIMELINE[ev.forma] || ev.forma}${ev.parcelas > 1 ? ` ${ev.parcelas}x` : ''}`;
-            subtitulo = `${esc(ev.clienteNome)} · ${esc(ev.produtoResumo)}`;
         } else if (ev.tipo === 'parcela') {
             icone = 'bi-check-circle-fill';
             titulo = `Parcela ${ev.numero}/${ev.totalParcelas} paga`;
-            subtitulo = `${esc(ev.clienteNome)} · ${esc(ev.produtoResumo)}`;
         } else { // revogacao
             icone = 'bi-arrow-counterclockwise';
             titulo = `Parcela ${ev.numero}/${ev.totalParcelas} revogada`;
-            subtitulo = `${esc(ev.clienteNome)} · ${esc(ev.produtoResumo)}`;
         }
-
         return `
-            <div class="pulse-tl-row${riscado ? ' cancelado' : ''}">
-                <div class="pulse-tl-ic"><i class="bi ${icone}"></i></div>
-                <div class="pulse-tl-mid">
-                    <div class="pulse-tl-titulo">${titulo}</div>
-                    <div class="pulse-tl-sub">${subtitulo}</div>
+            <div class="rel-ev${ev.cancelado ? ' canc' : ''}">
+                <span class="rel-ev-ic"><i class="bi ${icone}"></i></span>
+                <div class="rel-ev-m">
+                    <b>${titulo}</b>
+                    <small>${esc(ev.clienteNome)} · ${esc(ev.produtoResumo)}</small>
                 </div>
-                <div class="pulse-tl-right">
-                    <div class="pulse-tl-valor">${ev.tipo === 'revogacao' ? '−' : ''}${fmt(ev.valor)}</div>
-                    <div class="pulse-tl-data">${dataStr} · ${horaStr}</div>
+                <div class="rel-ev-r">
+                    <b>${ev.tipo === 'revogacao' ? '−' : ''}${fmt(ev.valor)}</b>
+                    <small>${horaStr}</small>
                 </div>
             </div>`;
     }
 
+    // "Hoje · 08/11", "Ontem · 07/11" ou "Qui · 05/11".
+    function rotuloDoDia(ts) {
+        const d = new Date(ts);
+        const hoje = new Date();
+        const chave = dataLocalISO(d);
+        const ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1);
+        const nome = chave === dataLocalISO(hoje) ? 'Hoje' : chave === dataLocalISO(ontem) ? 'Ontem' : SEMANA_CURTA[d.getDay()];
+        return `${nome} · ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    // Entradas agrupadas por dia (mais novo primeiro). O total do dia soma só o
+    // que está de pé: evento cancelado/revogado aparece riscado e não conta.
     function renderTimeline(limites) {
         const wrap = el('relTimelineWrap');
         if (!wrap) return;
         const todos = montarTimelineEventos(limites);
         if (!todos.length) {
-            wrap.innerHTML = `<div class="stq-hist-sub text-center" style="padding:14px 0;">Nenhuma entrada com horário registrado nesse período.</div>`;
+            wrap.innerHTML = `<div class="rel-vazio">Nenhuma entrada com horário registrado nesse período.</div>`;
             return;
         }
+        const totalDoDia = {};
+        todos.forEach(ev => {
+            if (ev.cancelado || ev.tipo === 'revogacao') return;
+            const k = dataLocalISO(new Date(ev.ts));
+            totalDoDia[k] = (totalDoDia[k] || 0) + (ev.valor || 0);
+        });
         const visiveis = todos.slice(0, timelineLimite);
         const restantes = todos.length - visiveis.length;
-        wrap.innerHTML = visiveis.map(renderTimelineEvento).join('')
-            + (restantes > 0 ? `<button type="button" class="venda-ver-mais-btn" id="relTimelineVerMaisBtn">Ver mais (${restantes} restante${restantes > 1 ? 's' : ''})</button>` : '');
+        let html = '', diaAtual = '';
+        visiveis.forEach(ev => {
+            const k = dataLocalISO(new Date(ev.ts));
+            if (k !== diaAtual) {
+                diaAtual = k;
+                html += `<div class="rel-dia"><span>${rotuloDoDia(ev.ts)}</span><b>${fmt0(totalDoDia[k] || 0)}</b></div>`;
+            }
+            html += renderTimelineEvento(ev);
+        });
+        const lista = wrap.querySelector('.rel-ent-lista');
+        const rolagem = lista ? lista.scrollTop : 0; // "Ver mais" não pode jogar a lista de volta pro topo
+        wrap.innerHTML = `<div class="rel-ent-lista">${html}</div>`
+            + (restantes > 0 ? `<button type="button" class="rel-mais" id="relTimelineVerMaisBtn">Ver mais (${restantes})</button>` : '');
+        const novaLista = wrap.querySelector('.rel-ent-lista');
+        if (novaLista && rolagem) novaLista.scrollTop = rolagem;
         el('relTimelineVerMaisBtn')?.addEventListener('click', () => {
             timelineLimite += 20;
             renderTimeline(limites);
         });
+    }
+
+    // Anel "pra onde foi cada real vendido": lucro / custo / taxas sobre o valor
+    // exibido como vendido. Lucro negativo (vendeu abaixo do custo) não vira arco —
+    // fica só na legenda, em vermelho.
+    function anelHtml(base, lucro, custo, taxas) {
+        const partes = [['var(--success)', lucro], ['var(--warning)', custo], ['var(--danger)', taxas]].filter(p => p[1] > 0);
+        const soma = partes.reduce((s, p) => s + p[1], 0) || 1;
+        const C = 2 * Math.PI * 52;
+        let desloc = 0;
+        const arcos = partes.map(([cor, v]) => {
+            const len = v / soma * C;
+            const e = `<circle cx="70" cy="70" r="52" fill="none" stroke="${cor}" stroke-width="16" stroke-dasharray="${Math.max(0, len - (partes.length > 1 ? 2 : 0))} ${C}" stroke-dashoffset="${-desloc}" transform="rotate(-90 70 70)"/>`;
+            desloc += len;
+            return e;
+        }).join('');
+        return `<svg class="rel-anel" viewBox="0 0 140 140" role="img" aria-label="Divisão do valor vendido"><circle cx="70" cy="70" r="52" fill="none" stroke="var(--surface-raised)" stroke-width="16"/>${arcos}<text x="70" y="65" text-anchor="middle" class="k">VENDIDO</text><text x="70" y="84" text-anchor="middle" class="v">${fmt0(base)}</text></svg>`;
     }
 
     function calcularERenderizar() {
@@ -477,21 +529,24 @@
         if (!conteudoEl || !vendasCache || !produtosCustoCache) return;
 
         const limites = limitesDoPeriodo();
-        if (!limites) { conteudoEl.innerHTML = `<div class="stq-hist-sub text-center">Escolha as duas datas.</div>`; return; }
+        if (!limites) { conteudoEl.innerHTML = `<div class="rel-vazio">Escolha as duas datas.</div>`; return; }
+        if (limites.inicio > limites.fim) { conteudoEl.innerHTML = `<div class="rel-vazio">A data final é antes da inicial.</div>`; return; }
 
         const vendasFechadas = vendasFechadasEntre(limites.inicio, limites.fim);
 
-        // Timeline é independente do resumo de lucro — mostra mesmo se não
-        // houver venda FECHADA no período (ex: uma parcela paga agora, de
-        // venda fechada em outro dia, ainda é uma entrada de dinheiro hoje).
-        const timelineHtml = `
-            <label class="form-label mt-2">Linha do tempo de entradas</label>
-            <div id="relTimelineWrap"></div>
-        `;
+        // As entradas são independentes do resumo de lucro — aparecem mesmo
+        // sem venda FECHADA no período (uma parcela paga hoje, de venda
+        // fechada em outro dia, ainda é dinheiro que entrou hoje).
+        const entradasHtml = `
+            <section class="rel-card rel-ent">
+                <h3>Entradas de dinheiro</h3>
+                <div class="rel-sub">Cada pagamento recebido, do mais novo pro mais antigo</div>
+                <div id="relTimelineWrap"></div>
+            </section>`;
 
+        timelineLimite = 20;
         if (!vendasFechadas.length) {
-            conteudoEl.innerHTML = `<div class="stq-hist-empty"><i class="bi bi-bar-chart"></i><br/>Nenhuma venda fechada nesse período.</div>` + timelineHtml;
-            timelineLimite = 20;
+            conteudoEl.innerHTML = `<div class="rel-grade"><div class="rel-card rel-vazio rel-vazio-card"><i class="bi bi-bar-chart"></i><br/>Nenhuma venda fechada nesse período.</div>${entradasHtml}</div>`;
             renderTimeline(limites);
             return;
         }
@@ -511,8 +566,18 @@
         const lucroReal = resumoVendas.lucro;
         const margem = totalBrutoExibido > 0 ? (lucroReal / totalBrutoExibido) * 100 : 0;
         const ticketMedio = totalBrutoExibido / vendasFechadas.length;
+        const taxasExibidas = ocultarTaxa ? 0 : taxaMaquina;
+        const pctDe = v => Math.round(v / Math.max(1, totalBrutoExibido) * 100);
+        const nomePeriodo = { hoje: 'hoje', semana: 'esta semana', mes: 'este mês', custom: 'o período' }[periodo];
 
-        const barras = lucroPorDia(vendasFechadas, limites);
+        const barras = barrasDoPeriodo(vendasFechadas, limites);
+        const maxBarra = Math.max(1, ...barras.map(b => b.v));
+        const passoRotulo = Math.ceil(barras.length / 12); // com muitas barras, o rótulo aparece de tantas em tantas
+        const barrasHtml = barras.map((b, i) => {
+            const alt = Math.max(4, Math.round(Math.max(0, b.v) / maxBarra * 78));
+            const cls = b.v < 0 ? ' neg' : (b.v === maxBarra && b.v > 0 ? ' max' : '');
+            return `<div><i class="${cls.trim()}" style="height:${alt}%" title="${esc(b.l)}: ${fmt(b.v)}"></i><span>${i % passoRotulo === 0 ? esc(b.l) : ''}</span></div>`;
+        }).join('');
 
         const contagemProdutos = {};
         vendasFechadas.forEach(v => {
@@ -522,67 +587,52 @@
             });
         });
         const rankingProdutos = Object.entries(contagemProdutos).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        const maiorQtd = rankingProdutos.length ? rankingProdutos[0][1] : 1;
 
-        // Larguras da cascata proporcionais ao bruto EXIBIDO (mínimo 4% pra aparecer)
-        const pct = v => Math.max(4, Math.min(100, Math.round((Math.abs(v) / Math.max(1, totalBrutoExibido)) * 100)));
+        const kpi = (rotulo, valor, extra) => `<div class="rel-kpi${extra ? ' ' + extra : ''}"><small>${rotulo}</small><b>${valor}</b></div>`;
 
         conteudoEl.innerHTML = `
-            <div class="stq-hist-sub text-center mb-2">${vendasFechadas.length} venda(s) fechada(s) no período</div>
+            <div class="rel-grade">
+                <section class="rel-card rel-hero">
+                    <div class="rel-hero-topo"><span class="rel-lbl">Lucro real · ${{ hoje: 'hoje', semana: 'semana', mes: 'mês', custom: 'período' }[periodo]}</span><span class="rel-chip${lucroReal < 0 ? ' neg' : ''}">margem ${margem.toFixed(0)}%</span></div>
+                    <div class="rel-grande${lucroReal < 0 ? ' neg' : ''}">${fmt(lucroReal)}</div>
+                    <div class="rel-sub">de ${fmt(totalBrutoExibido)} vendidos · ${vendasFechadas.length} venda${vendasFechadas.length > 1 ? 's' : ''}</div>
+                    ${resumoVendas.itensSemCusto > 0 ? `<div class="rel-aviso"><i class="bi bi-exclamation-triangle-fill"></i> ${resumoVendas.itensSemCusto} item(ns) sem preço de compra: o lucro pode estar maior que o real.</div>` : ''}
+                    <div class="rel-barras">${barrasHtml}</div>
+                </section>
 
-            <div class="pulse-hero" style="margin-bottom:12px;">
-                <div class="pulse-hero-top">
-                    <div class="pulse-hero-label">Lucro Real</div>
-                    <div class="pulse-hero-margem">margem ${margem.toFixed(0)}%</div>
+                <div class="rel-kpis">
+                    ${kpi('Vendas', vendasFechadas.length)}
+                    ${kpi('Ticket médio', fmt0(ticketMedio))}
+                    ${ocultarTaxa ? '' : kpi('Líquido', fmt0(totalLiquido))}
+                    ${kpi(ocultarTaxa ? 'Total vendido' : 'Bruto', fmt0(totalBrutoExibido), 'so-pc')}
                 </div>
-                <div class="pulse-hero-value">${fmt(lucroReal)}</div>
-                <div class="pulse-hero-sub">de ${fmt(totalBrutoExibido)} em vendas brutas · ${vendasFechadas.length} venda(s)</div>
-                <div class="pulse-hero-bars">
-                    ${barras.map(h => `<span style="height:${h}%;"></span>`).join('')}
-                </div>
+
+                <section class="rel-card rel-anel-card">
+                    <h3>Para onde foi cada real vendido</h3>
+                    <div class="rel-sub">Do total vendido ${nomePeriodo}</div>
+                    <div class="rel-anel-linha">
+                        ${anelHtml(totalBrutoExibido, lucroReal, custoTotal, taxasExibidas)}
+                        <div class="rel-leg">
+                            <div><i style="background:${lucroReal < 0 ? 'var(--danger)' : 'var(--success)'}"></i>Lucro real<small>${pctDe(lucroReal)}%</small><b>${fmt0(lucroReal)}</b></div>
+                            <div><i style="background:var(--warning)"></i>Custo<small>${pctDe(custoTotal)}%</small><b>${fmt0(custoTotal)}</b></div>
+                            ${ocultarTaxa ? '' : `<div><i style="background:var(--danger)"></i>Taxas<small>${pctDe(taxaMaquina)}%</small><b>${fmt0(taxaMaquina)}</b></div>`}
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rel-card rel-rank">
+                    <h3>Produtos mais vendidos</h3>
+                    <div class="rel-rk">
+                        ${rankingProdutos.map(([nome, qtd], i) => `
+                            <span class="n">${i + 1}</span><span class="nm">${esc(nome)}</span><span class="q">${qtd} un.</span>
+                            <div class="tr"><i style="width:${Math.max(4, Math.round(qtd / maiorQtd * 100))}%"></i></div>`).join('')}
+                    </div>
+                </section>
+
+                ${entradasHtml}
             </div>
-
-            <div class="pulse-waterfall">
-                <div class="pulse-waterfall-title">De onde veio esse número</div>
-                <div class="pulse-wf-row">
-                    <div class="pulse-wf-label">Bruto</div>
-                    <div class="pulse-wf-bar-wrap"><div class="pulse-wf-bar" style="width:100%;background:#c7bfff;"></div></div>
-                    <div class="pulse-wf-value">${fmt(totalBrutoExibido)}</div>
-                </div>
-                ${!ocultarTaxa ? `
-                <div class="pulse-wf-row">
-                    <div class="pulse-wf-label">− Taxas</div>
-                    <div class="pulse-wf-bar-wrap"><div class="pulse-wf-bar" style="width:${pct(taxaMaquina)}%;background:#fca5a5;"></div></div>
-                    <div class="pulse-wf-value">− ${fmt(taxaMaquina)}</div>
-                </div>` : ''}
-                <div class="pulse-wf-row">
-                    <div class="pulse-wf-label">− Custo prod.</div>
-                    <div class="pulse-wf-bar-wrap"><div class="pulse-wf-bar" style="width:${pct(custoTotal)}%;background:#fdba74;"></div></div>
-                    <div class="pulse-wf-value">− ${fmt(custoTotal)}</div>
-                </div>
-                <div class="pulse-wf-row">
-                    <div class="pulse-wf-label"><b>= Lucro Real</b></div>
-                    <div class="pulse-wf-bar-wrap"><div class="pulse-wf-bar" style="width:${pct(lucroReal)}%;background:linear-gradient(90deg,#5b3df5,#4f8cff);"></div></div>
-                    <div class="pulse-wf-value" style="color:#22c55e;">${fmt(lucroReal)}</div>
-                </div>
-            </div>
-
-            <div class="pulse-kpi-grid">
-                <div class="pulse-kpi-card"><div class="pulse-kpi-l">Total Bruto</div><div class="pulse-kpi-v">${fmt(totalBrutoExibido)}</div></div>
-                ${!ocultarTaxa ? `<div class="pulse-kpi-card"><div class="pulse-kpi-l">Líquido (após taxa)</div><div class="pulse-kpi-v">${fmt(totalLiquido)}</div></div>` : ''}
-                <div class="pulse-kpi-card"><div class="pulse-kpi-l">Custo dos produtos</div><div class="pulse-kpi-v red">${fmt(custoTotal)}</div></div>
-                <div class="pulse-kpi-card"><div class="pulse-kpi-l">Ticket médio</div><div class="pulse-kpi-v">${fmt(ticketMedio)}</div></div>
-            </div>
-
-            <label class="form-label mt-1">Produtos mais vendidos</label>
-            ${rankingProdutos.map(([nome, qtd], i) => `
-                <div class="venda-cart-item">
-                    <div class="venda-cart-item-nome">${i + 1}º · ${esc(nome)}</div>
-                    <span style="color:var(--primary);font-weight:700;font-size:.8rem;">${qtd} un.</span>
-                </div>`).join('')}
-
-            ${timelineHtml}
         `;
-        timelineLimite = 20;
         renderTimeline(limites);
     }
 
@@ -591,11 +641,11 @@
         periodo = 'hoje';
         dataDe = '';
         dataAte = '';
-        el('relPeriodoPills').querySelectorAll('.stq-cat-pill').forEach(p => p.classList.remove('active'));
-        el('relPeriodoPills').querySelector('[data-v="hoje"]').classList.add('active');
-        el('relCustomRow').style.display = 'none';
+        el('relPeriodoPills').querySelectorAll('button').forEach(p => p.classList.toggle('on', p.dataset.v === 'hoje'));
+        el('relCustomRow').classList.remove('on');
         el('relDataDe').value = '';
         el('relDataAte').value = '';
+        el('relConteudo').innerHTML = `<div class="rel-vazio">Carregando…</div>`;
         Promise.all([carregarVendas(), carregarCustosDosProdutos()]).then(calcularERenderizar);
     };
 })();
