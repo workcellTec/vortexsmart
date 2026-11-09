@@ -2,7 +2,7 @@
 // inicio-mobile.js — VortexSmart · Tela Início do celular
 //
 // Monta com dados reais o que o mockup aprovado mostra na Início:
-//   • topo: iniciais, saudação por horário, nome e contador de notificações (o contador vem do core.js)
+//   • topo: logo da loja (ou as iniciais, se não tiver), saudação por horário, nome e contador de notificações (o contador vem do core.js)
 //   • "Entrou hoje · N vendas", valor e comparação com ontem
 //   • rosca "Entrou por forma de pagamento" (mês) · Meta do mês · Concertos
 //   • subtítulos dos módulos em "Seus módulos"
@@ -18,7 +18,7 @@
 //
 // Meta do mês: configuracoes/metaMes (número, só o Gestor altera).
 //
-// Expõe via window.*: _vsInicioAtualizar, _vsInicioPerfil, _vsAbrirConta
+// Expõe via window.*: _vsInicioAtualizar, _vsInicioPerfil, _vsAbrirConta, _vsLogoLojaAtualizar
 // Depende de (via window.*): _lojaId, _lojaRef, _dbGet, _dbQuery, _dbOrderByChild, _dbStartAt, _dbEqualTo,
 //   _dbOnValue, _dbUpdate, _firebaseAuthUid, _papelUsuario, _papelAtual, _temPermissao, _nomeUsuario,
 //   _reparosConfig, _percorrerEntradas, _notificacoesRecebidas, _nomeLojaCadastrada, _confirmarSair, openConfiguracoesSection, showCustomModal
@@ -53,12 +53,47 @@
         return (p.length > 1 ? p[0][0] + p[1][0] : p[0].slice(0, 2)).toUpperCase();
     }
 
+    // ── Logo da loja no avatar ──────────────────────────────────
+    // Usa a miniatura (configuracoes/documentos/storeLogoMini, ~128 px) e, enquanto a loja ainda não tem uma
+    // (logo enviada antes desta versão), a própria URL. Fica guardada no aparelho por loja: a logo aparece
+    // na hora ao abrir o app, sem esperar a rede; a leitura do banco só confirma/atualiza em segundo plano.
+    const chaveLogo = () => 'vs_logo_' + (window._lojaId || '');
+    function lerLogoGuardada() { try { return localStorage.getItem(chaveLogo()) || ''; } catch (e) { return ''; } }
+    function pintarLogo(src) {
+        const av = document.querySelector('.vs-ini-avatar'), img = el('vsTopoLogo');
+        if (!av || !img) return;
+        if (!src) { av.classList.remove('tem-logo'); img.removeAttribute('src'); return; }
+        if (img.getAttribute('src') !== src) {
+            img.onerror = () => { av.classList.remove('tem-logo'); }; // imagem quebrada: volta pras iniciais
+            img.src = src;
+        }
+        av.classList.add('tem-logo');
+    }
+    // Chamada pelo Documentos (ao salvar/abrir) com os dados da loja.
+    window._vsLogoLojaAtualizar = function (cfg) {
+        const src = (cfg && (cfg.storeLogoMini || cfg.storeLogoUrl)) || '';
+        try { if (src) localStorage.setItem(chaveLogo(), src); else localStorage.removeItem(chaveLogo()); } catch (e) { /* sem armazenamento: só não guarda */ }
+        pintarLogo(src);
+    };
+    let logoConferidaPara = null;
+    async function conferirLogo() {
+        const loja = window._lojaId;
+        if (!loja || logoConferidaPara === loja) return;
+        logoConferidaPara = loja;
+        const campo = async c => { const s = await window._dbGet(window._lojaRef('configuracoes/documentos/' + c)); return s.exists() ? s.val() : ''; };
+        try {
+            const mini = await campo('storeLogoMini');
+            window._vsLogoLojaAtualizar({ storeLogoMini: mini, storeLogoUrl: mini ? '' : await campo('storeLogoUrl') });
+        } catch (e) { /* sem permissão ou sem rede: mantém o que já está no aparelho */ }
+    }
+
     // Também decide quais cards existem pra este usuário (Meta só pra quem vê a loja inteira, Concertos
     // só se o módulo está liberado) e a visibilidade de Configurações. Roda a cada render da barra.
     window._vsInicioPerfil = function () {
         const nome = (window._nomeUsuario || '').trim();
         const ini = el('vsTopoIniciais'), nm = el('vsTopoNome'), oi = el('vsTopoSaudacao');
         if (ini) ini.textContent = iniciais(nome);
+        pintarLogo(lerLogoGuardada());
         if (nm) nm.textContent = nome.split(/\s+/)[0] || 'Usuário';
         if (oi) oi.textContent = saudacao();
 
@@ -323,6 +358,7 @@
     window._vsInicioAtualizar = function () {
         window._vsInicioPerfil();
         if (!window._lojaId || typeof window._dbGet !== 'function' || typeof window._percorrerEntradas !== 'function') return;
+        conferirLogo();
         ouvirMeta();
         const minha = ++seq;
         const ativa = () => minha === seq;

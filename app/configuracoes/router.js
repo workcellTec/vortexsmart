@@ -128,6 +128,7 @@
         el('openConfigDiagnostico2')?.addEventListener('click', () => {
             if (typeof window._abrirDiagnosticoSistema === 'function') window._abrirDiagnosticoSistema();
         });
+        el('openConfigSair2')?.addEventListener('click', () => { if (typeof window._confirmarSair === 'function') window._confirmarSair(); });
         el('openConfigUsuarios2')?.addEventListener('click', () => openConfiguracoesSection('configuracoesUsuarios'));
         el('openConfigNotificacoes2')?.addEventListener('click', () => openConfiguracoesSection('configuracoesNotificacoes'));
         el('openConfigReparos2')?.addEventListener('click', () => openConfiguracoesSection('configuracoesReparos'));

@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-09.18';
+        window._VS_VERSAO = '2026-11-09.19';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -191,7 +191,7 @@
 
     <!-- Cabeçalho: avatar (abre o menu do perfil) + saudação + sino de notificações -->
     <header class="vs-ini-topo">
-        <button type="button" class="vs-ini-avatar" id="ctwNavProfile" title="Perfil" aria-label="Perfil e configurações"><span id="vsTopoIniciais">··</span></button>
+        <button type="button" class="vs-ini-avatar" id="ctwNavProfile" title="Perfil" aria-label="Perfil e configurações"><img class="vs-ini-logo" id="vsTopoLogo" alt="" decoding="async"><span id="vsTopoIniciais">··</span></button>
         <div class="vs-ini-quem">
             <div class="vs-ini-oi" id="vsTopoSaudacao">Olá</div>
             <div class="vs-ini-nome" id="vsTopoNome">Usuário</div>
@@ -716,6 +716,13 @@
                     <div class="cfgA-icon" style="background:linear-gradient(135deg,#38bdf8,#0369a1);">🏷️</div>
                     <div class="cfgA-name">Impressora de Etiquetas<span id="cfgImpressoraEtiquetaNome" style="display:block;font-weight:500;font-size:.7rem;opacity:.7;margin-top:2px;"></span></div>
                     <span class="cfgA-chev">›</span>
+                </button>
+            </div>
+
+            <div class="cfgA-card cfgA-sair" data-shell-only="mobile">
+                <button type="button" class="cfgA-row" id="openConfigSair2">
+                    <div class="cfgA-icon"><i class="bi bi-box-arrow-right"></i></div>
+                    <div class="cfgA-name">Sair da conta</div>
                 </button>
             </div>
         </div>
@@ -1281,7 +1288,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v43';
+  const SW_VERSION = 'v44';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;

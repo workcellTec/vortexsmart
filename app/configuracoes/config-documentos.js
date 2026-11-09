@@ -17,7 +17,7 @@
     const dbref = (caminho) => window._lojaRef(caminho);
     const CFG_PATH = 'configuracoes/documentos';
 
-    const CD = { initialized: false, logoBlob: null, assinaturaBlob: null, aba: 'loja' };
+    const CD = { initialized: false, logoBlob: null, logoMini: null, assinaturaBlob: null, preparando: null, aba: 'loja' };
     const ABAS = [['loja', 'Loja'], ['garantia', 'Garantia'], ['contrato', 'Contrato']];
     const ehPc = () => document.documentElement.getAttribute('data-shell') === 'pc';
 
@@ -79,7 +79,7 @@
                         <h5><i class="bi bi-shop"></i> Identidade da Loja</h5>
                         <div class="d-flex align-items-center gap-3 mb-3">
                             <div id="cdLogoPreviewWrap" style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.05);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
-                                <img id="cdLogoPreview" style="display:none;width:100%;height:100%;object-fit:cover;">
+                                <img id="cdLogoPreview" decoding="async" style="display:none;width:100%;height:100%;object-fit:cover;">
                                 <i class="bi bi-image text-secondary" id="cdLogoIconPlaceholder" style="font-size:1.4rem;"></i>
                             </div>
                             <button class="btn btn-secondary" id="cdLogoBtn" type="button" style="flex:1;">
@@ -108,7 +108,7 @@
                         <div class="mb-1"><label class="form-label"><i class="bi bi-pen"></i> Assinatura</label></div>
                         <div class="d-flex align-items-center gap-3">
                             <div id="cdAssinaturaPreviewWrap" style="width:120px;height:60px;border-radius:10px;background:rgba(255,255,255,.05);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
-                                <img id="cdAssinaturaPreview" style="display:none;width:100%;height:100%;object-fit:contain;">
+                                <img id="cdAssinaturaPreview" decoding="async" style="display:none;width:100%;height:100%;object-fit:contain;">
                                 <i class="bi bi-pen text-secondary" id="cdAssinaturaIconPlaceholder" style="font-size:1.2rem;"></i>
                             </div>
                             <button class="btn btn-secondary" id="cdAssinaturaBtn" type="button" style="flex:1;">
@@ -306,7 +306,7 @@ Valor da parcela: {{moeda:valor_parcela:Valor da Parcela}} x {{numero:qtd_parcel
         return true;
     };
     function descartarAlteracoes() {
-        CD.logoBlob = null; CD.assinaturaBlob = null;
+        CD.logoBlob = null; CD.logoMini = null; CD.assinaturaBlob = null;
         ['cdLogoInput', 'cdAssinaturaInput'].forEach(id => { if (el(id)) el(id).value = ''; });
         limparSujo();
         if (dadosCache) preencherForm(dadosCache);
@@ -374,32 +374,76 @@ Segue o meu contrato original abaixo. Gere a versão com as tags:
         }
     }
 
-    function handleLogoSelect(e) {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        CD.logoBlob = file;
-        const preview   = el('cdLogoPreview');
-        const iconPlace = el('cdLogoIconPlaceholder');
-        const reader = new FileReader();
-        reader.onload = ev => {
-            if (preview) { preview.src = ev.target.result; preview.style.display = 'block'; }
-            if (iconPlace) iconPlace.style.display = 'none';
+    // A câmera do celular entrega fotos de vários MB: sem reduzir, a pré-visualização, o envio e o PDF ficavam
+    // pesados. A logo vira no máximo 512 px (e ganha uma miniatura de 128 px, que a Início e esta tela mostram
+    // na hora); a assinatura, 800 px. PNG/WebP/GIF continuam PNG (mantém a transparência); o resto vira JPEG.
+    async function abrirImagem(file) {
+        try { return await createImageBitmap(file); } catch (e) { /* cai pro <img> */ }
+        const url = URL.createObjectURL(file);
+        try { const img = new Image(); img.src = url; await img.decode(); return img; } finally { URL.revokeObjectURL(url); }
+    }
+    async function reduzirImagem(file, ladoMax, ladoMini) {
+        const img = await abrirImagem(file);
+        const largura = img.naturalWidth || img.width, altura = img.naturalHeight || img.height;
+        const png = /^image\/(png|webp|gif)$/.test(file.type);
+        const tipo = png ? 'image/png' : 'image/jpeg';
+        const desenhar = lado => {
+            const esc = Math.min(1, lado / Math.max(largura, altura));
+            const c = document.createElement('canvas');
+            c.width = Math.max(1, Math.round(largura * esc)); c.height = Math.max(1, Math.round(altura * esc));
+            const ctx = c.getContext('2d');
+            if (!png) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+            ctx.drawImage(img, 0, 0, c.width, c.height);
+            return c;
         };
-        reader.readAsDataURL(file);
+        try {
+            let blob = null;
+            if (ladoMax) {
+                blob = await new Promise((ok, falha) => desenhar(ladoMax).toBlob(b => b ? ok(b) : falha(new Error('imagem')), tipo, 0.85));
+                if (blob.size >= file.size && (file.type === 'image/png' || file.type === 'image/jpeg')) blob = file; // já era pequena
+            }
+            return { blob, mini: ladoMini ? desenhar(ladoMini).toDataURL(tipo, 0.8) : null };
+        } finally { if (img.close) img.close(); }
     }
 
+    // Escolheu um arquivo: reduz, guarda pra enviar no "Salvar" e mostra na pré-visualização. Nunca rejeita:
+    // se o aparelho não conseguir reduzir, segue com o arquivo original.
+    async function escolherImagem(file, { campo, ladoMax, ladoMini, previewId, iconeId }) {
+        let blob = file, mini = null;
+        try { ({ blob, mini } = await reduzirImagem(file, ladoMax, ladoMini)); } catch (e) { console.error('Reduzir imagem:', e); }
+        CD[campo] = blob;
+        if (campo === 'logoBlob') CD.logoMini = mini;
+        const preview = el(previewId), icone = el(iconeId);
+        if (preview) {
+            if (preview.dataset.obj) URL.revokeObjectURL(preview.dataset.obj);
+            preview.dataset.obj = URL.createObjectURL(blob);
+            preview.src = preview.dataset.obj;
+            preview.style.display = 'block';
+        }
+        if (icone) icone.style.display = 'none';
+    }
+    function handleLogoSelect(e) {
+        const file = e.target.files?.[0];
+        if (file) CD.preparando = escolherImagem(file, { campo: 'logoBlob', ladoMax: 512, ladoMini: 128, previewId: 'cdLogoPreview', iconeId: 'cdLogoIconPlaceholder' });
+    }
     function handleAssinaturaSelect(e) {
         const file = e.target.files?.[0];
-        if (!file) return;
-        CD.assinaturaBlob = file;
-        const preview   = el('cdAssinaturaPreview');
-        const iconPlace = el('cdAssinaturaIconPlaceholder');
-        const reader = new FileReader();
-        reader.onload = ev => {
-            if (preview) { preview.src = ev.target.result; preview.style.display = 'block'; }
-            if (iconPlace) iconPlace.style.display = 'none';
-        };
-        reader.readAsDataURL(file);
+        if (file) CD.preparando = escolherImagem(file, { campo: 'assinaturaBlob', ladoMax: 800, ladoMini: 0, previewId: 'cdAssinaturaPreview', iconeId: 'cdAssinaturaIconPlaceholder' });
+    }
+
+    // Logo enviada antes da miniatura existir: tenta gerar a miniatura uma vez (precisa de CORS no Storage;
+    // sem ele, ou sem rede, segue mostrando a URL direta — reenviar a logo resolve de vez).
+    let miniTentadaPara = null;
+    async function migrarMiniLogo(url) {
+        if (miniTentadaPara === url) return;
+        miniTentadaPara = url;
+        try {
+            const { mini } = await reduzirImagem(await (await fetch(url)).blob(), 0, 128);
+            if (!mini) return;
+            await window._dbUpdate(dbref(CFG_PATH), { storeLogoMini: mini });
+            dadosCache = { ...dadosCache, storeLogoMini: mini };
+            if (typeof window._vsLogoLojaAtualizar === 'function') window._vsLogoLojaAtualizar(dadosCache);
+        } catch (e) { /* segue com a URL direta */ }
     }
 
     // Envia pra "pastinha" da PRÓPRIA loja no Firebase Storage
@@ -491,9 +535,10 @@ Segue o meu contrato original abaixo. Gere a versão com as tags:
         const logoPreview   = el('cdLogoPreview');
         const logoIcon      = el('cdLogoIconPlaceholder');
         if (logoPreview) {
-            if (dados.storeLogoUrl) logoPreview.src = dados.storeLogoUrl; else logoPreview.removeAttribute('src');
-            logoPreview.style.display = dados.storeLogoUrl ? 'block' : 'none';
-            if (logoIcon) logoIcon.style.display = dados.storeLogoUrl ? 'none' : '';
+            const logoSrc = dados.storeLogoMini || dados.storeLogoUrl;
+            if (logoSrc) logoPreview.src = logoSrc; else logoPreview.removeAttribute('src');
+            logoPreview.style.display = logoSrc ? 'block' : 'none';
+            if (logoIcon) logoIcon.style.display = logoSrc ? 'none' : '';
         }
 
         const assinaturaPreview = el('cdAssinaturaPreview');
@@ -528,6 +573,8 @@ Segue o meu contrato original abaixo. Gere a versão com as tags:
 
         dadosCache = dados;
         if (!estaSujo()) preencherForm(dados);
+        if (typeof window._vsLogoLojaAtualizar === 'function') window._vsLogoLojaAtualizar(dados);
+        if (dados.storeLogoUrl && !dados.storeLogoMini) migrarMiniLogo(dados.storeLogoUrl);
     }
 
     async function saveConfig() {
@@ -578,8 +625,9 @@ Segue o meu contrato original abaixo. Gere a versão com as tags:
 
             // 2º as imagens, uma de cada vez, cada uma com limite de tempo. Se uma falhar, os dados
             // já estão salvos e a imagem fica escolhida pra tentar de novo no próximo "Salvar".
+            if (CD.preparando) await CD.preparando; // imagem escolhida agora há pouco ainda sendo reduzida
             const imagens = [
-                { blob: CD.logoBlob, caminho: 'documentos/logo.jpg', campo: 'storeLogoUrl', rotulo: 'logo', limpar: () => { CD.logoBlob = null; } },
+                { blob: CD.logoBlob, caminho: 'documentos/logo.jpg', campo: 'storeLogoUrl', rotulo: 'logo', extra: () => ({ storeLogoMini: CD.logoMini || null }), limpar: () => { CD.logoBlob = null; CD.logoMini = null; } },
                 { blob: CD.assinaturaBlob, caminho: 'documentos/assinatura.jpg', campo: 'storeAssinaturaUrl', rotulo: 'assinatura', limpar: () => { CD.assinaturaBlob = null; } },
             ];
             for (const img of imagens) {
@@ -588,14 +636,16 @@ Segue o meu contrato original abaixo. Gere a versão com as tags:
                 const r = await uploadImagemStorage(img.blob, img.caminho);
                 if (!r.url) { falhas.push('a ' + img.rotulo + ' NÃO foi enviada: ' + r.erro); continue; }
                 try {
-                    await window._dbUpdate(dbref(CFG_PATH), { [img.campo]: r.url });
-                    dadosCache = { ...dadosCache, [img.campo]: r.url };
+                    const campos = { [img.campo]: r.url, ...(img.extra ? img.extra() : {}) };
+                    await window._dbUpdate(dbref(CFG_PATH), campos);
+                    dadosCache = { ...dadosCache, ...campos };
                     img.limpar(); // já está no servidor: não precisa subir de novo
                 } catch (e) {
                     falhas.push('a ' + img.rotulo + ' foi enviada mas não consegui registrar: ' + e.message);
                 }
             }
 
+            if (typeof window._vsLogoLojaAtualizar === 'function') window._vsLogoLojaAtualizar(dadosCache);
             limparSujo();
             if (falhas.length) marcarSujo('loja'); // a imagem que não subiu continua pendente
 

@@ -2204,8 +2204,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return; // não deixa cair pra navegação de seção normal também
         }
 
+        // Fechar folha/modal/câmera só tira a entrada do modal do histórico: a tela embaixo já está certa.
+        // Re-renderizá-la (restaurar vsFn) apagava o que a pessoa tinha na tela — ex: o carrinho da Nova Venda
+        // ao fechar o leitor de código de barras (a 2ª leitura "não somava").
+        if (veioDeModal) return;
+
         // Tela com alterações não salvas (ex: Configurações › Documentos) segura a saída e pergunta antes.
-        if (!veioDeModal && typeof window._vsGuardaSaida === 'function' && window._vsGuardaSaida()) {
+        if (typeof window._vsGuardaSaida === 'function' && window._vsGuardaSaida()) {
             history.pushState(e.state, '');
             return;
         }
