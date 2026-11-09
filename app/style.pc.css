@@ -1079,6 +1079,18 @@ html.tema-claro .fg { --fg-cinza: #9AA0A8; }
 .fg-corpo { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 12px; align-items: start; margin-top: 12px; }
 .fg-card { min-width: 0; padding: 15px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; }
 .fg-card.larga, .fg-verd, .fg-vs, .fg-opt { grid-column: 1 / -1; }
+/* PC, "Neste mês": em cima "para onde foi" e "despesas" lado a lado (mesma altura); embaixo o calendário na largura toda.
+   Em janela estreita fica tudo empilhado, como no resto. */
+@media (min-width: 1000px) {
+    .fg-corpo:has(.fg-cal) { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+    .fg-corpo:has(.fg-cal) > .fg-card:not(.larga):first-child { grid-column: 1; grid-row: 1; }
+    .fg-corpo:has(.fg-cal) > .fg-card:not(.larga):last-child { grid-column: 2; grid-row: 1; }
+    .fg-corpo:has(.fg-cal) > .fg-card.larga { grid-column: 1 / -1; grid-row: 2; }
+    .fg-corpo:has(.fg-cal) .fg-cal { max-width: none; gap: 6px; }
+    .fg-corpo:has(.fg-cal) .fg-d { aspect-ratio: 3.4 / 1; padding: 6px 9px 5px; border-radius: 12px; }
+    .fg-corpo:has(.fg-cal) .fg-d .n { font-size: .8rem; }
+    .fg-corpo:has(.fg-cal) .fg-d .v { flex-direction: row; justify-content: flex-end; gap: 8px; font-size: .78rem; }
+}
 .fg-card h3 { margin: 0 0 2px; font-size: .95rem; font-weight: 800; color: var(--text-strong); }
 .fg-sub { margin-bottom: 12px; font-size: .78rem; line-height: 1.4; color: var(--text-secondary); }
 .fg-vazio { padding: 18px 8px; text-align: center; font-size: .86rem; color: var(--text-secondary); }
