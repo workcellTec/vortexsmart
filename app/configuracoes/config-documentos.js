@@ -5,9 +5,8 @@
 // logo, assinatura e termos que os módulos de documentos
 // (ex: bookip.js) leem na hora de gerar.
 //
-// Campos salvos em configuracoes/documentos:
-//   storeName, storeEmail, storeCNPJ, storeEndereco, storeTelefone,
-//   storeLogoUrl, storeAssinaturaUrl, termosGarantia
+// A tela tem 3 abas (Loja · Garantia · Contrato) e UM Salvar só, que grava
+// tudo de uma vez em configuracoes/documentos (ver saveConfig pra lista dos campos).
 // ================================================================
 (function () {
     'use strict';
@@ -18,7 +17,13 @@
     const dbref = (caminho) => window._lojaRef(caminho);
     const CFG_PATH = 'configuracoes/documentos';
 
-    const CD = { initialized: false, logoBlob: null, assinaturaBlob: null };
+    const CD = { initialized: false, logoBlob: null, assinaturaBlob: null, aba: 'loja' };
+    const ABAS = [['loja', 'Loja'], ['garantia', 'Garantia'], ['contrato', 'Contrato']];
+    const ehPc = () => document.documentElement.getAttribute('data-shell') === 'pc';
+
+    // Alterações ainda não salvas, por aba (bolinha amarela na aba + aviso ao sair).
+    const sujo = { loja: false, garantia: false, contrato: false };
+    const estaSujo = () => ABAS.some(([id]) => sujo[id]);
 
     window._initConfigDocumentos = function () {
         if (!CD.initialized) {
@@ -26,149 +31,299 @@
             attachListeners();
             CD.initialized = true;
         }
+        ajustarBarra();
         loadFromFirebase();
     };
+
+    // Tags que o modelo de contrato aceita. Uma lista só: alimenta a folha (celular) e o painel (PC).
+    const TAGS = [
+        ['{{texto:nome_cliente:Nome Completo}}', 'campo de texto'],
+        ['{{numero:cpf:CPF/CNPJ}}', 'número/documento'],
+        ['{{moeda:valor_parcela:Valor da Parcela}}', 'valor em R$'],
+        ['{{data:data_pagamento:Data de Pagamento}}', 'data'],
+        ['{{calc:total:valor_parcela*qtd_parcelas}}', 'calculado automaticamente'],
+        ['{{hoje:data_assinatura:Data de Assinatura}}', 'preenche sozinho com a data de hoje'],
+        ['{{diadata:dia_vencimento:data_inicio_pagamento}}', 'pega o dia de outro campo <b>data</b>'],
+        ['{{escolha:estado:Estado|Novo|Seminovo}}', 'interruptor com opções, em vez de texto livre'],
+    ];
+    const tagsHtml = comInserir => `
+        <div class="cd-tags">${TAGS.map(([tag, desc]) => `
+            <div class="cd-tag"><div class="cd-tag-txt"><code>${tag}</code><div>${desc}</div></div>${comInserir ? `<button type="button" class="cd-tag-ins" data-cd-inserir="${tag.replace(/"/g, '&quot;')}">Inserir</button>` : ''}</div>`).join('')}
+        </div>
+        <p class="text-secondary small mt-2 mb-0">Dica: repetir o mesmo <code>id</code> em dois pontos do contrato (ex: prazo em meses e qtd. de parcelas) mantém os dois sempre iguais, com um único campo.</p>`;
+    const iaHtml = `
+        <p class="text-secondary small mb-2">Copie o prompt abaixo, cole numa IA (ChatGPT, Claude, etc.) junto com o texto do seu contrato original, e cole a resposta dela no campo do modelo.</p>
+        <textarea class="form-control mb-2" id="cdIaPrompt" rows="11" readonly style="font-size:.72rem;line-height:1.5;"></textarea>
+        <button class="btn btn-info w-100" id="cdIaCopiar" type="button"><i class="bi bi-clipboard"></i> Copiar Prompt</button>`;
+
+    // Interruptor (no lugar da caixinha): o <input> continua sendo um checkbox, só muda o visual.
+    const interruptor = (id, titulo, desc) => `
+        <label class="cd-sw" for="${id}"><span class="cd-sw-t">${titulo}<small>${desc}</small></span><input class="form-check-input" type="checkbox" id="${id}"></label>`;
 
     function renderShell() {
         const wrap = el('configuracoesDocumentos');
         if (!wrap) return;
+        const pc = ehPc();
         wrap.innerHTML = `
             <div class="section-header">
                 <h3>Documentos</h3>
                 <button class="btn-back" id="cdBack" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
             </div>
-            <div class="content-card w-100" style="padding-bottom:110px;">
-
-                <h5 class="mb-3"><i class="bi bi-shop"></i> Identidade da Loja</h5>
-                <div class="d-flex align-items-center gap-3 mb-3">
-                    <div id="cdLogoPreviewWrap" style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.05);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
-                        <img id="cdLogoPreview" style="display:none;width:100%;height:100%;object-fit:cover;">
-                        <i class="bi bi-image text-secondary" id="cdLogoIconPlaceholder" style="font-size:1.4rem;"></i>
-                    </div>
-                    <button class="btn btn-secondary" id="cdLogoBtn" type="button" style="flex:1;">
-                        <i class="bi bi-upload"></i> Escolher Logo
-                    </button>
-                    <input type="file" accept="image/*" id="cdLogoInput" class="hidden">
-                </div>
-                <div class="mb-3"><label class="form-label">Nome da Loja</label><input class="form-control" id="cdNome" placeholder="Nome da sua loja"></div>
-
-                <div class="mb-4">
-                    <label class="form-label">Tamanho da Logo no documento</label>
-                    <div class="d-flex align-items-center gap-3">
-                        <input type="range" id="cdLogoSize" min="40" max="140" step="2" value="76" style="flex:1;accent-color:var(--primary);">
-                        <span class="text-secondary small" id="cdLogoSizeLabel" style="min-width:44px;">76px</span>
-                    </div>
+            <div class="cd-corpo">
+                <div class="cd-seg" id="cdSeg" role="tablist">
+                    ${ABAS.map(([id, nome]) => `<button type="button" role="tab" data-cd-aba="${id}" aria-selected="false">${nome}<i class="cd-dot"></i></button>`).join('')}
                 </div>
 
-                <div class="mb-1"><label class="form-label"><i class="bi bi-pen"></i> Assinatura</label></div>
-                <p class="text-secondary small mb-2">Aparece no final do documento de garantia, no lugar da linha em branco.</p>
-                <div class="d-flex align-items-center gap-3 mb-4">
-                    <div id="cdAssinaturaPreviewWrap" style="width:120px;height:60px;border-radius:10px;background:rgba(255,255,255,.05);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
-                        <img id="cdAssinaturaPreview" style="display:none;width:100%;height:100%;object-fit:contain;">
-                        <i class="bi bi-pen text-secondary" id="cdAssinaturaIconPlaceholder" style="font-size:1.2rem;"></i>
+                <section class="cd-pane cd-pane-loja" data-cd-pane="loja" role="tabpanel">
+                    <div class="content-card cd-card">
+                        <h5><i class="bi bi-shop"></i> Identidade da Loja</h5>
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div id="cdLogoPreviewWrap" style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.05);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                                <img id="cdLogoPreview" style="display:none;width:100%;height:100%;object-fit:cover;">
+                                <i class="bi bi-image text-secondary" id="cdLogoIconPlaceholder" style="font-size:1.4rem;"></i>
+                            </div>
+                            <button class="btn btn-secondary" id="cdLogoBtn" type="button" style="flex:1;">
+                                <i class="bi bi-upload"></i> Escolher Logo
+                            </button>
+                            <input type="file" accept="image/*" id="cdLogoInput" class="hidden">
+                        </div>
+                        <div class="mb-3"><label class="form-label">Nome da Loja</label><input class="form-control" id="cdNome" placeholder="Nome da sua loja"></div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Tamanho da Logo no documento</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="range" id="cdLogoSize" min="40" max="140" step="2" value="76" style="flex:1;accent-color:var(--primary);">
+                                <span class="text-secondary small" id="cdLogoSizeLabel" style="min-width:44px;">76px</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Cor primária da minha empresa</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <input type="color" id="cdCorBarra" value="#16a34a" style="width:52px;height:38px;border-radius:10px;border:1.5px solid var(--border);background:none;padding:2px;cursor:pointer;">
+                                <span class="text-secondary small">Usada no cabeçalho dos documentos e nas imagens geradas pela calculadora e pelo orçamento</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-1"><label class="form-label"><i class="bi bi-pen"></i> Assinatura</label></div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div id="cdAssinaturaPreviewWrap" style="width:120px;height:60px;border-radius:10px;background:rgba(255,255,255,.05);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                                <img id="cdAssinaturaPreview" style="display:none;width:100%;height:100%;object-fit:contain;">
+                                <i class="bi bi-pen text-secondary" id="cdAssinaturaIconPlaceholder" style="font-size:1.2rem;"></i>
+                            </div>
+                            <button class="btn btn-secondary" id="cdAssinaturaBtn" type="button" style="flex:1;">
+                                <i class="bi bi-upload"></i> Escolher Assinatura
+                            </button>
+                            <input type="file" accept="image/*" id="cdAssinaturaInput" class="hidden">
+                        </div>
+                        <p class="text-secondary small mt-2 mb-0">Aparece no final do documento de garantia, no lugar da linha em branco.</p>
                     </div>
-                    <button class="btn btn-secondary" id="cdAssinaturaBtn" type="button" style="flex:1;">
-                        <i class="bi bi-upload"></i> Escolher Assinatura
-                    </button>
-                    <input type="file" accept="image/*" id="cdAssinaturaInput" class="hidden">
-                </div>
 
-                <h5 class="mb-3 mt-4"><i class="bi bi-telephone-fill"></i> Dados de Contato</h5>
-                <div class="mb-2"><label class="form-label">Email</label><input class="form-control" id="cdEmail" type="email" placeholder="contato@sualoja.com"></div>
-                <div class="mb-2"><label class="form-label">CNPJ</label><input class="form-control" id="cdCnpj" placeholder="00.000.000/0000-00"></div>
-                <div class="mb-2"><label class="form-label">Endereço</label><input class="form-control" id="cdEndereco" placeholder="Rua, número, bairro, cidade/UF"></div>
-                <div class="mb-2"><label class="form-label">Local (Cidade/UF)</label><input class="form-control" id="cdCidadeUf" placeholder="Ex: Goiânia - GO"></div>
-                <p class="text-secondary small mt-1 mb-2" style="margin-top:-6px;">Usado na linha de local e data automática dos documentos.</p>
-                <div class="mb-3"><label class="form-label">Telefone(s)</label><input class="form-control" id="cdTelefone" placeholder="(62) 99999-9999 / (62) 98888-8888"></div>
-
-                <div class="mb-4">
-                    <label class="form-label">Cor primária da minha empresa</label>
-                    <div class="d-flex align-items-center gap-3">
-                        <input type="color" id="cdCorBarra" value="#16a34a" style="width:52px;height:38px;border-radius:10px;border:1.5px solid var(--border);background:none;padding:2px;cursor:pointer;">
-                        <span class="text-secondary small">Usada no cabeçalho dos documentos e nas imagens geradas pela calculadora e pelo orçamento</span>
+                    <div class="content-card cd-card">
+                        <h5><i class="bi bi-telephone-fill"></i> Dados de Contato</h5>
+                        <div class="cd-contato">
+                            <div class="cd-f-email"><label class="form-label">Email</label><input class="form-control" id="cdEmail" type="email" placeholder="contato@sualoja.com"></div>
+                            <div class="cd-f-cnpj"><label class="form-label">CNPJ</label><input class="form-control" id="cdCnpj" placeholder="00.000.000/0000-00"></div>
+                            <div class="cd-f-end"><label class="form-label">Endereço</label><input class="form-control" id="cdEndereco" placeholder="Rua, número, bairro, cidade/UF"></div>
+                            <div class="cd-f-local"><label class="form-label">Local (Cidade/UF)</label><input class="form-control" id="cdCidadeUf" placeholder="Ex: Goiânia - GO"><p class="text-secondary small mt-1 mb-0">Usado na linha de local e data automática dos documentos.</p></div>
+                            <div class="cd-f-tel"><label class="form-label">Telefone(s)</label><input class="form-control" id="cdTelefone" placeholder="(62) 99999-9999 / (62) 98888-8888"></div>
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="mb-4">
-                    <label class="form-label">Nome do Documento</label>
-                    <input class="form-control" id="cdNomeDocumento" placeholder="Ex: Termo de compra e garantia">
-                    <p class="text-secondary small mt-1 mb-0">Usado no nome do arquivo e no assunto ao compartilhar. Ex: "Termo de compra e garantia de João Silva.pdf"</p>
-                </div>
-
-                <h5 class="mb-2 mt-4"><i class="bi bi-chat-left-text"></i> Mensagem Padrão</h5>
-                <p class="text-secondary small mb-2">Usada ao compartilhar a garantia. O sistema adiciona "Olá [Nome do Cliente]," automaticamente antes deste texto.</p>
-                <textarea class="form-control mb-4" id="cdMensagemPadrao" rows="4" placeholder="Ex: Segue em anexo o comprovante da sua compra e garantia. Qualquer dúvida, estamos à disposição!" style="font-size:.82rem;"></textarea>
-
-                <h5 class="mb-2 mt-4"><i class="bi bi-shield-check"></i> Termos de Garantia — Venda</h5>
-                <p class="text-secondary small mb-2">Este texto aparece no documento de garantia de uma <b>venda</b>. Use <b>**texto**</b> para deixar algo em negrito.</p>
-                <textarea class="form-control mb-4" id="cdTermos" rows="10" style="font-size:.78rem;line-height:1.5;" placeholder="Escreva aqui os termos de garantia da sua loja..."></textarea>
-
-                <h5 class="mb-2 mt-4"><i class="bi bi-tools"></i> Termos de Garantia — Concerto</h5>
-                <p class="text-secondary small mb-2">Este texto aparece no documento de garantia gerado a partir de um <b>reparo</b> (aba Concertos) — geralmente diferente do termo de venda. Se deixar em branco, usa o termo de venda no lugar.</p>
-                <textarea class="form-control mb-4" id="cdTermosConcerto" rows="10" style="font-size:.78rem;line-height:1.5;" placeholder="Escreva aqui os termos de garantia dos consertos da sua loja (pode ser diferente do de venda)..."></textarea>
-
-                <h5 class="mb-2 mt-4"><i class="bi bi-file-earmark-text"></i> Modelo de Contrato</h5>
-                <p class="text-secondary small mb-2">
-                    Cole aqui o contrato da sua loja. Use tags <b>{{tipo:id:rótulo}}</b> nos pontos que o cliente vai preencher — o sistema cria os campos automaticamente na tela de Contrato.
-                </p>
-                <div class="content-card mb-3" style="padding:12px 14px;">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="small"><b><i class="bi bi-stars"></i> Já tem um contrato pronto?</b></span>
-                        <button class="btn btn-sm btn-secondary" id="cdIaToggle" type="button">Ver prompt pra IA</button>
+                <section class="cd-pane cd-pane-garantia" data-cd-pane="garantia" role="tabpanel" hidden>
+                    <div class="content-card cd-card">
+                        <h5><i class="bi bi-file-earmark-text"></i> Nome do Documento</h5>
+                        <input class="form-control" id="cdNomeDocumento" placeholder="Ex: Termo de compra e garantia">
+                        <p class="text-secondary small mt-2 mb-0">Usado no nome do arquivo e no assunto ao compartilhar. Ex: "Termo de compra e garantia de João Silva.pdf"</p>
                     </div>
-                    <div id="cdIaBox" style="display:none;">
-                        <p class="text-secondary small mb-2">Copie o prompt abaixo, cole numa IA (ChatGPT, Claude, etc.) junto com o texto do seu contrato original, e cole a resposta dela no campo do modelo mais abaixo.</p>
-                        <textarea class="form-control mb-2" id="cdIaPrompt" rows="11" readonly style="font-size:.72rem;line-height:1.5;"></textarea>
-                        <button class="btn btn-info w-100" id="cdIaCopiar" type="button"><i class="bi bi-clipboard"></i> Copiar Prompt</button>
+                    <div class="content-card cd-card">
+                        <h5><i class="bi bi-chat-left-text"></i> Mensagem Padrão</h5>
+                        <textarea class="form-control" id="cdMensagemPadrao" rows="4" placeholder="Ex: Segue em anexo o comprovante da sua compra e garantia. Qualquer dúvida, estamos à disposição!" style="font-size:.82rem;"></textarea>
+                        <p class="text-secondary small mt-2 mb-0">Usada ao compartilhar a garantia. O sistema adiciona "Olá [Nome do Cliente]," automaticamente antes deste texto.</p>
                     </div>
-                </div>
-
-                <div class="content-card mb-3" style="padding:12px 14px;">
-                    <div class="text-secondary small mb-1"><b>Tipos disponíveis:</b></div>
-                    <div class="text-secondary small" style="line-height:1.7;">
-                        <code>{{texto:nome_cliente:Nome Completo}}</code> — campo de texto<br>
-                        <code>{{numero:cpf:CPF/CNPJ}}</code> — número/documento<br>
-                        <code>{{moeda:valor_parcela:Valor da Parcela}}</code> — valor em R$<br>
-                        <code>{{data:data_pagamento:Data de Pagamento}}</code> — data<br>
-                        <code>{{calc:total:valor_parcela*qtd_parcelas}}</code> — calculado automaticamente<br>
-                        <code>{{hoje:data_assinatura:Data de Assinatura}}</code> — preenche sozinho com a data de hoje<br>
-                        <code>{{diadata:dia_vencimento:data_inicio_pagamento}}</code> — pega o dia de outro campo <b>data</b><br>
-                        <code>{{escolha:estado:Estado|Novo|Seminovo}}</code> — interruptor com opções, em vez de texto livre<br>
-                        <span class="text-secondary">Dica: repetir o mesmo <code>id</code> em dois pontos do contrato (ex: prazo em meses e qtd. de parcelas) mantém os dois sempre iguais, com um único campo.</span>
+                    <div class="content-card cd-card cd-card-termos">
+                        <h5><i class="bi bi-shield-check"></i> Termos de Garantia — Venda</h5>
+                        <textarea class="form-control" id="cdTermos" rows="10" style="font-size:.78rem;line-height:1.5;" placeholder="Escreva aqui os termos de garantia da sua loja..."></textarea>
+                        <p class="text-secondary small mt-2 mb-0">Aparece no documento de garantia de uma <b>venda</b>. Use <b>**texto**</b> para deixar algo em negrito.</p>
                     </div>
-                </div>
+                    <div class="content-card cd-card cd-card-termos">
+                        <h5><i class="bi bi-tools"></i> Termos de Garantia — Concerto</h5>
+                        <textarea class="form-control" id="cdTermosConcerto" rows="10" style="font-size:.78rem;line-height:1.5;" placeholder="Escreva aqui os termos de garantia dos consertos da sua loja (pode ser diferente do de venda)..."></textarea>
+                        <p class="text-secondary small mt-2 mb-0">Aparece no documento gerado a partir de um <b>reparo</b> (aba Concertos). Se deixar em branco, usa o termo de venda no lugar.</p>
+                    </div>
+                </section>
 
-                <div class="mb-3"><label class="form-label">Título do Contrato</label><input class="form-control" id="cdContratoTitulo" placeholder="Ex: CONTRATO DE PRESTAÇÃO DE SERVIÇO"></div>
-                <p class="text-secondary small mb-2" style="margin-top:-8px;">Aparece em destaque, maior e em negrito, no topo do documento gerado.</p>
-
-                <textarea class="form-control mb-1" id="cdContratoTemplate" rows="14" placeholder="CONTRATANTE: {{texto:nome_cliente:Nome Completo}}, inscrito(a) no CPF/CNPJ sob nº {{numero:cpf:CPF/CNPJ}}...
+                <section class="cd-pane cd-pane-contrato" data-cd-pane="contrato" role="tabpanel" hidden>
+                    <div class="cd-contrato">
+                        <div class="cd-col-modelo">
+                            ${pc ? '' : `
+                            <div class="content-card cd-card">
+                                <h5><i class="bi bi-stars"></i> Já tem um contrato pronto?</h5>
+                                <p class="text-secondary small mb-2">Cole o contrato da loja no campo do modelo, com tags <b>{{tipo:id:rótulo}}</b> nos pontos que o cliente vai preencher — o sistema cria os campos na tela de Contrato.</p>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-secondary" id="cdIaToggle" type="button" style="flex:1;">Ver prompt pra IA</button>
+                                    <button class="btn btn-sm btn-secondary" id="cdTagsToggle" type="button" style="flex:1;">Como usar as tags</button>
+                                </div>
+                            </div>`}
+                            <div class="content-card cd-card">
+                                <h5><i class="bi bi-file-earmark-text"></i> Modelo de Contrato</h5>
+                                <div class="mb-3"><label class="form-label">Título do Contrato</label><input class="form-control" id="cdContratoTitulo" placeholder="Ex: CONTRATO DE PRESTAÇÃO DE SERVIÇO"><p class="text-secondary small mt-1 mb-0">Aparece em destaque, maior e em negrito, no topo do documento gerado.</p></div>
+                                <textarea class="form-control" id="cdContratoTemplate" rows="${pc ? 22 : 14}" placeholder="CONTRATANTE: {{texto:nome_cliente:Nome Completo}}, inscrito(a) no CPF/CNPJ sob nº {{numero:cpf:CPF/CNPJ}}...
 
 Valor da parcela: {{moeda:valor_parcela:Valor da Parcela}} x {{numero:qtd_parcelas:Qtd. Parcelas}} = {{calc:total:valor_parcela*qtd_parcelas}}" style="font-size:.78rem;line-height:1.6;"></textarea>
-                <p class="text-secondary small mb-3">O mesmo id não pode se repetir com tipos diferentes. Use <b>**texto**</b> para negrito.</p>
+                                <p class="text-secondary small mt-2 mb-0">O mesmo id não pode se repetir com tipos diferentes. Use <b>**texto**</b> para negrito.</p>
+                            </div>
+                            <div class="content-card cd-card">
+                                <h5><i class="bi bi-pen"></i> Assinaturas do contrato</h5>
+                                ${interruptor('cdContratoDataAutomatica', 'Local e data automáticos', 'Antes da(s) assinatura(s). Usa a data de hoje e o "Local (Cidade/UF)" da aba Loja.')}
+                                ${interruptor('cdContratoAssinaturaLocador', 'Assinatura da Locadora', 'Linha para a sua loja assinar.')}
+                                ${interruptor('cdContratoAssinatura', 'Assinatura do Locatário', 'Linha para o cliente assinar.')}
+                            </div>
+                        </div>
+                        ${pc ? `
+                        <div class="cd-col-tags">
+                            <div class="content-card cd-card">
+                                <h5><i class="bi bi-stars"></i> Tags do contrato</h5>
+                                <p class="text-secondary small mb-2">Use <b>{{tipo:id:rótulo}}</b> nos pontos que o cliente vai preencher. Passe o mouse numa tag e clique em Inserir para colocá-la no modelo.</p>
+                                ${tagsHtml(true)}
+                                <button class="btn btn-sm btn-secondary w-100 mt-3" id="cdIaToggle" type="button">Já tem um contrato? Ver prompt pra IA</button>
+                                <div id="cdIaBox" class="mt-3" style="display:none;">${iaHtml}</div>
+                            </div>
+                        </div>` : ''}
+                    </div>
+                </section>
+            </div>
 
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="cdContratoDataAutomatica">
-                    <label class="form-check-label small" for="cdContratoDataAutomatica">Adicionar local e data automáticos antes da(s) assinatura(s)</label>
-                </div>
-                <p class="text-secondary small mb-3" style="margin-top:-6px;">Usa sempre a data de hoje e o "Local (Cidade/UF)" salvo em Dados de Contato — nunca precisa editar.</p>
-
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="cdContratoAssinaturaLocador">
-                    <label class="form-check-label small" for="cdContratoAssinaturaLocador">Incluir linha de assinatura da Locadora (sua loja)</label>
-                </div>
-                <div class="form-check mb-4">
-                    <input class="form-check-input" type="checkbox" id="cdContratoAssinatura">
-                    <label class="form-check-label small" for="cdContratoAssinatura">Incluir linha de assinatura do Locatário</label>
-                </div>
-
-                <button class="btn btn-primary w-100" id="cdSave">
+            <div class="cd-savebar">
+                <span class="cd-status" id="cdStatus" aria-live="polite"></span>
+                <button class="btn btn-primary" id="cdSave">
                     <i class="bi bi-check-circle-fill"></i> Salvar Configurações
                 </button>
             </div>
         `;
+        mostrarAba(CD.aba);
+        ajustarBarra();
+    }
+
+    // ── Abas ───────────────────────────────────────────────────────
+    function mostrarAba(id) {
+        if (!ABAS.some(([a]) => a === id)) id = 'loja';
+        CD.aba = id;
+        document.querySelectorAll('#cdSeg [data-cd-aba]').forEach(b => {
+            const on = b.dataset.cdAba === id;
+            b.classList.toggle('on', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        document.querySelectorAll('#configuracoesDocumentos [data-cd-pane]').forEach(p => { p.hidden = p.dataset.cdPane !== id; });
+    }
+
+    // Bolinha amarela na aba com alteração + aviso em cima do Salvar.
+    function marcarSujo(aba) {
+        if (!aba || sujo[aba]) return;
+        sujo[aba] = true;
+        atualizarIndicadores();
+    }
+    function limparSujo() {
+        ABAS.forEach(([id]) => { sujo[id] = false; });
+        atualizarIndicadores();
+    }
+    function atualizarIndicadores() {
+        document.querySelectorAll('#cdSeg [data-cd-aba]').forEach(b => b.classList.toggle('sujo', !!sujo[b.dataset.cdAba]));
+        const st = el('cdStatus');
+        if (st) st.textContent = estaSujo() ? 'Alterações não salvas' : '';
+    }
+    function aoEditar(e) {
+        const pane = e.target.closest && e.target.closest('[data-cd-pane]');
+        if (pane) marcarSujo(pane.dataset.cdPane);
+    }
+
+    // No celular a barra Salvar fica logo acima da barra de navegação; mede a altura dela.
+    function ajustarBarra() {
+        const wrap = el('configuracoesDocumentos');
+        const nav = document.getElementById('ctwBottomNav');
+        const h = nav && nav.offsetHeight ? nav.offsetHeight : 0;
+        if (wrap) wrap.style.setProperty('--cd-nav-h', h + 'px');
+    }
+
+    // Folha de baixo (celular): "Como usar as tags" e "Prompt pra IA".
+    function abrirFolha(tipo) {
+        let f = el('cdFolha');
+        if (!f) {
+            f = document.createElement('div');
+            f.id = 'cdFolha';
+            f.className = 'vs-folha-overlay';
+            f.innerHTML = `
+                <div class="vs-folha" role="dialog">
+                    <div class="vs-folha-alca"></div>
+                    <div class="vs-folha-titulo" id="cdFolhaTitulo"></div>
+                    <div class="cd-folha-corpo" id="cdFolhaCorpo"></div>
+                </div>`;
+            document.body.appendChild(f);
+            f.addEventListener('click', e => {
+                if (e.target === f) fecharFolha();
+                else if (e.target.closest('#cdIaCopiar')) copiarPromptIA();
+            });
+        }
+        el('cdFolhaTitulo').textContent = tipo === 'ia' ? 'Prompt pra IA' : 'Como usar as tags';
+        el('cdFolhaCorpo').innerHTML = tipo === 'ia' ? iaHtml : tagsHtml(false);
+        if (tipo === 'ia' && el('cdIaPrompt')) el('cdIaPrompt').value = IA_PROMPT;
+        void f.offsetWidth;
+        f.classList.add('active');
+        if (typeof window._vsAbrirModal === 'function') window._vsAbrirModal(fecharFolha);
+    }
+    function fecharFolha() {
+        const f = el('cdFolha');
+        if (f && f.classList.contains('active')) {
+            f.classList.remove('active');
+            if (typeof window._vsFecharModal === 'function') window._vsFecharModal();
+        }
+    }
+
+    // Insere a tag clicada (PC) no ponto do cursor do modelo de contrato.
+    function inserirTag(tag) {
+        const t = el('cdContratoTemplate');
+        if (!t) return;
+        const ini = t.selectionStart ?? t.value.length, fim = t.selectionEnd ?? ini;
+        t.value = t.value.slice(0, ini) + tag + t.value.slice(fim);
+        t.focus();
+        t.selectionStart = t.selectionEnd = ini + tag.length;
+        marcarSujo('contrato');
+    }
+
+    // Ao tocar em "voltar" com alterações pendentes: pergunta antes de descartar. O core.js chama isto
+    // no "voltar" (botão ← e gesto do Android); true = segurei a saída.
+    window._vsGuardaSaida = function () {
+        const wrap = el('configuracoesDocumentos');
+        if (!estaSujo() || !wrap || !wrap.getClientRects().length) return false;
+        modal({
+            message: 'Você tem alterações não salvas em Documentos. Sair e descartar?',
+            confirmText: 'Descartar',
+            cancelText: 'Continuar editando',
+            onConfirm: () => { descartarAlteracoes(); history.back(); },
+            onCancel: () => {},
+        });
+        return true;
+    };
+    function descartarAlteracoes() {
+        CD.logoBlob = null; CD.assinaturaBlob = null;
+        ['cdLogoInput', 'cdAssinaturaInput'].forEach(id => { if (el(id)) el(id).value = ''; });
+        limparSujo();
+        if (dadosCache) preencherForm(dadosCache);
     }
 
     function attachListeners() {
+        const wrap = el('configuracoesDocumentos');
+        wrap?.addEventListener('input', aoEditar);
+        wrap?.addEventListener('change', aoEditar);
+        wrap?.addEventListener('click', e => {
+            const aba = e.target.closest('[data-cd-aba]');
+            if (aba) { mostrarAba(aba.dataset.cdAba); window.scrollTo(0, 0); return; }
+            const ins = e.target.closest('[data-cd-inserir]');
+            if (ins) { inserirTag(ins.dataset.cdInserir); return; }
+            if (e.target.closest('#cdIaCopiar')) copiarPromptIA();
+        });
+        window.addEventListener('resize', ajustarBarra);
         el('cdLogoBtn')?.addEventListener('click', () => el('cdLogoInput')?.click());
         el('cdLogoInput')?.addEventListener('change', handleLogoSelect);
         el('cdAssinaturaBtn')?.addEventListener('click', () => el('cdAssinaturaInput')?.click());
@@ -178,14 +333,15 @@ Valor da parcela: {{moeda:valor_parcela:Valor da Parcela}} x {{numero:qtd_parcel
             if (lbl) lbl.textContent = el('cdLogoSize').value + 'px';
         });
         el('cdSave')?.addEventListener('click', saveConfig);
+        el('cdTagsToggle')?.addEventListener('click', () => abrirFolha('tags'));
         el('cdIaToggle')?.addEventListener('click', () => {
+            if (!ehPc()) { abrirFolha('ia'); return; }
             const box = el('cdIaBox');
             if (!box) return;
             const abrindo = box.style.display === 'none';
             box.style.display = abrindo ? 'block' : 'none';
             if (abrindo && el('cdIaPrompt')) el('cdIaPrompt').value = IA_PROMPT;
         });
-        el('cdIaCopiar')?.addEventListener('click', copiarPromptIA);
     }
 
     // ── Prompt pronto pra usar em qualquer IA externa (ChatGPT, Claude...) ──
@@ -334,11 +490,19 @@ Segue o meu contrato original abaixo. Gere a versão com as tags:
 
         const logoPreview   = el('cdLogoPreview');
         const logoIcon      = el('cdLogoIconPlaceholder');
-        if (dados.storeLogoUrl && logoPreview) { logoPreview.src = dados.storeLogoUrl; logoPreview.style.display = 'block'; if (logoIcon) logoIcon.style.display = 'none'; }
+        if (logoPreview) {
+            if (dados.storeLogoUrl) logoPreview.src = dados.storeLogoUrl; else logoPreview.removeAttribute('src');
+            logoPreview.style.display = dados.storeLogoUrl ? 'block' : 'none';
+            if (logoIcon) logoIcon.style.display = dados.storeLogoUrl ? 'none' : '';
+        }
 
         const assinaturaPreview = el('cdAssinaturaPreview');
         const assinaturaIcon    = el('cdAssinaturaIconPlaceholder');
-        if (dados.storeAssinaturaUrl && assinaturaPreview) { assinaturaPreview.src = dados.storeAssinaturaUrl; assinaturaPreview.style.display = 'block'; if (assinaturaIcon) assinaturaIcon.style.display = 'none'; }
+        if (assinaturaPreview) {
+            if (dados.storeAssinaturaUrl) assinaturaPreview.src = dados.storeAssinaturaUrl; else assinaturaPreview.removeAttribute('src');
+            assinaturaPreview.style.display = dados.storeAssinaturaUrl ? 'block' : 'none';
+            if (assinaturaIcon) assinaturaIcon.style.display = dados.storeAssinaturaUrl ? 'none' : '';
+        }
     }
 
     async function loadFromFirebase() {
@@ -346,7 +510,8 @@ Segue o meu contrato original abaixo. Gere a versão com as tags:
         // já tem, sem esperar rede nenhuma. Continua abaixo buscando de
         // novo em segundo plano (não trava a tela nisso), só pra pegar
         // alguma mudança feita em outro aparelho nesse meio tempo.
-        if (dadosCache) preencherForm(dadosCache);
+        // (Se há alterações não salvas — ex: voltou de uma folha — o que foi digitado fica como está.)
+        if (dadosCache && !estaSujo()) preencherForm(dadosCache);
 
         let dados = {};
         try {
@@ -362,7 +527,7 @@ Segue o meu contrato original abaixo. Gere a versão com as tags:
         }
 
         dadosCache = dados;
-        preencherForm(dados);
+        if (!estaSujo()) preencherForm(dados);
     }
 
     async function saveConfig() {
@@ -430,6 +595,9 @@ Segue o meu contrato original abaixo. Gere a versão com as tags:
                     falhas.push('a ' + img.rotulo + ' foi enviada mas não consegui registrar: ' + e.message);
                 }
             }
+
+            limparSujo();
+            if (falhas.length) marcarSujo('loja'); // a imagem que não subiu continua pendente
 
             // UMA mensagem só e honesta (antes o "erro de imagem" era coberto pelo "salvo com sucesso").
             modal({ message: falhas.length

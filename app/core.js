@@ -2096,6 +2096,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // em vez de apagar o registro dele (o formulário ficava na tela mas o voltar navegava pro Início).
     let modalPilha = [];
     let pularPopstate = false;   // o history.back() que a gente mesmo dá ao voltar pro modal de baixo
+    let voltandoDeModal = false;  // o history.back() de _vsFecharModal (fechar folha/modal NÃO é sair da tela)
 
     window._vsAbrirModal = function (fecharFn, opcoes) {
         if (opcoes && opcoes.empilhar && modalFecharCallback) modalPilha.push(modalFecharCallback);
@@ -2113,6 +2114,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // voltar pro modal de baixo não é "navegar": o popstate disso não pode fechar nem re-renderizar nada
                 pularPopstate = true;
                 setTimeout(() => { pularPopstate = false; }, 600);
+            } else {
+                voltandoDeModal = true;
+                setTimeout(() => { voltandoDeModal = false; }, 600);
             }
             history.back();
         }
@@ -2184,6 +2188,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('popstate', e => {
         if (pularPopstate) { pularPopstate = false; return; }
+        const veioDeModal = voltandoDeModal;
+        voltandoDeModal = false;
         if (window._vsOperacaoBloqueante) {
             history.pushState(e.state, ''); // reempurra o estado que acabamos de sair, anulando o "voltar" na prática
             if (typeof window.showCustomModal === 'function') window.showCustomModal({ message: operacaoBloqueanteMsg });
@@ -2196,6 +2202,12 @@ document.addEventListener('DOMContentLoaded', () => {
             fechar();
             modalFechandoViaPopstate = false;
             return; // não deixa cair pra navegação de seção normal também
+        }
+
+        // Tela com alterações não salvas (ex: Configurações › Documentos) segura a saída e pergunta antes.
+        if (!veioDeModal && typeof window._vsGuardaSaida === 'function' && window._vsGuardaSaida()) {
+            history.pushState(e.state, '');
+            return;
         }
 
         const st = e.state;
