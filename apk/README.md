@@ -6,5 +6,5 @@ escolher foto/arquivo, baixar e compartilhar PDF/imagem, abrir WhatsApp/links fo
 
 - Gerar: GitHub › Actions › **Gerar APK (Android)** › Run workflow. O arquivo sai em Releases › "VortexSmart APK".
 - O app abre o endereço oficial; cada deploy do site já atualiza o app. APK novo só se mudar ícone/nome/permissões.
-- Assinatura: `vortexsmart.jks.enc` (chave criptografada) + segredo `APK_SENHA` no GitHub.
+- Assinatura: chave criada na 1ª execução e guardada criptografada em `vortexsmart.jks.enc`; a senha é o segredo `APK_SENHA` (você escolhe).
   **Guarde a chave e a senha**: sem elas não dá pra atualizar um APK já instalado (teria de desinstalar).

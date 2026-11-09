@@ -2,8 +2,8 @@
 # Como usar: aba Actions > "Gerar APK (Android)" > Run workflow. Pronto em ~5 min; o arquivo fica em
 # Releases > "VortexSmart APK" (link direto no fim da execução). O APK abre o endereço informado
 # abaixo, então cada deploy do site já atualiza o app — só gere um APK novo se mudar ícone/nome/permissões.
-# Requer o segredo APK_SENHA (Settings > Secrets and variables > Actions): senha que abre a chave de
-# assinatura guardada criptografada em apk/vortexsmart.jks.enc. Sem ela o build para com aviso claro.
+# Requer o segredo APK_SENHA (Settings > Secrets and variables > Actions): uma senha forte escolhida por você;
+# ela protege a chave de assinatura (guardada criptografada em apk/vortexsmart.jks.enc). Sem ela o build para.
 name: Gerar APK (Android)
 
 on:
@@ -41,8 +41,24 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Abrir a chave de assinatura
-        run: openssl enc -d -aes-256-cbc -pbkdf2 -in apk/vortexsmart.jks.enc -out "$RUNNER_TEMP/vortexsmart.jks" -pass env:APK_SENHA
+      # Na 1ª vez cria a chave de assinatura com a senha do segredo APK_SENHA, guarda ela CRIPTOGRAFADA
+      # no repositório (apk/vortexsmart.jks.enc) e reaproveita nas próximas. Ninguém além de quem
+      # tem a senha consegue abrir. Guarde a senha: sem ela o APK instalado não recebe atualização por cima.
+      - name: Chave de assinatura
+        run: |
+          CHAVE="$RUNNER_TEMP/vortexsmart.jks"
+          if [ -f apk/vortexsmart.jks.enc ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -in apk/vortexsmart.jks.enc -out "$CHAVE" -pass env:APK_SENHA
+          else
+            keytool -genkeypair -keystore "$CHAVE" -alias vortexsmart -keyalg RSA -keysize 2048 -validity 36500 \
+              -storepass "$APK_SENHA" -keypass "$APK_SENHA" -dname "CN=VortexSmart, O=Workcell, C=BR"
+            openssl enc -aes-256-cbc -pbkdf2 -salt -in "$CHAVE" -out apk/vortexsmart.jks.enc -pass env:APK_SENHA
+            git config user.name "github-actions"
+            git config user.email "github-actions@users.noreply.github.com"
+            git add apk/vortexsmart.jks.enc
+            git commit -m "chore(apk): chave de assinatura (criptografada)"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
 
       - name: Compilar
         working-directory: apk
