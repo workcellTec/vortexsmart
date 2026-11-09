@@ -3295,7 +3295,7 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 }
 .scan-input-principal input::placeholder { color: rgba(217,119,6,.75); }
 .scan-input-principal input:focus { outline: none; border-color: #d97706; background: rgba(217,119,6,.12); }
-.vs-scan-btn { display: none; } /* leitor por câmera é só do celular; no PC fica a pistola */
+.vs-scan-btn, .vs-so-celular { display: none !important; } /* leitor por câmera é só do celular; no PC fica a pistola */
 
 /* ══════════════════════════════════════════════════════════════
    TABELA DE PARCELAS (Repassar Valores, Empréstimo, Por Aparelho) —

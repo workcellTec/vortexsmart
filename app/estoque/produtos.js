@@ -829,6 +829,7 @@
                             <label class="form-label" for="stqCodigoBarras"><i class="bi bi-upc-scan"></i> Código de Barras <span class="text-secondary small">(opcional)</span></label>
                             <div style="display:flex;gap:8px;">
                                 <input class="form-control" id="stqCodigoBarras" type="text" placeholder="Leia com a pistola, digite, ou gere abaixo" style="flex:1;"/>
+                                <button type="button" class="btn btn-secondary vs-so-celular" id="stqLerCodigoBtn" title="Ler com a câmera" aria-label="Ler código de barras com a câmera"><i class="bi bi-upc-scan"></i></button>
                                 <button type="button" class="btn btn-secondary" id="stqGerarCodigoBtn" title="Gerar e salvar código de barras"><i class="bi bi-magic"></i></button>
                             </div>
                             <div id="stqBarcodePreviewWrap" class="hidden mt-2" style="text-align:center;background:#fff;border-radius:8px;padding:10px;">
@@ -988,6 +989,7 @@
         el('stqQuantidade')?.addEventListener('input', atualizarCompraInicial);
         el('stqValor')?.addEventListener('input', atualizarMargemAoVivo);
         el('stqGerarCodigoBtn')?.addEventListener('click', gerarCodigoBarrasParaForm);
+        el('stqLerCodigoBtn')?.addEventListener('click', lerCodigoDoFormPelaCamera);
         el('stqCodigoBarras')?.addEventListener('input', () => { renderBarcodePreview(el('stqCodigoBarras').value); atualizarResumosForm(); });
         el('stqQtdMenos')?.addEventListener('click', () => passoQuantidade(-1));
         el('stqQtdMais')?.addEventListener('click', () => passoQuantidade(1));
@@ -1241,6 +1243,25 @@
     //      agora (com o que já estiver preenchido; nome é obrigatório) e
     //      o modal passa a editar esse produto.
     //    O campo/preview só são preenchidos depois da gravação confirmada. ──
+    // Celular: a câmera lê UM código (leitor-camera.js) e ele entra no campo como se tivesse sido
+    // digitado — o 'input' atualiza a prévia e os resumos; a trava de duplicidade é a do salvarProduto,
+    // mas já avisa aqui pra não descobrir só no fim do cadastro.
+    let lendoPelaCamera = false;
+    function lerCodigoDoFormPelaCamera() {
+        if (lendoPelaCamera || typeof window._vsLerCodigoCamera !== 'function') return;
+        lendoPelaCamera = true;
+        window._vsLerCodigoCamera()
+            .then(codigo => {
+                const campo = el('stqCodigoBarras');
+                if (!codigo || !campo) return;
+                campo.value = String(codigo).trim().toUpperCase();
+                campo.dispatchEvent(new Event('input'));
+                const outro = (window.products || []).find(p => p.codigoBarras && p.codigoBarras.trim().toUpperCase() === campo.value && p.id !== editingId);
+                if (outro) window.showCustomModal({ message: `Esse código de barras já está cadastrado no produto "${outro.nome}". Cada código só pode pertencer a um produto.` });
+            })
+            .finally(() => { lendoPelaCamera = false; });
+    }
+
     async function gerarCodigoBarrasParaForm() {
         const btn = el('stqGerarCodigoBtn');
         if (el('stqCodigoBarras')?.value.trim()) {
@@ -2065,22 +2086,35 @@
         const body = abrirModal('primary', 'Repor Estoque');
         body.innerHTML = `
             <label class="form-label">Código de barras</label>
+            <button type="button" class="vs-scan-btn mb-2" id="stqReporCameraBtn"><i class="bi bi-upc-scan"></i> Ler com a câmera</button>
             <input class="form-control mb-3" id="stqReporCodigo" placeholder="🔫 Leia ou digite o código..." autocomplete="off"/>
             <div id="stqReporProdutoInfo"></div>
         `;
-        setTimeout(() => el('stqReporCodigo')?.focus(), 100);
-        el('stqReporCodigo').addEventListener('keydown', e => {
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            const codigo = el('stqReporCodigo').value.trim().toUpperCase();
+        // Pistola/teclado e câmera caem no mesmo caminho: acha o produto pelo código e pede a quantidade.
+        const buscarPorCodigo = codigo => {
             if (!codigo) return;
             const produto = (window.products || []).find(p => p.codigoBarras && p.codigoBarras.trim().toUpperCase() === codigo);
             if (!produto) {
-                el('stqReporProdutoInfo').innerHTML = `<div class="stq-hist-empty">Nenhum produto com esse código.</div>`;
+                el('stqReporProdutoInfo').innerHTML = `<div class="stq-hist-empty">Nenhum produto com o código ${esc(codigo)}.</div>`;
                 el('stqReporCodigo').value = '';
                 return;
             }
             renderReporProdutoInfo(produto);
+        };
+        // No celular o foco automático abriria o teclado por cima do botão da câmera; no PC a pistola precisa do foco
+        if (document.documentElement.dataset.shell !== 'mobile') setTimeout(() => el('stqReporCodigo')?.focus(), 100);
+        el('stqReporCodigo').addEventListener('keydown', e => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            buscarPorCodigo(el('stqReporCodigo').value.trim().toUpperCase());
+        });
+        let lendo = false;
+        el('stqReporCameraBtn').addEventListener('click', () => {
+            if (lendo || typeof window._vsLerCodigoCamera !== 'function') return;
+            lendo = true;
+            window._vsLerCodigoCamera()
+                .then(codigo => { if (codigo) buscarPorCodigo(String(codigo).trim().toUpperCase()); })
+                .finally(() => { lendo = false; });
         });
     }
 

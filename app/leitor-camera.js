@@ -168,7 +168,7 @@
         s.aoSair = () => { if (document.visibilityState === 'hidden') encerrar(s, null); }; // câmera nunca fica ligada em segundo plano
         document.addEventListener('visibilitychange', s.aoSair);
         montarTela(s);
-        if (typeof window._vsAbrirModal === 'function') window._vsAbrirModal(() => encerrar(s, null)); // voltar do Android fecha a câmera
+        if (typeof window._vsAbrirModal === 'function') window._vsAbrirModal(() => encerrar(s, null), { empilhar: true }); // voltar do Android fecha a câmera (e só ela, se estiver por cima de um formulário)
         iniciar(s);
         return s.promessa;
     };

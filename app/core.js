@@ -2088,16 +2088,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // MESMA função de fechar pra limpar a tela).
     let modalFecharCallback = null;
     let modalFechandoViaPopstate = false;
+    // Modais que ficam POR BAIXO do atual: a câmera de código de barras abre por cima de um formulário
+    // (_vsAbrirModal(fn, { empilhar: true })). Fechar a de cima devolve o voltar do Android pro de baixo,
+    // em vez de apagar o registro dele (o formulário ficava na tela mas o voltar navegava pro Início).
+    let modalPilha = [];
+    let pularPopstate = false;   // o history.back() que a gente mesmo dá ao voltar pro modal de baixo
 
-    window._vsAbrirModal = function (fecharFn) {
+    window._vsAbrirModal = function (fecharFn, opcoes) {
+        if (opcoes && opcoes.empilhar && modalFecharCallback) modalPilha.push(modalFecharCallback);
+        else modalPilha = [];
         modalFecharCallback = fecharFn;
         history.pushState({ vsModal: true }, '');
     };
 
     window._vsFecharModal = function () {
         if (!modalFecharCallback) return; // já fechado — evita disparo duplo
-        modalFecharCallback = null;
+        const haModalAbaixo = modalPilha.length > 0;
+        modalFecharCallback = modalPilha.pop() || null;
         if (!modalFechandoViaPopstate && history.state && history.state.vsModal) {
+            if (haModalAbaixo) {
+                // voltar pro modal de baixo não é "navegar": o popstate disso não pode fechar nem re-renderizar nada
+                pularPopstate = true;
+                setTimeout(() => { pularPopstate = false; }, 600);
+            }
             history.back();
         }
     };
@@ -2113,6 +2126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // em seguida (via _vsPushNav/_vsReplaceNav) já cuida do histórico.
     window._vsLimparModalSemVoltar = function () {
         modalFecharCallback = null;
+        modalPilha = [];
     };
 
     // Mesma ideia do modal acima, só que pra operações que NÃO têm uma
@@ -2166,6 +2180,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.addEventListener('popstate', e => {
+        if (pularPopstate) { pularPopstate = false; return; }
         if (window._vsOperacaoBloqueante) {
             history.pushState(e.state, ''); // reempurra o estado que acabamos de sair, anulando o "voltar" na prática
             if (typeof window.showCustomModal === 'function') window.showCustomModal({ message: operacaoBloqueanteMsg });
