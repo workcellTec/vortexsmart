@@ -99,7 +99,7 @@
             a = document.createElement('div');
             a.id = 'vsAtualizacaoAviso';
             a.setAttribute('role', 'status');
-            a.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:100000;display:flex;align-items:center;gap:10px;width:min(94vw,440px);box-sizing:border-box;padding:10px 12px 10px 16px;border-radius:16px;background:var(--card-bg,#1a1540);color:var(--text-strong,#fff);border:1px solid rgba(var(--primary-rgb,91,61,245),.6);box-shadow:0 12px 36px rgba(0,0,0,.5);font:600 .82rem/1.3 Poppins,system-ui,sans-serif;';
+            a.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:100000;display:flex;align-items:center;gap:10px;width:min(94vw,440px);box-sizing:border-box;padding:10px 12px 10px 16px;border-radius:16px;background:var(--modal-card-bg);color:var(--text-strong);border:1px solid rgba(var(--primary-rgb,91,61,245),.6);box-shadow:0 12px 36px rgba(0,0,0,.5);font:600 .82rem/1.3 Poppins,system-ui,sans-serif;';
             document.body.appendChild(a);
         }
         a.innerHTML = '';
@@ -112,8 +112,8 @@
             const b = document.createElement('button');
             b.type = 'button';
             b.textContent = rotulo;
-            b.style.cssText = 'flex:0 0 auto;height:34px;padding:0 12px;border-radius:10px;cursor:pointer;font:700 .76rem Poppins,system-ui,sans-serif;border:1px solid rgba(255,255,255,.18);' +
-                (destaque ? 'background:var(--primary,#5b3df5);color:#fff;border-color:transparent;' : 'background:transparent;color:inherit;');
+            b.style.cssText = 'flex:0 0 auto;height:34px;padding:0 12px;border-radius:10px;cursor:pointer;font:700 .76rem Poppins,system-ui,sans-serif;border:1px solid var(--border);' +
+                (destaque ? 'background:var(--primary);color:var(--on-primary,#fff);border-color:transparent;' : 'background:transparent;color:inherit;');
             b.addEventListener('click', acao);
             a.appendChild(b);
         });
@@ -169,10 +169,10 @@
             <div style="font-size:.84rem;line-height:1.7;">
                 <div>Versão em uso: <b>${instalada() || '—'}</b></div>
                 <div>Última verificação: <b>${quando(e.ultimaChecagem)}</b></div>
-                <div id="vsAtualStatus" style="margin-top:4px;color:${servidor ? '#fbbf24' : 'var(--text-secondary,#a9a3d6)'};">${fixo ? 'Este é o programa instalado no computador: ele só muda quando o programa for trocado.' : e.resultado}</div>
+                <div id="vsAtualStatus" style="margin-top:4px;color:${servidor ? 'var(--warning)' : 'var(--text-secondary)'};">${fixo ? 'Este é o programa instalado no computador: ele só muda quando o programa for trocado.' : e.resultado}</div>
             </div>
             ${fixo ? '' : `
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);">
                 <div><b style="font-size:.86rem;">Atualizar sozinho</b><div style="font-size:.72rem;opacity:.7;margin-top:2px;">Ao achar versão nova, avisa e recarrega em poucos segundos. Desligado, só avisa.</div></div>
                 <button type="button" class="ctx-switch${e.auto ? ' on' : ''}" id="vsAtualAuto" role="switch" aria-checked="${e.auto ? 'true' : 'false'}" aria-label="Atualizar sozinho"></button>
             </div>
@@ -198,7 +198,7 @@
         const fundo = document.createElement('div');
         fundo.id = 'vsAtualFundo';
         fundo.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:16px;';
-        fundo.innerHTML = '<div id="vsAtualCaixa" style="background:var(--card-bg,#14102a);color:var(--text-strong,#fff);border-radius:16px;width:min(460px,100%);display:flex;flex-direction:column;padding:16px;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);"></div>';
+        fundo.innerHTML = '<div id="vsAtualCaixa" style="background:var(--modal-card-bg);color:var(--text-strong);border-radius:16px;width:min(460px,100%);display:flex;flex-direction:column;padding:16px;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);"></div>';
         document.body.appendChild(fundo);
         fundo.addEventListener('click', e => { if (e.target === fundo) fecharPainel(); });
         desenharPainel();

@@ -571,22 +571,21 @@
 
         panel.innerHTML = `
         <div class="rep-painel">
-            <div class="rep-defeito"><div class="rep-lbl">Defeito</div><p>${esc(os.defeito || '—')}</p></div>
+            <div class="rep-defeito"><span class="rep-lbl">Defeito</span><p>${esc(os.defeito || '—')}</p></div>
             <div class="rep-info-grid">
                 ${cel('', 'cal', 'Cadastro', os.criadoEm ? new Date(os.criadoEm).toLocaleDateString('pt-BR') : '—')}
                 ${celEntrega}
                 ${cel('', 'money', 'Valor', os.valorCobrado ? fmtDinheiro(os.valorCobrado) : '—')}
                 ${cel('', 'user', 'Atendente', esc(atendente))}
-                ${linkWhatsApp(tel) ? `<div class="rep-ig cheia ok"><span class="rep-ig-ib">${ic('wa')}</span><span class="rep-ig-it"><small>WhatsApp</small><b>${esc(fmtTelefone(tel))}</b></span></div>` : ''}
             </div>
             <div class="rep-senha" id="repSenhaMini-${os.id}"><span class="rep-senha-txt">Carregando senha...</span></div>
-            <div>
+            <div class="rep-fotos-bloco">
                 <div class="rep-lbl">Fotos de chegada · ${fotos.length}</div>
                 ${fotos.length
                     ? `<div class="rep-fotos" data-galeria="chegada">${fotos.map((url, i) => `<button type="button" data-ver-foto="${esc(url)}" data-titulo="Chegada" aria-label="Foto ${i + 1}"><img src="${esc(url)}" loading="lazy" alt=""/></button>`).join('')}</div>`
                     : `<div class="rep-sem-foto">Nenhuma foto</div>`}
             </div>
-            ${(tl || nx) ? `<div><div class="rep-lbl">Linha do tempo</div><div class="rep-tl">${tl}${nx}</div></div>` : ''}
+            ${(tl || nx) ? `<div><div class="rep-lbl">Linha do tempo</div><div class="rep-tl${nx ? '' : ' sem-prox'}">${tl}${nx}</div>${entradas.length > 1 ? `<button type="button" class="rep-tl-mais" data-action="toggle-tl">Ver histórico completo · ${entradas.length} etapas</button>` : ''}</div>` : ''}
             ${(botaoPrincipal || botaoManual) ? `<div class="rep-acts">${botaoPrincipal}${botaoManual}</div>` : ''}
             ${ferramentas.length ? `<div class="rep-tools" style="--n:${ferramentas.length}">${ferramentas.join('')}</div>` : ''}
         </div>`;
@@ -1021,6 +1020,7 @@
                 else if (acao === 'editar') { if (typeof window.openReparosSection === 'function') window.openReparosSection('reparosForm', { repairId: os.id }); }
                 else if (acao === 'apagar') apagarOS(os);
                 else if (acao === 'timeline') abrirTimeline(os);
+                else if (acao === 'toggle-tl') { const aberto = btn.previousElementSibling.classList.toggle('completa'); btn.textContent = aberto ? 'Mostrar só a última etapa' : `Ver histórico completo · ${entradasTimeline(os).length} etapas`; }
             });
 
             // Card que já estava expandido antes desse refresh de dados

@@ -250,7 +250,7 @@
         fundo.id = 'vsDiagFundo';
         fundo.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:16px;';
         fundo.innerHTML = `
-            <div style="background:var(--card-bg,#14102a);color:var(--text-strong,#fff);border-radius:16px;width:min(780px,100%);max-height:92dvh;display:flex;flex-direction:column;padding:16px;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+            <div style="background:var(--modal-card-bg);color:var(--text-strong);border-radius:16px;width:min(780px,100%);max-height:92dvh;display:flex;flex-direction:column;padding:16px;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);">
                 <div style="display:flex;align-items:center;gap:8px;"><strong style="flex:1;">🩺 Diagnóstico do sistema</strong><button type="button" id="vsDiagFechar" class="btn btn-sm" style="min-width:40px;">✕</button></div>
                 <textarea id="vsDiagTexto" readonly spellcheck="false" style="flex:1;min-height:50dvh;width:100%;font:12px/1.45 Consolas,monospace;background:#0a0818;color:#d7d3ff;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px;resize:none;white-space:pre;">Lendo o sistema e o banco… (até alguns segundos)</textarea>
                 <div style="display:flex;gap:8px;"><button type="button" id="vsDiagCopiar" class="btn btn-ok" style="flex:1;" disabled>Copiar relatório</button><button type="button" id="vsDiagAtualizar" class="btn" style="flex:0 0 auto;">Atualizar</button></div>
