@@ -2089,7 +2089,7 @@ body.tema-claro .section-header { background: transparent; box-shadow: none; bor
 .stq-org-faixa small { display:block; font-size:12px; font-weight:500; color:var(--text-secondary); }
 .stq-org-faixa button { flex:none; margin-left:auto; height:36px; padding:0 18px; border-radius:11px; border:0; background:linear-gradient(135deg, var(--acento-hero), var(--acento-hero-2)); color:#fff; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
 .stq-org .stq-org-faixa { display:flex; }
-.stq-org .stq-ordem-btn, .stq-org .btn-header-action, .stq-org #stqBusca, .stq-org .stq-cats { opacity:.45; pointer-events:none; }
+.stq-org .stq-ordem-btn, .stq-org .btn-header-action, .stq-org #stqBusca, .stq-org .stq-cats, .stq-org .stq-seg { opacity:.45; pointer-events:none; }
 .stq-grip { order:-1; width:28px; height:36px; margin-right:-4px; flex:none; display:flex; align-items:center; justify-content:center; border-radius:10px; font-size:20px; color:var(--text-secondary); cursor:grab; user-select:none; -webkit-user-select:none; }
 .stq-grip:hover { color:var(--text-strong); background:rgba(var(--overlay-rgb), .06); }
 .stq-org .stq-card-main { cursor:default; }
@@ -2097,6 +2097,24 @@ body.tema-claro .section-header { background: transparent; box-shadow: none; bor
 .stq-card-wrap.arrastando .stq-grip { cursor:grabbing; }
 .stq-card-wrap.flash { animation:stqPiscar .6s; }
 @keyframes stqPiscar { 0% { background:rgba(var(--acento-hero-rgb), .3); } }
+
+/* ── Estoque · Produtos — filtro Esgotados ─────────────────────────────────── */
+#stqAviso { align-self:stretch; }
+.stq-seg { display:flex; gap:4px; flex:none; padding:3px; border-radius:12px; background:var(--surface); border:1px solid var(--border); backdrop-filter:blur(10px); }
+.stq-seg button { height:34px; padding:0 14px; display:flex; align-items:center; gap:6px; border:0; border-radius:10px; background:none; color:var(--text-secondary); font:inherit; font-size:13px; font-weight:700; white-space:nowrap; cursor:pointer; }
+.stq-seg button:hover { color:var(--text-strong); }
+.stq-seg button.on { background:linear-gradient(135deg, var(--acento-hero), var(--acento-hero-2)); color:#fff; }
+.stq-seg b { min-width:20px; height:18px; padding:0 6px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; background:rgba(var(--overlay-rgb),.1); }
+.stq-seg button.on b { background:rgba(255,255,255,.25); }
+.stq-seg button.alerta:not(.on) b { background:var(--danger); color:#fff; }
+.stq-aviso-esg { display:flex; align-self:stretch; align-items:center; gap:12px; margin:0 12px 12px; padding:12px 16px; border-radius:14px; background:color-mix(in srgb, var(--danger) 12%, var(--surface)); border:1px solid color-mix(in srgb, var(--danger) 38%, var(--border)); color:var(--text-strong); font-size:13.5px; font-weight:700; }
+.stq-aviso-esg small { display:block; font-size:12px; font-weight:500; color:var(--text-secondary); }
+.stq-aviso-ic { width:34px; height:34px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; background:var(--danger); color:#fff; }
+.stq-aviso-esg button { flex:none; margin-left:auto; height:34px; padding:0 16px; border-radius:11px; border:1px solid color-mix(in srgb, var(--danger) 50%, var(--border)); background:none; color:var(--text-strong); font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.stq-card-wrap.esgotado { border-color:color-mix(in srgb, var(--danger) 42%, var(--border)); background:linear-gradient(90deg, color-mix(in srgb, var(--danger) 9%, var(--surface)), var(--surface) 60%); }
+.stq-tag-esgotado { padding:1px 7px; border-radius:8px; font-size:.6rem; font-weight:800; letter-spacing:.02em; color:var(--danger); background:color-mix(in srgb, var(--danger) 15%, transparent); }
+.stq-repor-rapido { flex:none; height:34px; padding:0 16px; border-radius:11px; border:0; background:linear-gradient(135deg, var(--acento-hero), var(--acento-hero-2)); color:#fff; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.stq-empty-ok-ic { width:54px; height:54px; margin:0 auto 12px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px; background:color-mix(in srgb, var(--success) 18%, transparent); color:var(--success); }
 
 /* Painel — 4 botões numa linha só (Editar / Adicionar / Histórico / Apagar) */
 .stq-row-panel { padding:2px 10px 12px; }

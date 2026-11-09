@@ -157,6 +157,7 @@
     const ESTOQUE_PAGINA = 40;       // cards desenhados por vez na lista (o resto vem em "Ver mais")
     let limiteExibicao = ESTOQUE_PAGINA;
     let assinaturaFiltro = '';       // busca+categoria+ordem da última renderização — mudou, volta pra primeira página
+    let filtroEstoque = 'todos';     // 'todos' | 'estoque' (com saldo) | 'esgot' (quantidade 0 ou negativa)
     let ordemLocal = null;           // { modo: 'custom'|'nome'|'qtd', dir: { nome, qtd } } — escolha do usuário nesta sessão
     let organizando = false;         // modo "Organizar prateleira" (alças pra arrastar, lista inteira)
     let arraste = null;              // arraste em andamento: { el, box, y, pegada, rolador, v, raf, id }
@@ -170,15 +171,17 @@
     const esc = t  => typeof window.escapeHtml === 'function' ? window.escapeHtml(t) : t;
     const fmt = v  => typeof window._fmt === 'function' ? window._fmt(v) : `R$ ${Number(v || 0).toFixed(2)}`;
 
-    // Ícones da ordenação: a fonte de ícones do app é um subconjunto fechado, então estes vão em SVG.
-    const ICONES_ORDEM = {
+    // Ícones da ordenação e dos esgotados: a fonte de ícones do app é um subconjunto fechado, então estes vão em SVG.
+    const ICONES_SVG = {
         ordem: '<path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/>',
         alca: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
         mao: '<path d="M7 11V6a2 2 0 014 0v4M11 10V4a2 2 0 014 0v6M15 10V6a2 2 0 014 0v8a7 7 0 01-7 7h-1a6 6 0 01-5-3l-3-5a2 2 0 013-2l2 2"/>',
         nome: '<path d="M4 7h7M4 12h5M4 17h3M16 5v14M16 19l-3-3M16 19l3-3"/>',
-        qtd: '<path d="M5 19V9M12 19V5M19 19v-7"/>'
+        qtd: '<path d="M5 19V9M12 19V5M19 19v-7"/>',
+        alerta: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/>',
+        ok: '<path d="M5 12l5 5 9-10"/>'
     };
-    const icOrdem = n => `<svg class="stq-svg" viewBox="0 0 24 24" aria-hidden="true">${ICONES_ORDEM[n]}</svg>`;
+    const icSvg = n => `<svg class="stq-svg" viewBox="0 0 24 24" aria-hidden="true">${ICONES_SVG[n]}</svg>`;
 
     // ── Skeleton (montado 1x) ────────────────────────────────────
     function ensureSkeleton() {
@@ -188,7 +191,7 @@
         const podeCriar = typeof window._temPermissao === 'function' ? window._temPermissao('estoque_criar_produto') : true;
         const podeRepor = typeof window._temPermissao === 'function' ? window._temPermissao('estoque_editar_produto') : true;
         const pc = document.documentElement.getAttribute('data-shell') === 'pc';
-        const botaoOrdem = `<button type="button" class="stq-ordem-btn" id="stqOrdemBtn" aria-haspopup="true" aria-label="Ordenar produtos">${icOrdem('ordem')}<span id="stqOrdemRotulo"></span></button>`;
+        const botaoOrdem = `<button type="button" class="stq-ordem-btn" id="stqOrdemBtn" aria-haspopup="true" aria-label="Ordenar produtos">${icSvg('ordem')}<span id="stqOrdemRotulo"></span></button>`;
         const campoBusca = `<input class="form-control" id="stqBusca" type="text" placeholder="Buscar produto cadastrado..."/>`;
         container.innerHTML = `
             <div class="section-header">
@@ -204,13 +207,16 @@
             <div class="stq-barra">
                 <div class="stq-ordem-wrap">${botaoOrdem}<div class="stq-ordem-menu" id="stqOrdemMenu" hidden></div></div>
                 <div class="stq-barra-busca">${campoBusca}</div>
+                <div class="stq-seg" id="stqSeg"></div>
             </div>` : `
-            <div class="mb-2 w-100 max-width-400-margin-1rem">${campoBusca}</div>`}
+            <div class="mb-2 w-100 max-width-400-margin-1rem">${campoBusca}</div>
+            <div class="stq-seg" id="stqSeg"></div>`}
             <div class="stq-org-faixa" id="stqOrgFaixa">
                 <div>Organizando a prateleira<small>Segure a alça e arraste. Mostrando todos os produtos.</small></div>
                 <button type="button" id="stqOrgConcluir">Concluir</button>
             </div>
             <div class="stq-cats" id="stqCats"></div>
+            <div id="stqAviso"></div>
             <div class="stq-list" id="stqList"></div>
 
             <div class="stq-modal-backdrop" id="stqModalBackdrop">
@@ -231,6 +237,10 @@
         el('stqBusca')?.addEventListener('input', renderLista);
         el('stqOrdemBtn')?.addEventListener('click', e => { e.stopPropagation(); abrirOrdem(); });
         el('stqOrdemMenu')?.addEventListener('click', aoClicarOrdem);
+        [el('stqSeg'), el('stqAviso')].forEach(c => c?.addEventListener('click', e => {
+            const b = e.target.closest('[data-f]');
+            if (b) { filtroEstoque = b.dataset.f; renderLista(); }
+        }));
         el('stqOrgConcluir')?.addEventListener('click', () => sairDoOrganizar(true));
         el('stqList')?.addEventListener('touchstart', iniciarArraste, { passive: false });
         el('stqList')?.addEventListener('mousedown', iniciarArraste);
@@ -2241,6 +2251,11 @@
         el('stqReporValor')?.addEventListener('input', () => {
             el('stqReporValorAviso').style.display = lerMoeda(el('stqReporValor')) > 0 ? 'none' : '';
         });
+        // Já vem com o que foi pago na última reposição (dá pra trocar): repor esgotado é, quase sempre, comprar de novo.
+        if (el('stqReporValor') && produto.ultimoValorEntrada > 0) {
+            escreverMoeda(el('stqReporValor'), produto.ultimoValorEntrada);
+            el('stqReporValor').dispatchEvent(new Event('input', { bubbles: true }));
+        }
 
         const select = el('stqReporFornecedor');
         const preencherSelect = () => {
@@ -2502,7 +2517,7 @@
     const ehPc = () => document.documentElement.getAttribute('data-shell') === 'pc';
     const temPosicao = p => typeof p.posicao === 'number' && isFinite(p.posicao);
     const compararId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-    const podeOrganizar = () => typeof window._temPermissao === 'function' ? window._temPermissao('estoque_editar_produto') : true;
+    const podeEditarProdutos = () => typeof window._temPermissao === 'function' ? window._temPermissao('estoque_editar_produto') : true;
 
     function ordemAtual() {
         if (ordemLocal) return ordemLocal;
@@ -2544,7 +2559,7 @@
         const o = ordemAtual();
         const op = (modo, icone, titulo, sub, dir) => `
             <button type="button" class="stq-ordem-op ${o.modo === modo ? 'on' : ''}" data-ordem="${modo}">
-                <span class="stq-ordem-ic">${icOrdem(icone)}</span>
+                <span class="stq-ordem-ic">${icSvg(icone)}</span>
                 <span class="stq-ordem-tx"><b>${titulo}</b><small>${sub}</small></span>
                 ${dir && o.modo === modo ? `<span class="stq-ordem-dir">${dir}</span>` : ''}
             </button>`;
@@ -2552,7 +2567,7 @@
         return op('custom', 'mao', 'Personalizada', 'Do seu jeito, igual à prateleira', '')
             + op('nome', 'nome', 'Nome', 'Ordem alfabética. Toque de novo pra inverter', o.dir.nome === 'asc' ? 'A–Z' : 'Z–A')
             + op('qtd', 'qtd', 'Quantidade', 'Menos estoque primeiro. Toque de novo pra inverter', o.dir.qtd === 'asc' ? 'menor → maior' : 'maior → menor')
-            + (podeOrganizar() ? `<button type="button" class="stq-org-btn" data-organizar ${custom ? '' : 'disabled'}>${custom ? 'Organizar prateleira' : 'Organizar só na ordem Personalizada'}</button>` : '');
+            + (podeEditarProdutos() ? `<button type="button" class="stq-org-btn" data-organizar ${custom ? '' : 'disabled'}>${custom ? 'Organizar prateleira' : 'Organizar só na ordem Personalizada'}</button>` : '');
     }
 
     function desenharOpcoes() {
@@ -2626,7 +2641,7 @@
 
     // ── Organizar a prateleira (arrastar) ──────────────────────────
     function entrarNoOrganizar() {
-        if (!podeOrganizar() || ordemAtual().modo !== 'custom') return;
+        if (!podeEditarProdutos() || ordemAtual().modo !== 'custom') return;
         organizando = true;
         expandedId = null;
         el('estoqueProdutos')?.classList.add('stq-org');
@@ -2787,30 +2802,55 @@
         return (window.products || []).filter(p => !p.arquivado);
     }
 
+    const estaEsgotado = p => (p.quantidade || 0) <= 0;
+
     function renderCard(p) {
         const cat = infoCategoria(detectarCategoria(p.nome));
-        const zerado = (p.quantidade || 0) <= 0;
+        const zerado = estaEsgotado(p);
         const ringCor = zerado ? '#ef4444' : cat.cor;
         const cores = Array.isArray(p.cores) ? p.cores : [];
         return `
-            <div class="stq-card-wrap ${p.ignorarContagem ? 'oculto' : ''}" data-id="${p.id}">
+            <div class="stq-card-wrap ${p.ignorarContagem ? 'oculto' : ''} ${zerado ? 'esgotado' : ''}" data-id="${p.id}">
                 <div class="stq-card-main" data-action="toggle">
                     <div class="stq-ring" style="border-color:${ringCor};background:${ringCor}22;">${p.quantidade ?? 0}</div>
                     <div class="stq-card-info">
                         <div class="stq-card-nome">${esc(p.nome)}</div>
                         <div class="stq-card-meta">
                             <span>${fmt(p.valor || 0)}</span>
+                            ${zerado ? `<span class="stq-tag-esgotado">${(p.quantidade || 0) < 0 ? 'ESTOQUE NEGATIVO' : 'ESGOTADO'}</span>` : ''}
                             ${p.condicao && window._condicoesProduto?.[p.condicao] ? `<span>${esc(window._condicoesProduto[p.condicao])}</span>` : ''}
                             ${cores.map(c => `<span><span class="stq-card-cor-dot" style="background:${esc(c.hex || '#666')};"></span> ${esc(c.nome)}</span>`).join('')}
                         </div>
                     </div>
                     ${organizando
-                        ? `<span class="stq-grip" aria-label="Segure e arraste para mudar a posição">${icOrdem('alca')}</span>`
+                        ? `<span class="stq-grip" aria-label="Segure e arraste para mudar a posição">${icSvg('alca')}</span>`
+                        : zerado && podeEditarProdutos() ? '<button type="button" class="stq-repor-rapido" data-action="repor-rapido">Repor</button>'
                         : '<i class="bi bi-chevron-right stq-card-chev"></i>'}
                 </div>
                 ${organizando ? '' : alertaCustoHtml(p)}
                 <div class="stq-row-panel" style="display:none;"></div>
             </div>`;
+    }
+
+    // Filtro Todos · Em estoque · Esgotados (com a contagem da loja inteira) e a faixa de aviso.
+    function renderFiltroEstoque() {
+        const seg = el('stqSeg');
+        if (!seg) return;
+        const todos = getProdutos();
+        const nEsg = todos.filter(estaEsgotado).length;
+        seg.innerHTML = [['todos', 'Todos', todos.length], ['estoque', 'Em estoque', todos.length - nEsg], ['esgot', 'Esgotados', nEsg]]
+            .map(([k, nome, n]) => `<button type="button" data-f="${k}" class="${filtroEstoque === k ? 'on' : ''} ${k === 'esgot' && n ? 'alerta' : ''}">${nome} <b>${n}</b></button>`).join('');
+        const aviso = el('stqAviso');
+        if (!aviso) return;
+        const faixa = (titulo, sub, botao) => `
+            <div class="stq-aviso-esg">
+                <span class="stq-aviso-ic">${icSvg('alerta')}</span>
+                <div>${titulo}<small>${sub}</small></div>${botao}
+            </div>`;
+        aviso.innerHTML = !nEsg || organizando ? ''
+            : filtroEstoque === 'todos' ? faixa(`${nEsg} ${nEsg > 1 ? 'produtos esgotados' : 'produto esgotado'}`, 'Veja só eles e reponha', '<button type="button" data-f="esgot">Ver</button>')
+            : filtroEstoque === 'esgot' ? faixa(`${nEsg} pra repor`, 'Toque em Repor na linha do produto', '')
+            : '';
     }
 
     function renderLista() {
@@ -2822,14 +2862,21 @@
         let produtos = getProdutos();
         if (termos.length) produtos = produtos.filter(p => { const nome = normalizarTexto(p.nome); return termos.every(t => nome.includes(t)); });
         if (filtroCategoria) produtos = produtos.filter(p => detectarCategoria(p.nome) === filtroCategoria);
+        if (filtroEstoque !== 'todos') produtos = produtos.filter(p => estaEsgotado(p) === (filtroEstoque === 'esgot'));
         const ordem = ordemAtual();
         produtos = ordenarLista(produtos, ordem);
 
-        const assinatura = termos.join(' ') + '|' + (filtroCategoria || '') + '|' + ordemComoTexto(ordem);
+        const assinatura = termos.join(' ') + '|' + (filtroCategoria || '') + '|' + filtroEstoque + '|' + ordemComoTexto(ordem);
         if (assinatura !== assinaturaFiltro) { assinaturaFiltro = assinatura; limiteExibicao = ESTOQUE_PAGINA; }
 
+        renderFiltroEstoque();
         if (!produtos.length) {
-            listEl.innerHTML = `
+            listEl.innerHTML = filtroEstoque === 'esgot' && !termos.length && !filtroCategoria ? `
+                <div class="stq-empty stq-empty-ok">
+                    <span class="stq-empty-ok-ic">${icSvg('ok')}</span>
+                    <h4>Nada esgotado</h4>
+                    <p class="text-secondary small">Todos os produtos têm estoque.</p>
+                </div>` : `
                 <div class="stq-empty">
                     <i class="bi bi-box2-heart"></i>
                     <h4>Nenhum produto encontrado</h4>
@@ -2857,6 +2904,10 @@
             if (!produto) return;
 
             wrapEl.querySelector('.stq-card-main').addEventListener('click', () => { if (!organizando) toggleExpand(produto, wrapEl); });
+            wrapEl.querySelector('[data-action="repor-rapido"]')?.addEventListener('click', e => {
+                e.stopPropagation();
+                abrirReposicao(produto);
+            });
             wrapEl.querySelector('[data-action="ajustar-alerta"]')?.addEventListener('click', e => {
                 e.stopPropagation();
                 openFormForEdit(produto, true);
@@ -2884,7 +2935,7 @@
         fecharOrdem();
         // Abrir a tela de novo sai do "Organizar". Exceção: fechar a folha de ordem pelo histórico (popstate)
         // reabre esta mesma tela por baixo (_vsNavRestoring) — isso não é "voltar pra tela".
-        if (!window._vsNavRestoring) encerrarOrganizar();
+        if (!window._vsNavRestoring) { encerrarOrganizar(); filtroEstoque = 'todos'; }
         atualizarBotaoOrdem();
         limiteExibicao = ESTOQUE_PAGINA;
         renderCategoriaChips();   // refaz também o botão "Categorias" (só Gestor)
