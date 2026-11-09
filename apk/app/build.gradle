@@ -1,0 +1,57 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Valores que o workflow do GitHub passa com -P (ver .github/workflows/apk.yml).
+def enderecoApp = (project.findProperty('startUrl') ?: 'https://vortex-b3761.web.app/').toString()
+def codigoVersao = (project.findProperty('versionCode') ?: '1').toString().toInteger()
+def nomeVersao = (project.findProperty('versionName') ?: '1.0.0').toString()
+
+android {
+    namespace 'app.vortexsmart'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'app.vortexsmart'
+        minSdk 29
+        targetSdk 34
+        versionCode codigoVersao
+        versionName nomeVersao
+        buildConfigField 'String', 'START_URL', "\"${enderecoApp}\""
+    }
+
+    signingConfigs {
+        release {
+            if (project.hasProperty('ksPath')) {
+                storeFile file(project.property('ksPath'))
+                storePassword project.property('ksSenha')
+                keyAlias 'vortexsmart'
+                keyPassword project.property('ksSenha')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    buildFeatures { buildConfig true }
+
+    // O build só precisa gerar o APK; avisos de lint não devem impedir (o código é pequeno e revisado à mão).
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+}

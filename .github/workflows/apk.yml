@@ -1,0 +1,76 @@
+# Gera o APK do VortexSmart (app Android com WebView próprio, independente do Chrome).
+# Como usar: aba Actions > "Gerar APK (Android)" > Run workflow. Pronto em ~5 min; o arquivo fica em
+# Releases > "VortexSmart APK" (link direto no fim da execução). O APK abre o endereço informado
+# abaixo, então cada deploy do site já atualiza o app — só gere um APK novo se mudar ícone/nome/permissões.
+# Requer o segredo APK_SENHA (Settings > Secrets and variables > Actions): senha que abre a chave de
+# assinatura guardada criptografada em apk/vortexsmart.jks.enc. Sem ela o build para com aviso claro.
+name: Gerar APK (Android)
+
+on:
+  workflow_dispatch:
+    inputs:
+      endereco:
+        description: 'Endereço que o app abre (oficial por padrão; use o link do GitHub Pages pra um APK de teste)'
+        required: true
+        default: 'https://vortex-b3761.web.app/'
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      APK_SENHA: ${{ secrets.APK_SENHA }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir segredo
+        run: |
+          if [ -z "$APK_SENHA" ]; then
+            echo "::error::Falta o segredo APK_SENHA (Settings > Secrets and variables > Actions > New repository secret)."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Abrir a chave de assinatura
+        run: openssl enc -d -aes-256-cbc -pbkdf2 -in apk/vortexsmart.jks.enc -out "$RUNNER_TEMP/vortexsmart.jks" -pass env:APK_SENHA
+
+      - name: Compilar
+        working-directory: apk
+        env:
+          ENDERECO: ${{ inputs.endereco }}
+        run: |
+          gradle --no-daemon assembleRelease \
+            -PstartUrl="$ENDERECO" \
+            -PversionCode="${{ github.run_number }}" \
+            -PversionName="1.0.${{ github.run_number }}" \
+            -PksPath="$RUNNER_TEMP/vortexsmart.jks" \
+            -PksSenha="$APK_SENHA"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/VortexSmart.apk"
+
+      - name: Publicar em Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ENDERECO: ${{ inputs.endereco }}
+        run: |
+          gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create apk-latest "$RUNNER_TEMP/VortexSmart.apk" \
+            --title "VortexSmart APK" \
+            --notes "APK 1.0.${{ github.run_number }} (commit ${GITHUB_SHA::7}) — abre $ENDERECO" \
+            --target "$GITHUB_SHA"
+          echo "### APK pronto" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://github.com/${{ github.repository }}/releases/download/apk-latest/VortexSmart.apk" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VortexSmart-apk
+          path: ${{ runner.temp }}/VortexSmart.apk

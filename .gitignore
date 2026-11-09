@@ -67,3 +67,11 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Android (apk/)
+apk/.gradle/
+apk/build/
+apk/app/build/
+apk/local.properties
+*.jks
+!apk/vortexsmart.jks.enc
