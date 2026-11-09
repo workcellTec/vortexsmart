@@ -13,9 +13,13 @@
 //     sem etapa de confirmação, sem botão "Fechar mesmo assim".
 //   - Forma de pagamento não é mais grid de cards grandes (não escala
 //     com muitas formas customizadas) — é um campo que abre modal em
-//     lista. Cartão abre sub-fluxo dentro do mesmo modal: Máquina →
-//     Débito/Crédito → Bandeira (só se a taxa realmente variar entre
-//     bandeiras nessa máquina) → Parcelas (só no Crédito).
+//     lista, em no máximo DUAS telas. Tela 1: como o cliente pagou
+//     (Débito e Crédito já separados). Tela 2, só pra cartão e só quando
+//     falta decidir algo: maquininha (a última usada neste aparelho já vem
+//     marcada), bandeira (só se a taxa realmente variar entre bandeiras)
+//     e, no Crédito, as parcelas com o valor de cada uma — tocar na
+//     parcela já confirma. Débito com uma maquininha só e sem bandeira
+//     variável termina na tela 1.
 //   - Seletor Parcial/Total: Parcial é o padrão (digita o valor);
 //     Total auto-preenche com o que falta e trava o campo.
 //   - Data/hora do pagamento são editáveis (pré-preenchidas com agora)
@@ -125,16 +129,22 @@
     // Bandeiras agora vêm de window._getBandeirasDaMaquina(maquina) —
     // cada maquininha tem a sua própria lista (Configurações → Taxas),
     // não mais uma lista fixa igual pra todas.
+    function maxParcelasDe(maquina) {
+        return getMaquinas().find(m => m.v === maquina)?.maxParcelas || 18;
+    }
     function bandeirasDaMaquina(maquina) {
         return typeof window._getBandeirasDaMaquina === 'function' ? window._getBandeirasDaMaquina(maquina) : [];
     }
-    // Bandeira que vale de verdade pro cálculo/gravação: a escolhida no
-    // wizard, ou — se a etapa "Bandeira" foi pulada por não variar
+    // Bandeira que vale de verdade pro cálculo/gravação: a escolhida na
+    // tela de cartão, ou — se a escolha de bandeira foi pulada por não variar
     // taxa — a primeira bandeira da maquininha (nunca mais um "visa"
     // chumbado, que quebraria numa maquininha com bandeira de nome
     // customizado que nem se chama Visa).
+    function bandeiraDe(w) {
+        return w.bandeira || bandeirasDaMaquina(w.maquina)[0]?.id || '';
+    }
     function bandeiraEfetiva() {
-        return wiz.bandeira || bandeirasDaMaquina(wiz.maquina)[0]?.id || '';
+        return bandeiraDe(wiz);
     }
     const TOLERANCIA = 0.01; // arredondamento de centavos
 
@@ -287,20 +297,27 @@
         dinheiro:  'bi-cash-coin',
         pix:       'bi-qr-code',
         cartao:    'bi-credit-card-2-front',
+        debito:    'bi-credit-card',
+        credito:   'bi-credit-card-2-front',
         parcelado: 'bi-calendar3-range',
     };
 
-    // Detecta se a taxa de uma máquina/parcela varia entre bandeiras —
-    // se não varia (caso mais comum, "Personalizar por bandeira" desligado
-    // em Configurações → Taxas), a etapa "Bandeira" do wizard é pulada.
-    function taxaVariaPorBandeira(maquina, inst) {
+    // Detecta se a taxa de uma máquina varia entre bandeiras — no Débito, a taxa
+    // do débito; no Crédito, a de QUALQUER parcela (se variasse só em 12x e a
+    // bandeira não fosse perguntada, a taxa gravada seria a da primeira bandeira).
+    // Se não varia (caso mais comum, "Personalizar por bandeira" desligado em
+    // Configurações → Taxas), a bandeira não é perguntada.
+    function taxaVariaPorBandeira(maquina, debito) {
         const bandeiras = bandeirasDaMaquina(maquina);
-        if (bandeiras.length <= 1) return false; // 0 ou 1 bandeira: nada pra comparar, etapa nunca aparece
-        const valores = bandeiras
-            .map(b => (typeof window._getTaxa === 'function' ? window._getTaxa(maquina, b.id, inst) : undefined))
-            .filter(t => t !== undefined)
-            .map(t => `${t.tipo}:${t.valor}`);
-        return new Set(valores).size > 1;
+        if (bandeiras.length <= 1) return false; // 0 ou 1 bandeira: nada pra comparar, nunca pergunta
+        const parcelas = debito ? [0] : Array.from({ length: maxParcelasDe(maquina) }, (_, k) => k + 1);
+        return parcelas.some(inst => {
+            const valores = bandeiras
+                .map(b => (typeof window._getTaxa === 'function' ? window._getTaxa(maquina, b.id, inst) : undefined))
+                .filter(t => t !== undefined)
+                .map(t => `${t.tipo}:${t.valor}`);
+            return new Set(valores).size > 1;
+        });
     }
 
     let mounted = false;
@@ -313,6 +330,7 @@
     let formaSelecionada = null;
     let formaLabel = null;
     let wiz = { maquina: null, tipo: null, bandeira: null, parcelas: 1 };
+    let rascunho = null;             // cartão sendo montado no modal; só vira `wiz` ao confirmar
     let parceladoQtd = 1;
     let parceladoDataInicial = dataAgora();
     let parceladoPeriodicidade = 'mensal'; // 'semanal' | 'quinzenal' | 'mensal' | 'customizado'
@@ -538,7 +556,7 @@
 
             <label class="form-label">Forma de pagamento</label>
             <button type="button" class="fv-forma-select-btn ${!formaSelecionada ? 'placeholder' : ''}" id="fvAbrirFormaModal">
-                <span class="fv-forma-select-icon">${formaSelecionada ? `<i class="bi ${ICONE_FORMA[formaSelecionada] || 'bi-cash-stack'}"></i> ${esc(formaLabel || '')}` : 'Selecionar forma de pagamento'}</span>
+                <span class="fv-forma-select-icon">${formaSelecionada ? `<i class="bi ${ICONE_FORMA[formaSelecionada === 'cartao' ? wiz.tipo : formaSelecionada] || 'bi-cash-stack'}"></i> ${esc(formaLabel || '')}` : 'Selecionar forma de pagamento'}</span>
                 <i class="bi bi-chevron-right chev"></i>
             </button>
 
@@ -983,10 +1001,17 @@
             .catch(e => modal({ message: `Erro ao excluir pagamento: ${e.message}` }));
     }
 
-    // ── Modal "Forma de pagamento" — lista simples e escalável.
-    //    Cartão continua dentro do MESMO modal, só troca o conteúdo
-    //    pros passos do wizard (Máquina → Débito/Crédito → Bandeira
-    //    [se variar] → Parcelas [se Crédito]). ─────────────────────
+    // ── Modal "Forma de pagamento" — no máximo duas telas.
+    //    Tela 1: como o cliente pagou. Tela 2 (cartão): maquininha, bandeira
+    //    [se a taxa variar] e parcelas [só no Crédito]. O cartão é montado
+    //    num rascunho e só vira escolha (`wiz`) ao confirmar — cancelar não
+    //    perde a escolha anterior nem o valor digitado. ───────────────
+    const chaveUltimaMaquina = () => `vs_ultima_maquina_${window._lojaId || ''}`;
+    function maquinaInicial() {
+        const lembrada = window.safeStorage?.getItem(chaveUltimaMaquina());
+        const maquinas = getMaquinas();
+        return (maquinas.find(m => m.v === lembrada) || maquinas[0])?.v || null;
+    }
     function ensureModalFormaBackdrop() {
         if (el('fvModalFormaBackdrop')) return;
         document.body.insertAdjacentHTML('beforeend', `
@@ -996,7 +1021,6 @@
                         <div class="stq-modal-header-title" id="fvModalFormaTitulo">Forma de pagamento</div>
                         <button class="stq-modal-close" id="fvModalFormaClose"><i class="bi bi-x-lg"></i></button>
                     </div>
-                    <div class="fv-wiz-steps" id="fvWizardSteps"></div>
                     <div class="fv-wiz-back-row" id="fvWizardBackRow"></div>
                     <div class="stq-modal-body" id="fvModalFormaBody"></div>
                 </div>
@@ -1007,32 +1031,41 @@
     function fecharModalForma() {
         el('fvModalFormaBackdrop')?.classList.remove('show');
         window._vsDestravarScroll && window._vsDestravarScroll();
-        if (formaSelecionada === 'cartao' && !wiz.maquina) formaSelecionada = null;
+        rascunho = null;
         renderConteudo();
+    }
+    // Opções da tela 1: o "Cartão" virtual vira Débito e Crédito.
+    function opcoesTela1() {
+        return getFormasDisponiveis().flatMap(f => {
+            if (f.v === 'cartao') return [{ v: 'debito', l: 'Cartão de débito' }, { v: 'credito', l: 'Cartão de crédito', sub: 'à vista ou parcelado' }];
+            return [{ v: f.v, l: f.l, sub: f.v === 'parcelado' ? 'direto com você, sem maquininha' : '' }];
+        });
     }
     function abrirModalForma() {
         // Guarda o que já foi digitado ANTES de abrir — abrir/fechar
         // esse modal não pode apagar o valor.
         if (tipoPagamento === 'parcial') valorParcialStr = el('fvValorInput')?.value || valorParcialStr;
         ensureModalFormaBackdrop();
+        rascunho = null;
         el('fvModalFormaTitulo').textContent = 'Forma de pagamento';
-        el('fvWizardSteps').innerHTML = '';
         el('fvWizardBackRow').innerHTML = '';
-        el('fvModalFormaBody').innerHTML = getFormasDisponiveis().map(f => `
-            <div class="fv-modal-list-item" data-v="${f.v}">
+        el('fvModalFormaBody').innerHTML = opcoesTela1().map(f => `
+            <div class="fv-modal-list-item" data-v="${esc(f.v)}">
                 <i class="bi ${ICONE_FORMA[f.v] || 'bi-cash-stack'}"></i>
-                <span class="lbl">${esc(f.l)}</span>
+                <span class="lbl">${esc(f.l)}${f.sub ? `<small>${esc(f.sub)}</small>` : ''}</span>
                 <i class="bi bi-chevron-right chev"></i>
             </div>`).join('');
         el('fvModalFormaBody').querySelectorAll('[data-v]').forEach(item => {
             item.addEventListener('click', () => {
                 const v = item.dataset.v;
-                if (v === 'cartao') {
-                    wiz = { maquina: null, tipo: null, bandeira: null, parcelas: 1 };
-                    abrirWizardMaquina();
+                if (v === 'debito' || v === 'credito') {
+                    rascunho = { maquina: maquinaInicial(), tipo: v, bandeira: null, parcelas: 1 };
+                    // Débito com uma maquininha só e taxa igual em todas as bandeiras: nada a perguntar
+                    if (v === 'debito' && getMaquinas().length === 1 && !taxaVariaPorBandeira(rascunho.maquina, true)) finalizarWizardCartao();
+                    else abrirTelaCartao();
                 } else {
                     formaSelecionada = v;
-                    formaLabel = getFormasDisponiveis().find(f => f.v === v)?.l || v;
+                    formaLabel = opcoesTela1().find(f => f.v === v)?.l || v;
                     el('fvModalFormaBackdrop').classList.remove('show');
                     window._vsDestravarScroll && window._vsDestravarScroll();
                     renderConteudo();
@@ -1043,75 +1076,69 @@
         window._vsTravarScroll && window._vsTravarScroll();
     }
 
-    function passosWizard() {
-        const passos = ['maquina', 'tipo'];
-        if (wiz.maquina && taxaVariaPorBandeira(wiz.maquina, wiz.tipo === 'debito' ? 0 : (wiz.parcelas || 1))) passos.push('bandeira');
-        if (wiz.tipo === 'credito') passos.push('parcelas');
-        return passos;
-    }
-    function renderStepsDots(passoAtualIdx) {
-        const passos = passosWizard();
-        el('fvWizardSteps').innerHTML = passos.map((_, i) => `<div class="fv-wiz-step-dot ${i <= passoAtualIdx ? 'done' : ''}"></div>`).join('');
-    }
     function renderBackRow(onBack) {
         el('fvWizardBackRow').innerHTML = onBack ? `<button type="button" class="fv-wiz-back-btn" id="fvWizardBackBtn"><i class="bi bi-arrow-left"></i> Voltar</button>` : '';
         el('fvWizardBackBtn')?.addEventListener('click', onBack);
     }
-    function abrirWizardMaquina() {
-        el('fvModalFormaTitulo').textContent = 'Qual maquininha?';
-        renderStepsDots(0);
+    // Tela 2: maquininha + bandeira (se variar) + parcelas (Crédito). Débito confirma ao tocar
+    // na maquininha (ou na bandeira, quando ela é perguntada); Crédito, ao tocar na parcela.
+    function abrirTelaCartao() {
+        const d = rascunho, debito = d.tipo === 'debito';
+        const maquinas = getMaquinas();
+        const variaBandeira = taxaVariaPorBandeira(d.maquina, debito);
+        const falta = variaBandeira && !d.bandeira;   // taxa depende da bandeira: sem ela não dá pra confirmar
+        el('fvModalFormaTitulo').textContent = debito ? 'Cartão de débito' : 'Cartão de crédito';
         renderBackRow(abrirModalForma);
-        el('fvModalFormaBody').innerHTML = getMaquinas().map(m =>
-            `<div class="fv-modal-list-item" data-v="${m.v}"><i class="bi bi-credit-card-2-front"></i><span class="lbl">${esc(m.l)}</span><i class="bi bi-chevron-right chev"></i></div>`
-        ).join('');
-        el('fvModalFormaBody').querySelectorAll('[data-v]').forEach(item => {
-            item.addEventListener('click', () => { wiz.maquina = item.dataset.v; abrirWizardTipo(); });
-        });
-    }
-    function abrirWizardTipo() {
-        el('fvModalFormaTitulo').textContent = 'Débito ou Crédito?';
-        renderStepsDots(1);
-        renderBackRow(abrirWizardMaquina);
-        el('fvModalFormaBody').innerHTML = `
-            <div class="fv-modal-list-item" data-v="debito"><i class="bi bi-credit-card"></i><span class="lbl">Débito</span><i class="bi bi-chevron-right chev"></i></div>
-            <div class="fv-modal-list-item" data-v="credito"><i class="bi bi-credit-card-2-front"></i><span class="lbl">Crédito</span><i class="bi bi-chevron-right chev"></i></div>
-        `;
-        el('fvModalFormaBody').querySelectorAll('[data-v]').forEach(item => {
-            item.addEventListener('click', () => {
-                wiz.tipo = item.dataset.v;
-                if (taxaVariaPorBandeira(wiz.maquina, wiz.tipo === 'debito' ? 0 : 1)) abrirWizardBandeira();
-                else if (wiz.tipo === 'credito') abrirWizardParcelas();
-                else finalizarWizardCartao();
-            });
-        });
-    }
-    function abrirWizardBandeira() {
-        el('fvModalFormaTitulo').textContent = 'Qual bandeira?';
-        renderStepsDots(2);
-        renderBackRow(abrirWizardTipo);
-        const bandeiras = bandeirasDaMaquina(wiz.maquina);
-        el('fvModalFormaBody').innerHTML = bandeiras.map(b =>
-            `<div class="fv-modal-list-item" data-v="${b.id}"><i class="bi bi-credit-card"></i><span class="lbl">${esc(b.nome)}</span><i class="bi bi-chevron-right chev"></i></div>`
-        ).join('');
-        el('fvModalFormaBody').querySelectorAll('[data-v]').forEach(item => {
-            item.addEventListener('click', () => {
-                wiz.bandeira = item.dataset.v;
-                if (wiz.tipo === 'credito') abrirWizardParcelas(); else finalizarWizardCartao();
-            });
-        });
-    }
-    function abrirWizardParcelas() {
-        el('fvModalFormaTitulo').textContent = 'Quantas parcelas?';
-        renderStepsDots(passosWizard().length - 1);
-        renderBackRow(() => { if (wiz.bandeira !== null && taxaVariaPorBandeira(wiz.maquina, 1)) abrirWizardBandeira(); else abrirWizardTipo(); });
-        const max = getMaquinas().find(m => m.v === wiz.maquina)?.maxParcelas || 18;
-        const opcoes = Array.from({ length: max }, (_, i) => ({ v: String(i + 1), l: `${i + 1}x` }));
-        el('fvModalFormaBody').innerHTML = `<div class="stq-cats">${opcoes.map(o => `<button type="button" class="stq-cat-pill" data-v="${o.v}" style="color:var(--primary);">${o.l}</button>`).join('')}</div>`;
-        el('fvModalFormaBody').querySelectorAll('[data-v]').forEach(item => {
-            item.addEventListener('click', () => { wiz.parcelas = parseInt(item.dataset.v, 10) || 1; finalizarWizardCartao(); });
-        });
+        let h = '';
+        if (maquinas.length > 1) {
+            h += `<div class="fv-sec">Maquininha</div><div class="fv-seg">${maquinas.map(m =>
+                `<button type="button" data-maq="${esc(m.v)}" class="${m.v === d.maquina ? 'on' : ''}">${esc(m.l)}</button>`).join('')}</div>`;
+        }
+        if (variaBandeira) {
+            h += `<div class="fv-sec">Bandeira</div><div class="fv-pills">${bandeirasDaMaquina(d.maquina).map(b =>
+                `<button type="button" data-band="${esc(b.id)}" class="fv-pill ${b.id === d.bandeira ? 'on' : ''}">${esc(b.nome)}</button>`).join('')}</div>`;
+        }
+        if (debito) {
+            if (!variaBandeira) h += `<div class="fv-dica">Toque na maquininha para confirmar.</div>`;
+        } else {
+            const base = valorDigitado();
+            const max = maxParcelasDe(d.maquina);
+            const ate = rascunho.mostrarTodas ? max : Math.min(6, max);
+            h += `<div class="fv-sec">Em quantas vezes?</div>`;
+            if (falta) h += `<div class="fv-dica">Escolha a bandeira primeiro — a taxa muda de uma para outra.</div>`;
+            for (let n = 1; n <= ate; n++) {
+                const taxa = window._areRatesLoaded && window._getTaxa ? window._getTaxa(d.maquina, bandeiraDe(d), n) : undefined;
+                const semTaxa = window._areRatesLoaded && !taxa;
+                const sub = semTaxa ? 'sem taxa configurada' : base > 0 ? (n === 1 ? fmt(base) : `${n} de ${fmt(base / n)}`) : '';
+                h += `<div class="fv-modal-list-item${falta || semTaxa ? ' off' : ''}" data-parc="${n}">
+                    <span class="lbl">${n === 1 ? 'À vista' : `${n}x`}${sub ? `<small>${sub}</small>` : ''}</span>
+                    ${taxa ? `<span class="fv-taxa">taxa ${window._taxaTexto(taxa)}</span>` : ''}</div>`;
+            }
+            if (ate < max) h += `<button type="button" class="fv-mais" id="fvMaisParcelas">Mais parcelas (${ate + 1}x a ${max}x)</button>`;
+        }
+        el('fvModalFormaBody').innerHTML = h;
+        el('fvModalFormaBody').querySelectorAll('[data-maq]').forEach(b => b.addEventListener('click', () => {
+            if (b.dataset.maq !== d.maquina) d.bandeira = null;   // bandeiras são de cada maquininha
+            d.maquina = b.dataset.maq;
+            if (debito && !taxaVariaPorBandeira(d.maquina, true)) finalizarWizardCartao();
+            else abrirTelaCartao();
+        }));
+        el('fvModalFormaBody').querySelectorAll('[data-band]').forEach(b => b.addEventListener('click', () => {
+            d.bandeira = b.dataset.band;
+            if (debito) finalizarWizardCartao(); else abrirTelaCartao();
+        }));
+        el('fvModalFormaBody').querySelectorAll('[data-parc]').forEach(b => b.addEventListener('click', () => {
+            if (b.classList.contains('off')) return;
+            d.parcelas = parseInt(b.dataset.parc, 10) || 1;
+            finalizarWizardCartao();
+        }));
+        el('fvMaisParcelas')?.addEventListener('click', () => { d.mostrarTodas = true; abrirTelaCartao(); });
     }
     function finalizarWizardCartao() {
+        if (!rascunho) return;   // toque duplo: o cartão já foi confirmado
+        wiz = { maquina: rascunho.maquina, tipo: rascunho.tipo, bandeira: rascunho.bandeira, parcelas: rascunho.parcelas };
+        rascunho = null;
+        window.safeStorage?.setItem(chaveUltimaMaquina(), wiz.maquina);
         formaSelecionada = 'cartao';
         const maquinaL = getMaquinas().find(m => m.v === wiz.maquina)?.l || '';
         const tipoL = wiz.tipo === 'debito' ? 'Débito' : `Crédito ${wiz.parcelas}x`;

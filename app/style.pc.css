@@ -2369,19 +2369,32 @@ body.vs-scroll-locked { overflow: hidden !important; touch-action: none; height:
 .fv-forma-select-icon { display:inline-flex; align-items:center; gap:8px; }
 .fv-forma-select-icon i { color:var(--primary); }
 
-/* Itens de lista dentro do modal "Forma de pagamento" (formas e wizard) */
+/* Itens de lista dentro do modal "Forma de pagamento" (tela 1 e parcelas) */
 .fv-modal-list-item { display:flex; align-items:center; gap:12px; padding:13px 12px; border-radius:12px; cursor:pointer; border:1px solid rgba(var(--overlay-rgb),.06); margin-bottom:6px; }
 .fv-modal-list-item:active { background:rgba(var(--primary-rgb),.08); }
 .fv-modal-list-item i:first-child { font-size:1.05rem; width:22px; text-align:center; flex-shrink:0; color:var(--primary); }
 .fv-modal-list-item .lbl { font-size:.85rem; color:var(--text-strong); font-weight:600; flex:1; }
 .fv-modal-list-item .chev { color:var(--primary); font-size:.85rem; }
+.fv-modal-list-item .lbl small { display:block; margin-top:2px; font-size:.72rem; font-weight:500; color:var(--text-muted); }
+.fv-modal-list-item.off { opacity:.4; cursor:default; }
+.fv-modal-list-item.off:active { background:none; }
+.fv-taxa { font-size:.74rem; font-weight:500; color:var(--text-muted); flex-shrink:0; }
 
-/* Barrinhas de progresso + botão "Voltar" do wizard do Cartão */
-.fv-wiz-steps { display:flex; gap:5px; padding:0 18px 12px; }
-.fv-wiz-step-dot { flex:1; height:3px; border-radius:3px; background:rgba(255,255,255,.14); }
-.fv-wiz-step-dot.done { background:#fff; }
-.fv-wiz-back-row { padding:0 18px 8px; }
-.fv-wiz-back-btn { background:none; border:none; color:rgba(255,255,255,.85); font-size:.72rem; font-weight:700; display:flex; align-items:center; gap:5px; cursor:pointer; padding:4px 0; }
+/* Tela de cartão: maquininha, bandeira e parcelas */
+.fv-sec { font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin:14px 0 8px; }
+.fv-sec:first-child { margin-top:0; }
+.fv-seg { display:flex; gap:3px; padding:3px; border-radius:12px; background:rgba(var(--overlay-rgb),.06); }
+.fv-seg button { flex:1; border:none; background:none; color:var(--text-secondary); font-family:inherit; font-size:.85rem; font-weight:700; padding:10px 6px; border-radius:9px; cursor:pointer; }
+.fv-seg button.on { background:var(--primary); color:#fff; }
+.fv-pills { display:flex; flex-wrap:wrap; gap:7px; }
+.fv-pill { border:1.5px solid rgba(var(--overlay-rgb),.1); background:none; color:var(--text-strong); font-family:inherit; font-size:.82rem; font-weight:600; padding:8px 14px; border-radius:999px; cursor:pointer; }
+.fv-pill.on { border-color:var(--primary); background:rgba(var(--primary-rgb),.14); }
+.fv-dica { margin:10px 0 8px; padding:9px 11px; border-radius:10px; background:rgba(var(--primary-rgb),.1); color:var(--text-secondary); font-size:.76rem; line-height:1.35; }
+.fv-mais { border:none; background:none; color:var(--primary); font-family:inherit; font-size:.82rem; font-weight:700; padding:8px 2px; cursor:pointer; }
+
+/* Botão "Voltar" da tela de cartão */
+.fv-wiz-back-row { padding:10px 18px 0; }
+.fv-wiz-back-btn { background:none; border:none; color:var(--text-secondary); font-family:inherit; font-size:.72rem; font-weight:700; display:flex; align-items:center; gap:5px; cursor:pointer; padding:4px 0; }
 
 .fv-pagamentos-title { font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin:18px 0 8px; }
 .fv-vazio { text-align:center; font-size:.72rem; color:var(--text-muted); padding:10px 0 4px; }
