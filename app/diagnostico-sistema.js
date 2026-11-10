@@ -44,7 +44,12 @@
             const texto = b.matches && b.matches('button, a, [role=button]') ? ' "' + (b.textContent || '').trim().slice(0, 18) + '"' : '';
             return b.tagName.toLowerCase() + (id ? '.' + id : '') + texto;
         };
-        let t = null, ultPD = 0;
+        let t = null, ultPD = 0, ultUp = 0;
+        const secaoVisivel = () => {
+            const e = ['mainMenu', 'calculatorContainer', 'documentosContainer', 'estoqueContainer', 'vendaContainer', 'configuracoesContainer', 'reparosContainer', 'reposicaoContainer', 'credscanContainer', 'financeiroContainer']
+                .map(id => document.getElementById(id)).find(el => el && el.style.display !== 'none' && !el.classList.contains('hidden'));
+            return e ? e.id : '?';
+        };
         const fechar = (x, motivo) => {
             if (x.fim) return;
             x.fim = true;
@@ -52,7 +57,8 @@
             let l = 'toque ' + Math.round(x.x) + ',' + Math.round(x.y) + ' em ' + x.nome + ' · ' + ms + ' ms · dedo andou ' + Math.round(x.dist) + 'px';
             if (x.btn && !x.btn.isConnected) l += ' · botão SUBSTITUÍDO na tela no meio do toque';
             if (x.soltouEm && x.soltouEm !== x.nome) l += ' · soltou em ' + x.soltouEm;
-            l += motivo ? ' · ' + motivo : x.cancelado ? ' · CANCELADO pelo navegador (rolagem?)' : x.clicou ? ' · clique SIM' : ' · clique NÃO';
+            l += x.cancelado ? ' · CANCELADO pelo navegador (rolagem?)' : x.clicou ? ' · clique SIM (' + x.clickMs + ' ms depois de soltar)' : ' · clique NÃO' + (x.tUp ? ' (até agora)' : '');
+            if (motivo) l += ' · ' + motivo;
             if (x.oculta) l += ' · página OCULTA';
             if (x.atraso > 60) l += ' · evento entregue com ' + x.atraso + ' ms de atraso (página ocupada)';
             window._vsAnotarToque(l);
@@ -69,11 +75,23 @@
             if (!t) return;
             const meu = t;
             meu.tUp = performance.now();
+            ultUp = e.timeStamp;
             meu.dist = Math.hypot(e.clientX - meu.x, e.clientY - meu.y);
             meu.soltouEm = nome(e.target);
             setTimeout(() => fechar(meu), 450);   // dá tempo do "click" chegar
         }, true);
-        document.addEventListener('click', e => { if (t) { t.clicou = true; if (!t.soltouEm) t.soltouEm = nome(e.target); } }, true);
+        document.addEventListener('click', e => {
+            const lat = Math.round(e.timeStamp - ultUp);
+            if (t) {
+                if (t.fim && !t.clicou) window._vsAnotarToque('   clique em ' + nome(e.target) + ' chegou ' + lat + ' ms depois de soltar (a linha do toque já estava fechada)');
+                t.clicou = true; t.clickMs = lat; if (!t.soltouEm) t.soltouEm = nome(e.target);
+            }
+            // Botões da barra de baixo: o clique trocou mesmo de tela? (mostra se o toque chegou, virou clique e a navegação rodou)
+            if (e.target.closest && e.target.closest('.ctw-nav-btn')) {
+                const antes = secaoVisivel(), alvo = nome(e.target);
+                setTimeout(() => window._vsAnotarToque('   clique em ' + alvo + ': tela ' + antes + ' → ' + secaoVisivel() + ' (300 ms depois)'), 300);
+            }
+        }, true);
         // A página recebeu o toque do WebView mas não o transformou em pointerdown (o pointerdown vem um instante ANTES do touchstart)?
         document.addEventListener('touchstart', e => {
             const agora = performance.now();
