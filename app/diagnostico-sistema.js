@@ -33,10 +33,11 @@
         ['pointerdown', 'pointerup', 'pointercancel', 'click'].forEach(tipo => document.addEventListener(tipo, e => {
             const b = e.target.closest && e.target.closest(ALVO);
             if (tipo === 'pointerdown') baixo = b ? { b, x: e.clientX, y: e.clientY, t: performance.now() } : null;
-            if (!b) return;
-            let extra = '';
+            // Toque em qualquer lugar com a página "oculta" (o app está aberto mas o WebView parou de desenhar): é o caso que parece botão morto.
+            if (!b) { if (tipo === 'pointerdown' && document.hidden) window._vsAnotarToque('pointerdown em ' + (e.target.tagName || '?').toLowerCase() + ' com a página OCULTA (visibilityState=' + document.visibilityState + ')'); return; }
+            let extra = document.hidden ? ' · página OCULTA (' + document.visibilityState + ')' : '';
             if (tipo !== 'pointerdown' && baixo) {
-                extra = ' · dedo andou ' + Math.round(Math.hypot(e.clientX - baixo.x, e.clientY - baixo.y)) + 'px em ' + Math.round(performance.now() - baixo.t) + ' ms';
+                extra += ' · dedo andou ' + Math.round(Math.hypot(e.clientX - baixo.x, e.clientY - baixo.y)) + 'px em ' + Math.round(performance.now() - baixo.t) + ' ms';
                 if (baixo.b !== b) extra += ' · BOTÃO DIFERENTE do início do toque';
                 if (!baixo.b.isConnected) extra += ' · o botão do início do toque foi SUBSTITUÍDO na tela';
             }

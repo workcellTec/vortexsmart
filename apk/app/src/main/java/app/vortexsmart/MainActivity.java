@@ -107,6 +107,8 @@ public class MainActivity extends Activity {
     private long pausadoEm;
     private long voltouEm;
     private boolean aguardandoToque;
+    /** true entre onResume e onPause; a ponte (outra thread) lê para saber se a página "oculta" é anormal. */
+    private volatile boolean resumido;
     /** Muda a cada volta e a cada saída do app: verificações de tela agendadas numa volta antiga se cancelam sozinhas. */
     private int geracaoTela;
 
@@ -217,6 +219,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        resumido = true;
         DiagTela.registrar(this, "onResume" + (pausadoEm > 0 ? " (fora da tela há " + (SystemClock.elapsedRealtime() - pausadoEm) / 1000 + " s)" : ""));
         if (web != null) {
             web.onResume();
@@ -243,6 +246,12 @@ public class MainActivity extends Activity {
     public void onTrimMemory(int nivel) {
         super.onTrimMemory(nivel);
         DiagTela.registrar(this, "onTrimMemory nível " + nivel);
+    }
+
+    @Override
+    public void onTopResumedActivityChanged(boolean noTopo) {
+        super.onTopResumedActivityChanged(noTopo);
+        DiagTela.registrar(this, "activity no topo: " + noTopo);
     }
 
     @Override
@@ -290,6 +299,31 @@ public class MainActivity extends Activity {
     // (requestAnimationFrame) antes do 1º toque: a página está viva, o que falta é o WebView aparecer na janela.
     // Por isso olhamos o que a JANELA realmente mostra (PixelCopy) e, se estiver vazia, "cutucamos" o WebView em degraus
     // cada vez mais fortes, registrando qual degrau resolveu.
+
+    /**
+     * A página avisou "hidden" mas a Activity está em primeiro plano. Registra o estado nativo, pergunta à página se
+     * continua oculta e, se sim, empurra o WebView de volta (onResume/resumeTimers, depois INVISIBLE→VISIBLE).
+     */
+    private void paginaOcultaComAppAberto(final int geracao, final int degrau) {
+        if (web == null || geracao != geracaoTela || !resumido || isFinishing() || isDestroyed()) return;
+        web.postDelayed(() -> {
+            if (web == null || geracao != geracaoTela || !resumido) return;
+            DiagTela.registrar(this, "oculta com app aberto (degrau " + degrau + "): web.visibility=" + web.getVisibility()
+                + " isShown=" + web.isShown() + " janela.visivel=" + web.getWindowVisibility()
+                + " foco=" + hasWindowFocus() + " multijanela=" + isInMultiWindowMode()
+                + " pip=" + isInPictureInPictureMode());
+            web.evaluateJavascript("document.visibilityState", valor -> {
+                if (web == null || geracao != geracaoTela || !resumido) return;
+                boolean aindaOculta = valor != null && valor.contains("hidden");
+                DiagTela.registrar(this, "oculta com app aberto: visibilityState agora = " + valor);
+                if (!aindaOculta || degrau >= 2) return;
+                web.onResume();
+                web.resumeTimers();
+                cutucarWebView(3);   // INVISIBLE→VISIBLE devolve a visibilidade ao WebView
+                paginaOcultaComAppAberto(geracao, degrau + 1);
+            });
+        }, 300);
+    }
 
     /** 350 ms (depois 600 ms) após a volta, confere se a janela tem conteúdo; se estiver vazia, aplica o próximo ajuste. */
     private void verificarTela(int tentativa, int geracao) {
@@ -386,6 +420,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        resumido = false;
         pausadoEm = SystemClock.elapsedRealtime();
         geracaoTela++;   // cancela verificações de tela agendadas
         DiagTela.registrar(this, "onPause");
@@ -586,7 +621,13 @@ public class MainActivity extends Activity {
         // Diagnóstico da tela: a página avisa eventos (visibilidade, quadro desenhado) e o relatório lê tudo de volta.
         @JavascriptInterface
         public void diag(String mensagem) {
-            DiagTela.registrar(MainActivity.this, "página: " + (mensagem == null ? "" : mensagem.substring(0, Math.min(mensagem.length(), 200))));
+            String m = mensagem == null ? "" : mensagem.substring(0, Math.min(mensagem.length(), 200));
+            DiagTela.registrar(MainActivity.this, "página: " + m);
+            // Página "oculta" com o app aberto na frente = anormal (o WebView para de desenhar e os botões parecem mortos).
+            if (resumido && m.startsWith("visibilitychange → hidden")) {
+                final int geracao = geracaoTela;
+                runOnUiThread(() -> paginaOcultaComAppAberto(geracao, 1));
+            }
         }
 
         @JavascriptInterface
