@@ -44,7 +44,7 @@
             const texto = b.matches && b.matches('button, a, [role=button]') ? ' "' + (b.textContent || '').trim().slice(0, 18) + '"' : '';
             return b.tagName.toLowerCase() + (id ? '.' + id : '') + texto;
         };
-        let t = null;
+        let t = null, ultPD = 0;
         const fechar = (x, motivo) => {
             if (x.fim) return;
             x.fim = true;
@@ -54,12 +54,14 @@
             if (x.soltouEm && x.soltouEm !== x.nome) l += ' · soltou em ' + x.soltouEm;
             l += motivo ? ' · ' + motivo : x.cancelado ? ' · CANCELADO pelo navegador (rolagem?)' : x.clicou ? ' · clique SIM' : ' · clique NÃO';
             if (x.oculta) l += ' · página OCULTA';
+            if (x.atraso > 60) l += ' · evento entregue com ' + x.atraso + ' ms de atraso (página ocupada)';
             window._vsAnotarToque(l);
             if (x.clicou && x.btn) setTimeout(() => window._vsAnotarToque('   400 ms depois: folha ' + (document.querySelector('#repFolha.active') ? 'ABERTA' : 'fechada') + (document.documentElement.classList.contains('vs-scroll-locked') ? ' · rolagem TRAVADA' : '')), 400);
         };
         document.addEventListener('pointerdown', e => {
+            ultPD = performance.now();
             if (t) fechar(t, 'sem fim antes do toque seguinte');
-            t = { x: e.clientX, y: e.clientY, t0: performance.now(), dist: 0, nome: nome(e.target), btn: e.target.closest && e.target.closest(ALVO), oculta: document.hidden };
+            t = { x: e.clientX, y: e.clientY, t0: performance.now(), dist: 0, nome: nome(e.target), btn: e.target.closest && e.target.closest(ALVO), oculta: document.hidden, atraso: Math.round(performance.now() - e.timeStamp) };
             const meu = t;
             setTimeout(() => fechar(meu, 'sem soltar nem cancelar em 3 s'), 3000);
         }, true);
@@ -72,9 +74,37 @@
             setTimeout(() => fechar(meu), 450);   // dá tempo do "click" chegar
         }, true);
         document.addEventListener('click', e => { if (t) { t.clicou = true; if (!t.soltouEm) t.soltouEm = nome(e.target); } }, true);
+        // A página recebeu o toque do WebView mas não o transformou em pointerdown (o pointerdown vem um instante ANTES do touchstart)?
+        document.addEventListener('touchstart', e => {
+            const agora = performance.now();
+            const x = Math.round(e.touches[0] ? e.touches[0].clientX : 0), y = Math.round(e.touches[0] ? e.touches[0].clientY : 0);
+            setTimeout(() => { if (ultPD < agora - 50) window._vsAnotarToque('touchstart em ' + x + ',' + y + ' SEM pointerdown em 80 ms'); }, 80);
+        }, { capture: true, passive: true });
         const cancelou = () => { if (t) { t.cancelado = true; t.tUp = performance.now(); fechar(t); } };
         document.addEventListener('pointercancel', cancelou, true);
         document.addEventListener('touchcancel', cancelou, true);
+    })();
+
+    // Saúde da página (mesmo registro da seção 8): rolagens (a com "embalo" continua depois que o dedo sai e pode engolir toques),
+    // tarefas que seguram a thread principal e atrasos do relógio da página. Só anota o que passa do normal.
+    (function () {
+        const nota = t => window._vsAnotarToque(t);
+        let rolagem = null, parar = 0;
+        document.addEventListener('scroll', e => {
+            const el = e.target === document ? document.scrollingElement : e.target;
+            if (!rolagem) rolagem = { t0: performance.now(), nome: el === document.scrollingElement ? 'a página' : (el.id || (typeof el.className === 'string' ? el.className.split(' ')[0] : '') || el.tagName.toLowerCase()) };
+            rolagem.topo = Math.round(el.scrollTop);
+            clearTimeout(parar);
+            parar = setTimeout(() => { nota('rolagem terminou em ' + rolagem.nome + ': durou ' + Math.round(performance.now() - rolagem.t0 - 150) + ' ms, topo=' + rolagem.topo + 'px'); rolagem = null; }, 150);
+        }, { capture: true, passive: true });
+        try { new PerformanceObserver(l => l.getEntries().forEach(x => nota('tarefa longa de ' + Math.round(x.duration) + ' ms (página ocupada)'))).observe({ entryTypes: ['longtask'] }); } catch (_) { /* navegador sem longtask */ }
+        let ult = performance.now();
+        document.addEventListener('visibilitychange', () => { ult = performance.now(); });
+        setInterval(() => {
+            const agora = performance.now(), atraso = agora - ult - 100;
+            ult = agora;
+            if (!document.hidden && atraso > 150) nota('relógio da página atrasou ' + Math.round(atraso) + ' ms');
+        }, 100);
     })();
 
     const comTempo = (promessa, ms) => Promise.race([promessa, new Promise((_, rej) => setTimeout(() => rej(new Error('sem resposta em ' + (ms / 1000) + 's')), ms))]);
