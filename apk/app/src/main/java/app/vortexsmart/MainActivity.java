@@ -85,6 +85,17 @@ public class MainActivity extends Activity {
         + "document.addEventListener('visibilitychange',function(){VortexAndroid.diag('visibilitychange → '+document.visibilityState+' · tela='+tela())});"
         + "})();";
 
+    /** Sonda de estado da página (rodada quando a janela está vazia): o que está de fato à vista, na frente e em animação. */
+    private static final String JS_SONDA = "(function(){try{"
+        + "var ids=['mainMenu','calculatorContainer','documentosContainer','estoqueContainer','vendaContainer','configuracoesContainer','reparosContainer','reposicaoContainer','credscanContainer','financeiroContainer'];"
+        + "var nome=function(e){return e?(e.tagName.toLowerCase()+(e.id?'#'+e.id:'')+(typeof e.className==='string'&&e.className?'.'+e.className.trim().split(/\\s+/).slice(0,3).join('.'):'')):'null'};"
+        + "var sec=[];ids.forEach(function(i){var e=document.getElementById(i);if(!e)return;var c=getComputedStyle(e);if(c.display==='none')return;var b=e.getBoundingClientRect();sec.push(i+' op='+c.opacity+' vis='+c.visibility+' '+Math.round(b.width)+'x'+Math.round(b.height)+(e.classList.contains('hidden')?' HIDDEN':''))});"
+        + "var cen=document.elementFromPoint(innerWidth/2,innerHeight/2),cad=[];for(var e=cen,n=0;e&&n<4;e=e.parentElement,n++)cad.push(nome(e));"
+        + "var fix=[];Array.prototype.forEach.call(document.body.children,function(e){var c=getComputedStyle(e);if(c.display==='none'||c.visibility==='hidden'||+c.opacity===0)return;var b=e.getBoundingClientRect();if(b.width>=innerWidth*0.9&&b.height>=innerHeight*0.9)fix.push(nome(e)+' '+c.position+' bg='+c.backgroundColor+' op='+c.opacity)});"
+        + "var an=document.getAnimations().map(function(a){var t=a.effect&&a.effect.target;return a.playState+':'+(t?nome(t):'?')+'@'+Math.round(a.currentTime||0)}).slice(0,6);"
+        + "return JSON.stringify({vis:document.visibilityState,secoes:sec,centro:cad,cobrindo:fix,animacoes:an,corpo:getComputedStyle(document.body).opacity+' '+document.body.className,login:(document.getElementById('loginScreen')||{style:{}}).style.display||'-'})"
+        + "}catch(e){return 'sonda falhou: '+e}})()";
+
     private WebView web;
     private String hostApp;
     private ValueCallback<Uri[]> retornoArquivo;
@@ -310,7 +321,10 @@ public class MainActivity extends Activity {
 
     /** Quando a janela está vazia: de que cor ela está e se o WebView, desenhado direto num Bitmap, tem conteúdo (separa "a página está em branco" de "a página não está sendo mostrada"). */
     private void detalharTelaVazia(Bitmap amostra) {
-        DiagTela.registrar(this, String.format("tela vazia: cor da janela #%06X", amostra.getPixel(1, amostra.getHeight() / 2) & 0xFFFFFF));
+        DiagTela.registrar(this, String.format("tela vazia: cor da janela #%06X (fundo nativo do WebView #%06X)", amostra.getPixel(1, amostra.getHeight() / 2) & 0xFFFFFF, 0x141517));
+        DiagTela.registrar(this, "tela vazia: WebView alpha=" + web.getAlpha() + " visibilidade=" + web.getVisibility() + " janela=" + web.getWindowVisibility()
+            + " hardware=" + web.isHardwareAccelerated() + " camada=" + web.getLayerType() + " " + web.getWidth() + "x" + web.getHeight());
+        web.evaluateJavascript(JS_SONDA, valor -> DiagTela.registrar(this, "tela vazia: página = " + (valor == null ? "sem resposta" : valor.length() > 1200 ? valor.substring(0, 1200) + "…" : valor)));
         try {
             int w = web.getWidth(), h = web.getHeight();
             if (w <= 0 || h <= 0) return;
