@@ -1,5 +1,4 @@
 <resources>
-    <string name="app_name">VortexSmart</string>
     <string name="widget_acoes_nome">Ações rápidas</string>
     <string name="widget_acoes_desc">Vender, ler código de barras, novo concerto e calculadora a um toque.</string>
     <string name="widget_hoje_nome">Hoje</string>

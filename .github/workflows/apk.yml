@@ -1,7 +1,10 @@
 # Gera o APK do VortexSmart (app Android com WebView próprio, independente do Chrome).
-# Como usar: aba Actions > "Gerar APK (Android)" > Run workflow. Pronto em ~5 min; o arquivo fica em
-# Releases > "VortexSmart APK" (link direto no fim da execução). O APK abre o endereço informado
-# abaixo, então cada deploy do site já atualiza o app — só gere um APK novo se mudar ícone/nome/permissões.
+# Como usar: aba Actions > "Gerar APK (Android)" > Run workflow. Pronto em ~5 min; o link direto vem no fim da execução.
+# Dois canais, que nunca se misturam:
+#   • beta (padrão): app "VortexSmart Beta" (app.vortexsmart.beta), instala ao lado do oficial, abre o site de teste
+#     (GitHub Pages, atualizado a cada envio na main) e se atualiza pela Release "apk-beta".
+#   • oficial: app dos clientes (app.vortexsmart), abre o Firebase Hosting e se atualiza pela Release "apk-latest".
+# O APK abre o endereço do canal, então cada deploy do site já atualiza o app — só gere um APK novo se mudar a parte Android.
 # Requer o segredo APK_SENHA (Settings > Secrets and variables > Actions): uma senha forte escolhida por você;
 # ela protege a chave de assinatura (guardada criptografada em apk/vortexsmart.jks.enc). Sem ela o build para.
 name: Gerar APK (Android)
@@ -9,10 +12,15 @@ name: Gerar APK (Android)
 on:
   workflow_dispatch:
     inputs:
+      canal:
+        description: 'Canal: beta = app de teste separado (padrão); oficial = o app dos clientes'
+        type: choice
+        options: [beta, oficial]
+        default: beta
       endereco:
-        description: 'Endereço que o app abre (oficial por padrão; use o link do GitHub Pages pra um APK de teste)'
-        required: true
-        default: 'https://vortex-b3761.web.app/'
+        description: 'Endereço que o app abre (vazio = o do canal: beta abre o GitHub Pages, oficial abre o Firebase Hosting)'
+        required: false
+        default: ''
       novidades:
         description: 'O que mudou (aparece pro cliente na janela de atualização do app)'
         required: true
@@ -39,6 +47,27 @@ jobs:
             echo "::error::Falta o segredo APK_SENHA (Settings > Secrets and variables > Actions > New repository secret)."
             exit 1
           fi
+
+      # Resolve tudo que muda entre os canais num lugar só. Trava o erro perigoso: APK oficial (o dos clientes) abrindo o site de teste.
+      - name: Definir canal
+        id: canal
+        env:
+          CANAL: ${{ inputs.canal }}
+          ENDERECO: ${{ inputs.endereco }}
+        run: |
+          if [ "$CANAL" = "beta" ]; then
+            TAG=apk-beta; SUFIXO=-beta; PADRAO='https://workcelltec.github.io/vortexsmart/'
+          else
+            TAG=apk-latest; SUFIXO=''; PADRAO='https://vortex-b3761.web.app/'
+          fi
+          URL="${ENDERECO:-$PADRAO}"
+          if [ "$CANAL" = "oficial" ] && echo "$URL" | grep -q 'github\.io'; then
+            echo "::error::O APK oficial (dos clientes) não pode abrir o site de teste. Use o canal beta."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sufixo=$SUFIXO" >> "$GITHUB_OUTPUT"
+          echo "endereco=$URL" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v4
         with:
@@ -71,12 +100,13 @@ jobs:
       - name: Compilar
         working-directory: apk
         env:
-          ENDERECO: ${{ inputs.endereco }}
+          ENDERECO: ${{ steps.canal.outputs.endereco }}
         run: |
           gradle --no-daemon assembleRelease \
+            -Pcanal="${{ inputs.canal }}" \
             -PstartUrl="$ENDERECO" \
             -PversionCode="${{ github.run_number }}" \
-            -PversionName="1.0.${{ github.run_number }}" \
+            -PversionName="1.0.${{ github.run_number }}${{ steps.canal.outputs.sufixo }}" \
             -PksPath="$RUNNER_TEMP/vortexsmart.jks" \
             -PksSenha="$APK_SENHA"
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/VortexSmart.apk"
@@ -93,7 +123,7 @@ jobs:
           apk = open(t + '/VortexSmart.apk', 'rb').read()
           json.dump({
               'versionCode': int('${{ github.run_number }}'),
-              'versionName': '1.0.${{ github.run_number }}',
+              'versionName': '1.0.${{ github.run_number }}${{ steps.canal.outputs.sufixo }}',
               'notas': os.environ['NOVIDADES'].strip(),
               'obrigatoria': os.environ['OBRIGATORIA'] == 'true',
               'tamanho': len(apk),
@@ -101,18 +131,23 @@ jobs:
           }, open(t + '/apk-versao.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
           PY
 
+      # Cada canal mexe só na própria Release: publicar o beta nunca troca o APK que os clientes recebem.
       - name: Publicar em Releases
         env:
           GH_TOKEN: ${{ github.token }}
-          ENDERECO: ${{ inputs.endereco }}
+          ENDERECO: ${{ steps.canal.outputs.endereco }}
+          TAG: ${{ steps.canal.outputs.tag }}
+          SUFIXO: ${{ steps.canal.outputs.sufixo }}
         run: |
-          gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create apk-latest "$RUNNER_TEMP/VortexSmart.apk" "$RUNNER_TEMP/apk-versao.json" \
-            --title "VortexSmart APK" \
-            --notes "APK 1.0.${{ github.run_number }} (commit ${GITHUB_SHA::7}) — abre $ENDERECO" \
+          EXTRA=""; TITULO="VortexSmart APK"
+          if [ "$TAG" = "apk-beta" ]; then EXTRA="--prerelease"; TITULO="VortexSmart APK (beta)"; fi
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" "$RUNNER_TEMP/VortexSmart.apk" "$RUNNER_TEMP/apk-versao.json" \
+            --title "$TITULO" $EXTRA \
+            --notes "APK 1.0.${{ github.run_number }}${SUFIXO} (commit ${GITHUB_SHA::7}) — abre $ENDERECO" \
             --target "$GITHUB_SHA"
-          echo "### APK pronto" >> "$GITHUB_STEP_SUMMARY"
-          echo "https://github.com/${{ github.repository }}/releases/download/apk-latest/VortexSmart.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "### APK pronto (${{ inputs.canal }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://github.com/${{ github.repository }}/releases/download/${TAG}/VortexSmart.apk" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:

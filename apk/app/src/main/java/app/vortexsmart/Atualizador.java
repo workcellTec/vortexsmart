@@ -34,7 +34,8 @@ import java.security.MessageDigest;
  */
 final class Atualizador {
 
-    private static final String BASE = "https://github.com/workcellTec/vortexsmart/releases/download/apk-latest/";
+    /** Release do canal deste app: "apk-latest" (oficial) ou "apk-beta" (teste); o beta nunca oferece nem recebe o APK do oficial. */
+    private static final String BASE = BuildConfig.URL_ATUALIZACAO;
     private static final String URL_VERSAO = BASE + "apk-versao.json";
     private static final String URL_APK = BASE + "VortexSmart.apk";
     private static final long INTERVALO_MS = 30L * 60 * 1000;
