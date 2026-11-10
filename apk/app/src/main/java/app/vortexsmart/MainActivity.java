@@ -154,8 +154,26 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (web != null) web.onResume();
+        if (web != null) {
+            web.onResume();
+            web.resumeTimers();
+            repintar();
+        }
         if (atualizador != null) atualizador.aoVoltar();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean temFoco) {
+        super.onWindowFocusChanged(temFoco);
+        if (temFoco) repintar();
+    }
+
+    /** Ao voltar do segundo plano o WebView às vezes continua sem desenhar (tela preta) até o primeiro toque: força o redesenho. */
+    private void repintar() {
+        if (web == null) return;
+        web.requestLayout();
+        web.invalidate();
+        web.postDelayed(() -> { if (web != null) { web.requestLayout(); web.invalidate(); } }, 250);
     }
 
     @Override
