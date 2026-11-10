@@ -134,54 +134,43 @@ async function rajadaInicio(n) {
   await dorme(700);
   log('depois da rajada: ' + JSON.stringify(await estado()));
 }
-// Rastro interno do Chromium: grava (com categorias amplas) enquanto toca, para, puxa o arquivo e mostra o que ele contém sobre os toques.
-// Serve pra descobrir QUAIS eventos o rastro tem e se o resumo do app (RastroToque.ler) mostra o caminho de cada toque.
-async function rastroExploracao() {
-  log('── RASTRO do Chromium: gravar durante um ciclo de toques e inspecionar');
-  log('iniciar: ' + await ev(`VortexAndroid.rastroIniciar('input,latency,benchmark,rail,toplevel,devtools.timeline,ipc,blink,viz,cc')`));
+// Inércia travada (relatório de 20:07 do aparelho): um toque que vira arrasto e o dedo sai em movimento (fling); depois, durante ~6 s, o Android
+// entrega os toques ao app e o Chromium não recebe nenhum (só "ProgressFling" no rastro). Aqui: arrastadas rápidas na lista de Concertos
+// (lista curta = 2 OS, como a do aparelho; ou longa = 60) seguidas de toques num ponto fixo, contando quais chegaram na página.
+async function flingNoLimite() {
+  log(`── FLING: arrastadas rápidas em Concertos (${process.env.OS_QTD || 60} OS) e 8 toques depois de cada uma`);
+  await passo('abrir Concertos (fling)', '#goToReparos', (a, d) => d.tela === 'reparosContainer');
+  await dorme(1000);
+  await ev(`window.__rit=window.__rit||(()=>{const r={n:0};document.addEventListener('pointerdown',()=>r.n++,true);return r})();0`);
+  log('rastro: ' + await ev(`VortexAndroid.rastroIniciar('input,latency,benchmark,rail,toplevel')`));
   await dorme(1500);
-  log('estado depois de iniciar: ' + await ev('VortexAndroid.rastroEstado()'));
-  await ciclo('com rastro', 'os5');
-  const p0 = await posicao('.rep-card[data-id="os6"] .rep-card-main');
-  adb('shell', 'input', 'swipe', String(Math.round(p0.x * dpr + offX)), String(Math.round(p0.y * dpr + offY)), String(Math.round(p0.x * dpr + offX)), String(Math.round(p0.y * dpr + offY - 40)), '120');
-  await dorme(1500);
-  log('parar: ' + await ev('VortexAndroid.rastroParar()'));
+  const px = '540', py = '900';
+  let perdidosTotal = 0, totalToques = 0;
+  for (let k = 0; k < 8; k++) {
+    const [nome, y1, y2] = k % 2 ? ['para baixo', '700', '1500'] : ['para cima', '1500', '700'];
+    adb('shell', 'input', 'swipe', '540', y1, '540', y2, '110');
+    const chegou = [];
+    for (let i = 0; i < 8; i++) {
+      await dorme(250 + Math.floor(Math.random() * 300));
+      const antes = await ev('window.__rit.n');
+      adb('shell', 'input', 'swipe', px, py, px, py, '60');
+      await dorme(150);
+      chegou.push((await ev('window.__rit.n')) > antes ? 1 : 0);
+    }
+    totalToques += chegou.length; perdidosTotal += chegou.filter(x => !x).length;
+    log(`FLING ${k + 1} (${nome}): toques que chegaram na página: ${chegou.join('')}   (1 = chegou, 0 = perdido) · ${JSON.stringify(await estado())}`);
+    await dorme(1500);
+  }
+  log(`FLING  ${totalToques} toques, ${perdidosTotal} perdidos`);
+  log('rastro parar: ' + await ev('VortexAndroid.rastroParar()'));
   for (let i = 0; i < 60 && (await ev('VortexAndroid.rastroEstado()')) !== 'pronto'; i++) await dorme(1000);
-  log('estado final: ' + await ev('VortexAndroid.rastroEstado()'));
   const resumo = String(await ev('VortexAndroid.rastroLer()'));
   fs.writeFileSync(`${SAIDA}/rastro-resumo.txt`, resumo);
-  log(`RESUMO DO APP (rastroLer): ${resumo.length} caracteres, ${resumo.split('\n').length} linhas`);
   const ls = resumo.split('\n');
-  console.log('::group::rastro: resumo feito pelo app (cabeçalho e as 80 primeiras linhas de toque)');
-  console.log(ls.slice(0, 2).join('\n').slice(0, 1500) + '\n' + ls.filter(l => /Touch|Gesture|InputRouter|EventForwarder|TouchAction|allowed/.test(l)).slice(0, 80).join('\n'));
+  const nTouch = ls.filter(l => l.includes('EventForwarder::OnTouchEvent')).length;
+  console.log('::group::rastro: trechos de FLING e quantos toques entraram no Chromium (EventForwarder::OnTouchEvent = ' + nTouch + ')');
+  console.log(ls.slice(0, 2).join('\n').slice(0, 600) + '\n' + ls.filter(l => l.includes('FLING progredindo')).join('\n'));
   console.log('::endgroup::');
-  try {
-    const bruto = execFileSync('adb', ['exec-out', 'run-as', PACOTE, 'cat', 'files/rastro.json'], { maxBuffer: 1024 * 1024 * 1024 });
-    fs.writeFileSync(`${SAIDA}/rastro.json`, bruto);
-    log(`arquivo bruto: ${(bruto.length / 1048576).toFixed(1)} MB`);
-    const j = JSON.parse(bruto.toString('utf8'));
-    const ev0 = Array.isArray(j) ? j : j.traceEvents;
-    const nomesProc = {}, nomesThr = {};
-    ev0.forEach(e => { if (e.ph === 'M' && e.name === 'process_name') nomesProc[e.pid] = e.args.name; if (e.ph === 'M' && e.name === 'thread_name') nomesThr[e.pid + ':' + e.tid] = e.args.name; });
-    const cont = {};
-    ev0.forEach(e => { if (e.ph === 'M') return; const k = (e.cat || '') + ' | ' + e.name; cont[k] = (cont[k] || 0) + 1; });
-    const ordem = Object.entries(cont).sort((a, b) => b[1] - a[1]);
-    console.log('::group::rastro: ' + ev0.length + ' eventos, ' + ordem.length + ' nomes diferentes (categoria | nome × quantidade, 150 mais frequentes)');
-    console.log(ordem.slice(0, 150).map(([k, v]) => `${v}\t${k}`).join('\n'));
-    console.log('::endgroup::');
-    const toque = ordem.filter(([k]) => /touch|gesture|pointer|input|tap/i.test(k));
-    console.log('::group::rastro: nomes ligados a toque/entrada (' + toque.length + ')');
-    console.log(toque.map(([k, v]) => `${v}\t${k}`).join('\n'));
-    console.log('::endgroup::');
-    const rel = ev0.filter(e => /EventForwarder::OnTouchEvent|ForwardTouchEvent|PassthroughTouchEventQueue::QueueEvent|FilterAndSendWebInputEvent|ProcessAckedTouchEvent|FilterGestureEvent|WebFrameWidgetImpl::HandleInputEvent|allowed_touch_action/.test(e.name)).sort((x, y) => x.ts - y.ts);
-    const t0 = rel.length ? rel[0].ts : 0;
-    console.log('::group::rastro: eventos brutos do caminho do toque (primeiros 70; tempo em ms desde o primeiro)');
-    console.log(rel.slice(0, 70).map(e => `${((e.ts - t0) / 1000).toFixed(1)}\t${nomesProc[e.pid] || e.pid}/${nomesThr[e.pid + ':' + e.tid] || e.tid}\t${e.ph}\t${e.name}\t${JSON.stringify(e.args || {}).slice(0, 160)}`).join('\n'));
-    console.log('::endgroup::');
-    console.log('::group::rastro: processos e threads');
-    console.log(JSON.stringify(nomesProc) + '\n' + JSON.stringify(nomesThr));
-    console.log('::endgroup::');
-  } catch (e) { log('rastro bruto: ' + e.message); }
 }
 async function segundoPlano(segundos) {
   log(`── app em segundo plano por ${segundos} s e volta`);
@@ -208,7 +197,7 @@ async function segundoPlano(segundos) {
   await ciclo('3º uso (depois de voltar do segundo plano)', 'os7');
   await segundoPlano(25);
   await ciclo('4º uso (depois de 25 s fora)', 'os8');
-  await rastroExploracao();
+  await flingNoLimite();
 
   const ruins = resultados.filter(r => !r.ok || r.toques > 1);
   log(`\nRESUMO: ${resultados.length} passos, ${ruins.length} com problema (precisaram de mais de 1 toque ou falharam)`);

@@ -19,7 +19,8 @@ jobs:
       fail-fast: false
       matrix:
         api: [35, 36]
-        acessibilidade: [nao, sim]
+        acessibilidade: [nao]
+        os: [2, 60]
     steps:
       - uses: actions/checkout@v4
 
@@ -54,6 +55,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           ACESSIBILIDADE: ${{ matrix.acessibilidade }}
+          OS_QTD: ${{ matrix.os }}
         with:
           api-level: ${{ matrix.api }}
           target: google_apis
@@ -66,6 +68,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: resultado-emulador-api${{ matrix.api }}-acess-${{ matrix.acessibilidade }}
+          name: resultado-emulador-api${{ matrix.api }}-os-${{ matrix.os }}
           path: resultado
           if-no-files-found: warn

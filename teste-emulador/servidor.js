@@ -14,7 +14,7 @@ http.createServer((req, res) => {
   }
   if (url === '/__teste.js') {
     res.writeHead(200, { 'content-type': TIPOS['.js'] });
-    return res.end(fs.readFileSync(path.join(__dirname, 'dados-teste.js')));
+    return res.end(String(fs.readFileSync(path.join(__dirname, 'dados-teste.js'))).replace('__OS_QTD__', String(+process.env.OS_QTD || 60)));
   }
   let arq = path.join(RAIZ, url);
   if (!arq.startsWith(RAIZ)) { res.writeHead(403); return res.end(); }
