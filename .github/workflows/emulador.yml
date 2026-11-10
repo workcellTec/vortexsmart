@@ -18,9 +18,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [36, 37]
+        api: [36]
         acessibilidade: [nao]
-        os: [2, 60]
+        os: [60]
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +44,20 @@ jobs:
           gradle --no-daemon assembleDebug \
             -Pcanal=beta -Pteste=sim \
             -PstartUrl='http://10.0.2.2:8123/index.html?shell=mobile'
+
+      - name: Sondar fontes de um WebView mais novo (temporário)
+        continue-on-error: true
+        run: |
+          echo "--- imagens de sistema 36/37 e prévias"
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --list 2>/dev/null | grep -E "system-images;android-(3[6-9]|Cinnamon|Baklava)" | head -20 || true
+          echo "--- pastas do bucket de builds do Chromium"
+          curl -s "https://storage.googleapis.com/storage/v1/b/chromium-browser-snapshots/o?delimiter=/" | head -c 800 || true
+          echo; echo "--- Android_x64 (último)"
+          curl -s "https://storage.googleapis.com/chromium-browser-snapshots/Android_x64/LAST_CHANGE" | head -c 100 || true
+          echo; echo "--- versões do WebView no Google (omahaproxy/chromiumdash)"
+          curl -s "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Android&num=1" | head -c 400 || true
+          echo
 
       - name: Liberar o KVM (aceleração do emulador)
         run: |
