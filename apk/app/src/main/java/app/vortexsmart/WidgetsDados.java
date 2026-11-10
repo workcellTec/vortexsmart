@@ -68,9 +68,9 @@ final class WidgetsDados {
         return prefs(ctx).getBoolean(DESLOGADO, false);
     }
 
-    /** Valores em dinheiro nos widgets: ocultos por padrão (quem pegar o celular não vê o faturamento). */
+    /** Valores em dinheiro nos widgets: visíveis por padrão; quem quiser esconder (quem pegar o celular não vê o faturamento) liga em Customizações. */
     static boolean valoresVisiveis(Context ctx) {
-        return prefs(ctx).getBoolean(VALORES_VISIVEIS, false);
+        return prefs(ctx).getBoolean(VALORES_VISIVEIS, true);
     }
 
     static void definirValoresVisiveis(Context ctx, boolean visiveis) {

@@ -75,10 +75,10 @@
                     <div class="cz-item-ic" style="background:linear-gradient(135deg,#60a5fa,#2563eb);">🙈</div>
                     <div class="cz-item-body">
                         <div class="cz-item-title">Valores nos widgets</div>
-                        <div class="cz-item-sub">Ocultos por padrão: quem pegar o celular não vê o dinheiro na tela inicial</div>
+                        <div class="cz-item-sub">Escolha se o dinheiro aparece ou fica escondido (••••) nos widgets da tela inicial</div>
                         <div class="stq-cats" id="cfgCustomWidgetsPills" style="padding:0;margin-top:10px;">
-                            <button type="button" class="stq-cat-pill" data-v="ocultos" style="color:var(--primary);">🙈 Ocultos</button>
                             <button type="button" class="stq-cat-pill" data-v="visiveis" style="color:var(--primary);">👁 Visíveis</button>
+                            <button type="button" class="stq-cat-pill" data-v="ocultos" style="color:var(--primary);">🙈 Ocultos</button>
                         </div>
                     </div>
                 </div>
