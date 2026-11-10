@@ -77,8 +77,8 @@ public class MainActivity extends Activity {
         + "if(d.files&&d.files.length){var f=d.files[0];"
         + "return b64(f).then(function(x){VortexAndroid.compartilhar(x,f.name||'arquivo',f.type||'application/octet-stream',d.title||'',texto)})}"
         + "VortexAndroid.compartilharTexto(d.title||'',texto);return Promise.resolve()};"
-        + "function cor(){var m=document.querySelectorAll('meta[name=\"theme-color\"]');var c=m.length?m[m.length-1].content:'';if(c)VortexAndroid.corBarras(c)}"
-        + "cor();new MutationObserver(cor).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['content']});"
+        + "var ultimaCor='';function cor(){var m=document.querySelectorAll('meta[name=\"theme-color\"]');var c=m.length?m[m.length-1].content:'';if(c&&c!==ultimaCor){ultimaCor=c;VortexAndroid.corBarras(c)}}"
+        + "cor();new MutationObserver(cor).observe(document.head||document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['content']});"
         + "document.addEventListener('DOMContentLoaded',cor);"
         + "function tela(){var i=['mainMenu','calculatorContainer','documentosContainer','estoqueContainer','vendaContainer','configuracoesContainer','reparosContainer','reposicaoContainer','credscanContainer','financeiroContainer'];"
         + "for(var k=0;k<i.length;k++){var e=document.getElementById(i[k]);if(e&&e.style.display!=='none'&&!e.classList.contains('hidden'))return i[k]}return'?'}"
@@ -105,6 +105,8 @@ public class MainActivity extends Activity {
     private String destinoPendente;
     // Diagnóstico da tela preta ao voltar do segundo plano (ver DiagTela).
     private long pausadoEm;
+    /** Última cor aplicada às barras do sistema (só na thread principal); 0 = nenhuma ainda. */
+    private int corAplicada;
     private long voltouEm;
     private boolean aguardandoToque;
     /** true entre onResume e onPause; a ponte (outra thread) lê para saber se a página "oculta" é anormal. */
@@ -500,6 +502,8 @@ public class MainActivity extends Activity {
         int cor;
         try { cor = Color.parseColor(hex.trim()); } catch (IllegalArgumentException e) { return; }
         cor |= 0xFF000000;
+        if (cor == corAplicada) return;   // mesma cor: não mexe na janela (cada ajuste de barra é uma ida ao sistema e pode refazer a medição)
+        corAplicada = cor;
         getWindow().setStatusBarColor(cor);
         getWindow().setNavigationBarColor(cor);
         boolean claro = (0.299 * Color.red(cor) + 0.587 * Color.green(cor) + 0.114 * Color.blue(cor)) > 160;
