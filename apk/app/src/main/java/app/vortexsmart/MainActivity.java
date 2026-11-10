@@ -82,6 +82,28 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle estado) {
         super.onCreate(estado);
+        RelatorioErro.instalar(this);
+        // Se o app caiu na vez anterior, mostra o motivo antes de abrir (e deixa abrir de novo se a pessoa quiser).
+        String relatorio = RelatorioErro.lerEApagar(this);
+        if (relatorio != null) {
+            RelatorioErro.mostrar(this, relatorio, () -> iniciar(estado));
+            return;
+        }
+        iniciar(estado);
+    }
+
+    /** Monta a tela. Um erro aqui dentro aparece na hora (com o motivo) em vez de derrubar o app. */
+    private void iniciar(Bundle estado) {
+        try {
+            montarTela(estado);
+        } catch (Throwable erro) {
+            RelatorioErro.guardar(this, erro, "onCreate");
+            String relatorio = RelatorioErro.lerEApagar(this);
+            RelatorioErro.mostrar(this, relatorio != null ? relatorio : String.valueOf(erro), null);
+        }
+    }
+
+    private void montarTela(Bundle estado) {
         hostApp = Uri.parse(BuildConfig.START_URL).getHost();
         String corGuardada = getPreferences(MODE_PRIVATE).getString("corBarras", null);
         if (corGuardada != null) aplicarBarras(corGuardada, false);
@@ -125,33 +147,35 @@ public class MainActivity extends Activity {
     @Override
     protected void onSaveInstanceState(Bundle saida) {
         super.onSaveInstanceState(saida);
-        web.saveState(saida);
+        if (web != null) web.saveState(saida);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        web.onResume();
+        if (web != null) web.onResume();
         if (atualizador != null) atualizador.aoVoltar();
     }
 
     @Override
     protected void onPause() {
-        CookieManager.getInstance().flush();
-        web.onPause();
+        if (web != null) {
+            CookieManager.getInstance().flush();
+            web.onPause();
+        }
         super.onPause();
     }
 
     @Override
     protected void onDestroy() {
-        web.destroy();
+        if (web != null) web.destroy();
         super.onDestroy();
     }
 
     @Override
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
-        if (web.canGoBack()) web.goBack();
+        if (web != null && web.canGoBack()) web.goBack();
         else super.onBackPressed();
     }
 

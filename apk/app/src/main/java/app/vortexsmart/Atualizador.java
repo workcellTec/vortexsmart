@@ -28,7 +28,7 @@ import java.security.MessageDigest;
 /**
  * Atualização do próprio APK sem Play Store.
  * O workflow "Gerar APK" publica, junto do APK, um apk-versao.json (versão, novidades, tamanho, SHA-256, obrigatória).
- * Ao abrir o app (e ao voltar, no máximo a cada 6 h) ele é consultado; havendo versão maior, pergunta, baixa,
+ * Ao abrir o app (e ao voltar, no máximo a cada 30 min) ele é consultado; havendo versão maior, pergunta, baixa,
  * confere o SHA-256 e abre o instalador do Android. A assinatura é conferida pelo próprio Android: só aceita
  * atualização assinada com a mesma chave do app instalado.
  */
@@ -37,7 +37,7 @@ final class Atualizador {
     private static final String BASE = "https://github.com/workcellTec/vortexsmart/releases/download/apk-latest/";
     private static final String URL_VERSAO = BASE + "apk-versao.json";
     private static final String URL_APK = BASE + "VortexSmart.apk";
-    private static final long INTERVALO_MS = 6L * 60 * 60 * 1000;
+    private static final long INTERVALO_MS = 30L * 60 * 1000;
     private static final String PREFS = "atualizador";
     private static final String PREF_ULTIMA = "ultimaChecagem";
     private static final String TAG = "Atualizador";
@@ -65,7 +65,7 @@ final class Atualizador {
         verificar(true);
     }
 
-    /** Volta do segundo plano: continua o que estava pendente; senão consulta se já faz mais de 6 h. */
+    /** Volta do segundo plano: continua o que estava pendente; senão consulta se já faz mais de 30 min. */
     void aoVoltar() {
         if (aguardandoPermissao) {
             aguardandoPermissao = false;
