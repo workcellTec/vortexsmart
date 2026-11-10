@@ -18,7 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [35]
+        api: [35, 36]
+        acessibilidade: [nao, sim]
     steps:
       - uses: actions/checkout@v4
 
@@ -51,6 +52,8 @@ jobs:
 
       - name: Rodar o roteiro no emulador
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ACESSIBILIDADE: ${{ matrix.acessibilidade }}
         with:
           api-level: ${{ matrix.api }}
           target: google_apis
@@ -63,6 +66,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: resultado-emulador-api${{ matrix.api }}
+          name: resultado-emulador-api${{ matrix.api }}-acess-${{ matrix.acessibilidade }}
           path: resultado
           if-no-files-found: warn

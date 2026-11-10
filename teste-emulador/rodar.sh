@@ -5,6 +5,7 @@ set -u
 SAIDA="$PWD/resultado"; mkdir -p "$SAIDA"
 
 {
+  echo "acessibilidade de teste: ${ACESSIBILIDADE:-nao}"
   echo "Android: $(adb shell getprop ro.build.version.release) (API $(adb shell getprop ro.build.version.sdk))"
   echo "Aparelho: $(adb shell getprop ro.product.model)  tela: $(adb shell wm size | tail -1)  densidade: $(adb shell wm density | tail -1)"
   adb shell dumpsys webviewupdate | grep -iE "current|package|version" | head -8
@@ -18,6 +19,13 @@ adb logcat -v time > "$SAIDA/logcat.txt" 2>&1 &
 adb shell screenrecord --time-limit 170 /sdcard/roteiro.mp4 > /dev/null 2>&1 &
 
 adb install -g -r apk/app/build/outputs/apk/debug/app-debug.apk
+if [ "${ACESSIBILIDADE:-nao}" = "sim" ]; then
+  echo "serviço de acessibilidade de teste LIGADO (lê a árvore da tela a cada mudança, como um leitor de tela)"
+  adb shell settings put secure enabled_accessibility_services app.vortexsmart.beta/app.vortexsmart.ServicoAcessibilidadeTeste
+  adb shell settings put secure accessibility_enabled 1
+  sleep 3
+fi
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS > /dev/null 2>&1   # fecha o aviso "launcher não responde" que o emulador às vezes mostra
 adb shell am start -n app.vortexsmart.beta/app.vortexsmart.MainActivity
 sleep 15
 

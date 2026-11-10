@@ -46,7 +46,7 @@ async function evSeguro(expr) { try { return await ev(expr); } catch (e) { try {
 // ── Toque ────────────────────────────────────────────────────
 let offX = 0, offY = 0, dpr = 1;
 async function tocarFisico(px, py) {
-  if (MODO === 'adb') { adb('shell', 'input', 'tap', String(Math.round(px)), String(Math.round(py))); return; }
+  if (MODO === 'adb') { const x = String(Math.round(px)), y = String(Math.round(py)); adb('shell', 'input', 'swipe', x, y, x, y, '60'); return; }   // dedo parado por 60 ms (nos relatórios do aparelho: 50 a 75 ms)
   const x = px / dpr, y = py / dpr;
   await cdp('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
   await dorme(40);
@@ -129,7 +129,7 @@ async function rajadaInicio(n) {
   log(`── ${n} toques seguidos em Início (como o usuário fez pra provocar o bug)`);
   const c = await posicao('#ctwNavHome');
   const px = c.x * dpr + offX, py = c.y * dpr + offY;
-  if (MODO === 'adb') spawnSync('adb', ['shell', Array.from({ length: n }, () => `input tap ${Math.round(px)} ${Math.round(py)}`).join('; ')], { encoding: 'utf8' });
+  if (MODO === 'adb') spawnSync('adb', ['shell', Array.from({ length: n }, () => `input swipe ${Math.round(px)} ${Math.round(py)} ${Math.round(px)} ${Math.round(py)} 60`).join('; ')], { encoding: 'utf8' });
   else for (let i = 0; i < n; i++) { await tocarFisico(px, py); await dorme(150); }
   await dorme(700);
   log('depois da rajada: ' + JSON.stringify(await estado()));
