@@ -269,12 +269,16 @@ public class MainActivity extends Activity {
             aguardandoToque = false;
             DiagTela.registrar(this, "1º toque, " + (SystemClock.elapsedRealtime() - voltouEm) + " ms depois do onResume");
         }
-        anotarToqueNativo(ev);
-        return super.dispatchTouchEvent(ev);
+        boolean tratou = super.dispatchTouchEvent(ev);
+        anotarToqueNativo(ev, tratou);
+        return tratou;
     }
 
-    /** Guarda (60 linhas) cada dedo que desce/sobe/é cancelado, em dp (= px do CSS da página), com a hora. */
-    private void anotarToqueNativo(MotionEvent ev) {
+    /**
+     * Guarda (60 linhas) cada dedo que desce/sobe/é cancelado, em dp (= px do CSS da página), com a hora e, na descida,
+     * se alguém na janela aceitou o toque (true = o WebView tratou; false = ninguém quis, e a página não recebe nada).
+     */
+    private void anotarToqueNativo(MotionEvent ev, boolean tratou) {
         int acao = ev.getActionMasked();
         if (acao != MotionEvent.ACTION_DOWN && acao != MotionEvent.ACTION_UP && acao != MotionEvent.ACTION_CANCEL) return;
         float d = getResources().getDisplayMetrics().density;
@@ -282,7 +286,8 @@ public class MainActivity extends Activity {
         String linha;
         if (acao == MotionEvent.ACTION_DOWN) {
             toqueBaixoEm = ev.getEventTime();
-            linha = hora + "  dedo desceu em " + Math.round(ev.getX() / d) + "," + Math.round(ev.getY() / d);
+            linha = hora + "  dedo desceu em " + Math.round(ev.getX() / d) + "," + Math.round(ev.getY() / d)
+                + " · " + (tratou ? "aceito" : "NÃO ACEITO pela janela") + " · foco do WebView=" + (web != null && web.hasFocus());
         } else {
             linha = hora + "  dedo " + (acao == MotionEvent.ACTION_UP ? "subiu" : "CANCELADO") + " após " + (ev.getEventTime() - toqueBaixoEm) + " ms";
         }
