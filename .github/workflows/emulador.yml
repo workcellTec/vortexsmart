@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [35, 36]
+        api: [36, 37]
         acessibilidade: [nao]
         os: [2, 60]
     steps:
