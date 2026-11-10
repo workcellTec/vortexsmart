@@ -8,6 +8,7 @@ import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -79,7 +80,9 @@ public class MainActivity extends Activity {
         + "function cor(){var m=document.querySelectorAll('meta[name=\"theme-color\"]');var c=m.length?m[m.length-1].content:'';if(c)VortexAndroid.corBarras(c)}"
         + "cor();new MutationObserver(cor).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['content']});"
         + "document.addEventListener('DOMContentLoaded',cor);"
-        + "document.addEventListener('visibilitychange',function(){VortexAndroid.diag('visibilitychange → '+document.visibilityState+' · tela='+(typeof currentMainSectionId!=='undefined'?currentMainSectionId:'?'))});"
+        + "function tela(){var i=['mainMenu','calculatorContainer','documentosContainer','estoqueContainer','vendaContainer','configuracoesContainer','reparosContainer','reposicaoContainer','credscanContainer','financeiroContainer'];"
+        + "for(var k=0;k<i.length;k++){var e=document.getElementById(i[k]);if(e&&e.style.display!=='none'&&!e.classList.contains('hidden'))return i[k]}return'?'}"
+        + "document.addEventListener('visibilitychange',function(){VortexAndroid.diag('visibilitychange → '+document.visibilityState+' · tela='+tela())});"
         + "})();";
 
     private WebView web;
@@ -291,6 +294,7 @@ public class MainActivity extends Activity {
                     DiagTela.registrar(this, "tela (verificação " + tentativa + "): " + (vazia ? "VAZIA" : "com conteúdo")
                         + ", " + Math.round(diferentes * 1000) / 10.0 + "% dos pontos diferentes do fundo");
                     if (!vazia) return;
+                    if (tentativa == 1 || tentativa > 3) detalharTelaVazia(amostra);
                     if (tentativa > 3) {
                         DiagTela.registrar(this, "tela continua vazia depois dos 3 ajustes");
                         return;
@@ -302,6 +306,23 @@ public class MainActivity extends Activity {
                 DiagTela.registrar(this, "tela (verificação " + tentativa + "): a janela recusou a cópia: " + e.getMessage());
             }
         }, tentativa == 1 ? 350 : 600);
+    }
+
+    /** Quando a janela está vazia: de que cor ela está e se o WebView, desenhado direto num Bitmap, tem conteúdo (separa "a página está em branco" de "a página não está sendo mostrada"). */
+    private void detalharTelaVazia(Bitmap amostra) {
+        DiagTela.registrar(this, String.format("tela vazia: cor da janela #%06X", amostra.getPixel(1, amostra.getHeight() / 2) & 0xFFFFFF));
+        try {
+            int w = web.getWidth(), h = web.getHeight();
+            if (w <= 0 || h <= 0) return;
+            Bitmap direto = Bitmap.createBitmap(48, 96, Bitmap.Config.ARGB_8888);
+            Canvas tela = new Canvas(direto);
+            tela.scale(48f / w, 96f / h);
+            web.draw(tela);
+            double d = fracaoDiferenteDoFundo(direto);
+            DiagTela.registrar(this, "tela vazia: desenho direto do WebView " + (d < 0.015 ? "TAMBÉM VAZIO" : "COM conteúdo") + ", " + Math.round(d * 1000) / 10.0 + "%");
+        } catch (RuntimeException e) {
+            DiagTela.registrar(this, "tela vazia: desenho direto falhou: " + e);
+        }
     }
 
     /** Parte dos pontos da amostra (sem o topo e o rodapé, onde ficam as barras do sistema) que difere do ponto de referência. */
@@ -319,20 +340,25 @@ public class MainActivity extends Activity {
         return total == 0 ? 1 : diferentes / (double) total;
     }
 
-    /** Degrau 1: nova medição e um toque quase invisível de transparência. 2: avisa o Chromium que saiu e voltou. 3: tira e recoloca o WebView. */
+    /** Degrau 1: toque de mentira (o único gesto que já fez a tela aparecer). 2: nova medição, foco e um toque quase invisível de transparência. 3: tira e recoloca o WebView. */
     private void cutucarWebView(int degrau) {
         if (web == null) return;
         if (degrau == 1) {
-            DiagTela.registrar(this, "ajuste 1: nova medição + transparência 0,99");
+            DiagTela.registrar(this, "ajuste 1: toque sintético (DOWN + CANCEL no canto)");
+            long t = SystemClock.uptimeMillis();
+            MotionEvent baixo = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, 1f, 1f, 0);
+            web.dispatchTouchEvent(baixo);
+            baixo.recycle();
+            MotionEvent cancela = MotionEvent.obtain(t, SystemClock.uptimeMillis(), MotionEvent.ACTION_CANCEL, 1f, 1f, 0);
+            web.dispatchTouchEvent(cancela);
+            cancela.recycle();
+        } else if (degrau == 2) {
+            DiagTela.registrar(this, "ajuste 2: foco + nova medição + transparência 0,99");
+            web.requestFocus();
             web.requestLayout();
             web.invalidate();
             web.setAlpha(0.99f);
             web.postDelayed(() -> { if (web != null) web.setAlpha(1f); }, 80);
-        } else if (degrau == 2) {
-            DiagTela.registrar(this, "ajuste 2: onPause/onResume do WebView");
-            web.onPause();
-            web.onResume();
-            web.resumeTimers();
         } else {
             DiagTela.registrar(this, "ajuste 3: WebView invisível e visível de novo");
             web.setVisibility(View.INVISIBLE);
