@@ -79,7 +79,7 @@ public class MainActivity extends Activity {
         + "function cor(){var m=document.querySelectorAll('meta[name=\"theme-color\"]');var c=m.length?m[m.length-1].content:'';if(c)VortexAndroid.corBarras(c)}"
         + "cor();new MutationObserver(cor).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['content']});"
         + "document.addEventListener('DOMContentLoaded',cor);"
-        + "document.addEventListener('visibilitychange',function(){VortexAndroid.diag('visibilitychange → '+document.visibilityState)});"
+        + "document.addEventListener('visibilitychange',function(){VortexAndroid.diag('visibilitychange → '+document.visibilityState+' · tela='+(typeof currentMainSectionId!=='undefined'?currentMainSectionId:'?'))});"
         + "})();";
 
     private WebView web;
@@ -291,7 +291,7 @@ public class MainActivity extends Activity {
                     DiagTela.registrar(this, "tela (verificação " + tentativa + "): " + (vazia ? "VAZIA" : "com conteúdo")
                         + ", " + Math.round(diferentes * 1000) / 10.0 + "% dos pontos diferentes do fundo");
                     if (!vazia) return;
-                    if (tentativa >= 3) {
+                    if (tentativa > 3) {
                         DiagTela.registrar(this, "tela continua vazia depois dos 3 ajustes");
                         return;
                     }
