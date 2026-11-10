@@ -134,6 +134,37 @@ async function rajadaInicio(n) {
   await dorme(700);
   log('depois da rajada: ' + JSON.stringify(await estado()));
 }
+// Experimento de controle: o toque de 60 ms vira clique quando a página trava por um tempo? E quando o dedo fica parado mais de 500 ms?
+// Cada condição toca N vezes no mesmo card (página parada, ou travada por um laço ocupado iniciado logo antes do toque) e conta os cliques.
+async function experimentoMecanismo(n = 8) {
+  log(`── EXPERIMENTO: toque de 60 ms com a página parada, travada e com o dedo parado por mais tempo (${n} toques cada)`);
+  await passo('abrir Concertos (experimento)', '#goToReparos', (a, d) => d.tela === 'reparosContainer');
+  await dorme(1500);
+  const sel = '.rep-card[data-id="os5"] .rep-card-main';
+  await ev(`window.__cl=0;window.__pdn=0;document.addEventListener('click',()=>window.__cl++,true);document.addEventListener('pointerdown',()=>window.__pdn++,true);0`);
+  const condicoes = [
+    { nome: 'página parada, dedo 60 ms', trava: 0, dedo: 60 },
+    { nome: 'página travada 300 ms, dedo 60 ms', trava: 300, dedo: 60 },
+    { nome: 'página travada 700 ms, dedo 60 ms', trava: 700, dedo: 60 },
+    { nome: 'página travada 1500 ms, dedo 60 ms', trava: 1500, dedo: 60 },
+    { nome: 'página parada, dedo 700 ms', trava: 0, dedo: 700 },
+  ];
+  for (const c of condicoes) {
+    let cliques = 0, downs = 0;
+    for (let i = 0; i < n; i++) {
+      const p = await posicao(sel);
+      const x = String(Math.round(p.x * dpr + offX)), y = String(Math.round(p.y * dpr + offY));
+      await ev('window.__cl=0;window.__pdn=0;0');
+      if (c.trava) cdp('Runtime.evaluate', { expression: `(()=>{const t=performance.now()+${c.trava};while(performance.now()<t){}})()` }).catch(() => {});
+      adb('shell', 'input', 'swipe', x, y, x, y, String(c.dedo));
+      await dorme(c.trava + 1200);
+      cliques += await ev('window.__cl'); downs += await ev('window.__pdn');
+      if ((await estado()).exp) await ev(`document.querySelector(${JSON.stringify(sel)}).click();0`);   // recolhe o card pra próxima tentativa
+      await dorme(500);
+    }
+    log(`EXPERIMENTO  ${c.nome.padEnd(38)} pointerdown ${downs}/${n} · clique ${cliques}/${n}`);
+  }
+}
 async function segundoPlano(segundos) {
   log(`── app em segundo plano por ${segundos} s e volta`);
   if (MODO === 'adb') {
@@ -159,6 +190,7 @@ async function segundoPlano(segundos) {
   await ciclo('3º uso (depois de voltar do segundo plano)', 'os7');
   await segundoPlano(25);
   await ciclo('4º uso (depois de 25 s fora)', 'os8');
+  if (process.env.EXPERIMENTO !== 'nao') await experimentoMecanismo();
 
   const ruins = resultados.filter(r => !r.ok || r.toques > 1);
   log(`\nRESUMO: ${resultados.length} passos, ${ruins.length} com problema (precisaram de mais de 1 toque ou falharam)`);
