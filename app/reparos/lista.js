@@ -1379,4 +1379,7 @@
         renderLista();
     }
     window._renderReparosLista = renderReparosLista;
+    // Chamado pelo router ao ENTRAR na lista: card aberto não "fica salvo" de uma visita pra outra.
+    // (Redesenhos internos, como fechar a folha de Finalizar, não passam por aqui e mantêm o card aberto.)
+    window._reparosRecolherCards = () => { expandedId = null; };
 })();

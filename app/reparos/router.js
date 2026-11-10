@@ -40,6 +40,8 @@
         if (typeof window._vsBarraCentro === 'function') window._vsBarraCentro();
 
         if (sectionId === 'reparosLista' && typeof window._renderReparosLista === 'function') {
+            // Entrar na lista = cards fechados; só continua aberto ao voltar de uma folha/formulário ou vindo de "Ver OS".
+            if (!window._vsNavRestoring && !(contexto && contexto.focarId)) window._reparosRecolherCards?.();
             window._renderReparosLista(contexto);
         }
         if (sectionId === 'reparosForm' && typeof window._renderReparosForm === 'function') {
