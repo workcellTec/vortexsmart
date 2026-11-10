@@ -11,11 +11,14 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.view.MotionEvent;
+import android.view.PixelCopy;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsetsController;
@@ -90,6 +93,8 @@ public class MainActivity extends Activity {
     private long pausadoEm;
     private long voltouEm;
     private boolean aguardandoToque;
+    /** Muda a cada volta e a cada saída do app: verificações de tela agendadas numa volta antiga se cancelam sozinhas. */
+    private int geracaoTela;
 
     @Override
     protected void onCreate(Bundle estado) {
@@ -202,8 +207,8 @@ public class MainActivity extends Activity {
         if (web != null) {
             web.onResume();
             web.resumeTimers();
-            repintar();
             sondar();
+            verificarTela(1, ++geracaoTela);
         }
         if (atualizador != null) atualizador.aoVoltar();
     }
@@ -230,7 +235,6 @@ public class MainActivity extends Activity {
     public void onWindowFocusChanged(boolean temFoco) {
         super.onWindowFocusChanged(temFoco);
         DiagTela.registrar(this, "foco da janela: " + temFoco);
-        if (temFoco) repintar();
     }
 
     @Override
@@ -263,17 +267,83 @@ public class MainActivity extends Activity {
         web.postDelayed(() -> { if (!respondeu[0]) DiagTela.registrar(this, "JS SEM resposta em 2 s"); }, 2000);
     }
 
-    /** Ao voltar do segundo plano o WebView às vezes continua sem desenhar (tela preta) até o primeiro toque: força o redesenho. */
-    private void repintar() {
+    // ── Tela preta ao voltar do segundo plano ─────────────────────
+    // O registro de diagnóstico mostrou que, nas voltas com tela escura, o JS responde em ms e a página desenha quadros
+    // (requestAnimationFrame) antes do 1º toque: a página está viva, o que falta é o WebView aparecer na janela.
+    // Por isso olhamos o que a JANELA realmente mostra (PixelCopy) e, se estiver vazia, "cutucamos" o WebView em degraus
+    // cada vez mais fortes, registrando qual degrau resolveu.
+
+    /** 350 ms (depois 600 ms) após a volta, confere se a janela tem conteúdo; se estiver vazia, aplica o próximo ajuste. */
+    private void verificarTela(int tentativa, int geracao) {
         if (web == null) return;
-        web.requestLayout();
-        web.invalidate();
-        web.postDelayed(() -> { if (web != null) { web.requestLayout(); web.invalidate(); } }, 250);
+        web.postDelayed(() -> {
+            if (web == null || geracao != geracaoTela || isFinishing() || isDestroyed()) return;
+            final Bitmap amostra = Bitmap.createBitmap(48, 96, Bitmap.Config.ARGB_8888);
+            try {
+                PixelCopy.request(getWindow(), amostra, copia -> {
+                    if (web == null || geracao != geracaoTela) return;
+                    if (copia != PixelCopy.SUCCESS) {
+                        DiagTela.registrar(this, "tela (verificação " + tentativa + "): cópia falhou, código " + copia);
+                        return;
+                    }
+                    double diferentes = fracaoDiferenteDoFundo(amostra);
+                    boolean vazia = diferentes < 0.015;
+                    DiagTela.registrar(this, "tela (verificação " + tentativa + "): " + (vazia ? "VAZIA" : "com conteúdo")
+                        + ", " + Math.round(diferentes * 1000) / 10.0 + "% dos pontos diferentes do fundo");
+                    if (!vazia) return;
+                    if (tentativa >= 3) {
+                        DiagTela.registrar(this, "tela continua vazia depois dos 3 ajustes");
+                        return;
+                    }
+                    cutucarWebView(tentativa);
+                    verificarTela(tentativa + 1, geracao);
+                }, new Handler(Looper.getMainLooper()));
+            } catch (IllegalArgumentException e) {
+                DiagTela.registrar(this, "tela (verificação " + tentativa + "): a janela recusou a cópia: " + e.getMessage());
+            }
+        }, tentativa == 1 ? 350 : 600);
+    }
+
+    /** Parte dos pontos da amostra (sem o topo e o rodapé, onde ficam as barras do sistema) que difere do ponto de referência. */
+    private static double fracaoDiferenteDoFundo(Bitmap b) {
+        int ref = b.getPixel(1, b.getHeight() / 2);
+        int diferentes = 0, total = 0;
+        for (int y = b.getHeight() / 10; y < b.getHeight() * 9 / 10; y++) {
+            for (int x = 0; x < b.getWidth(); x++) {
+                int c = b.getPixel(x, y);
+                int d = Math.abs(Color.red(c) - Color.red(ref)) + Math.abs(Color.green(c) - Color.green(ref)) + Math.abs(Color.blue(c) - Color.blue(ref));
+                if (d > 12) diferentes++;
+                total++;
+            }
+        }
+        return total == 0 ? 1 : diferentes / (double) total;
+    }
+
+    /** Degrau 1: nova medição e um toque quase invisível de transparência. 2: avisa o Chromium que saiu e voltou. 3: tira e recoloca o WebView. */
+    private void cutucarWebView(int degrau) {
+        if (web == null) return;
+        if (degrau == 1) {
+            DiagTela.registrar(this, "ajuste 1: nova medição + transparência 0,99");
+            web.requestLayout();
+            web.invalidate();
+            web.setAlpha(0.99f);
+            web.postDelayed(() -> { if (web != null) web.setAlpha(1f); }, 80);
+        } else if (degrau == 2) {
+            DiagTela.registrar(this, "ajuste 2: onPause/onResume do WebView");
+            web.onPause();
+            web.onResume();
+            web.resumeTimers();
+        } else {
+            DiagTela.registrar(this, "ajuste 3: WebView invisível e visível de novo");
+            web.setVisibility(View.INVISIBLE);
+            web.postDelayed(() -> { if (web != null) web.setVisibility(View.VISIBLE); }, 80);
+        }
     }
 
     @Override
     protected void onPause() {
         pausadoEm = SystemClock.elapsedRealtime();
+        geracaoTela++;   // cancela verificações de tela agendadas
         DiagTela.registrar(this, "onPause");
         if (web != null) {
             CookieManager.getInstance().flush();
