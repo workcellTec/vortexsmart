@@ -34,7 +34,7 @@ import java.util.concurrent.Executors;
 final class RastroToque {
     private static final String ARQUIVO = "rastro.json";
     private static final String CATEGORIAS = "input,latency,benchmark,rail,toplevel,devtools.timeline";
-    private static final int MAX_LINHAS = 2500;
+    private static final int MAX_LINHAS = 3000;
     private static final int MAX_EVENTOS = 200000;
     private static final double TAREFA_LONGA_US = 30000;
 
@@ -82,6 +82,7 @@ final class RastroToque {
 
     private static final class Resumo {
         final List<Object[]> linhas = new ArrayList<>();          // {ts em µs, texto}
+        double flingIni, flingFim; int flingN;                     // trecho em andamento de RenderInputRouter::ProgressFlingIfNeeded
         final Map<String, Integer> contagem = new HashMap<>();
         final Map<String, String> nomeProcesso = new HashMap<>();
         final Map<String, String> nomeThread = new HashMap<>();
@@ -109,6 +110,7 @@ final class RastroToque {
         } catch (Exception e) {
             aviso = "(rastro cortado no meio: " + e + ")\n";
         }
+        fecharTrechoFling(r);
         Collections.sort(r.linhas, new Comparator<Object[]>() {
             @Override public int compare(Object[] a, Object[] b) { return Double.compare((Double) a[0], (Double) b[0]); }
         });
@@ -129,6 +131,13 @@ final class RastroToque {
             s.append(hora.format(new Date(ms))).append("  ").append((String) l[1]).append('\n');
         }
         return s.toString();
+    }
+
+    /** A inércia do dedo (fling) chama ProgressFlingIfNeeded a cada quadro: um trecho vira uma linha só, pra não esconder os toques. */
+    private static void fecharTrechoFling(Resumo r) {
+        if (r.flingN == 0) return;
+        r.linhas.add(new Object[]{r.flingIni, "FLING progredindo por " + Math.round((r.flingFim - r.flingIni) / 1000) + " ms (" + r.flingN + " quadros)"});
+        r.flingN = 0;
     }
 
     private static void lerEventos(JsonReader leitor, Resumo r) throws IOException {
@@ -180,6 +189,13 @@ final class RastroToque {
         if (ph.equals("M")) {
             if (nome.equals("process_name")) r.nomeProcesso.put(pid, nomeArg);
             else if (nome.equals("thread_name")) r.nomeThread.put(pid + ":" + tid, nomeArg);
+            return;
+        }
+        if (nome.equals("RenderInputRouter::ProgressFlingIfNeeded")) {
+            if (r.flingN > 0 && ts - r.flingFim > 200000) fecharTrechoFling(r);
+            if (r.flingN == 0) r.flingIni = ts;
+            r.flingFim = ts;
+            r.flingN++;
             return;
         }
         String low = nome.toLowerCase(Locale.ROOT);

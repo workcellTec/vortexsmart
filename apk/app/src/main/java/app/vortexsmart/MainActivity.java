@@ -114,6 +114,7 @@ public class MainActivity extends Activity {
     /** Últimos toques que o sistema entregou ao app (antes do WebView), pra comparar com os que a página recebeu. */
     private final java.util.ArrayDeque<String> toquesNativos = new java.util.ArrayDeque<>();
     private long toqueBaixoEm;
+    private int webRecebeuDown;      // quantos ACTION_DOWN chegaram em WebView.onTouchEvent (o degrau entre a janela e o Chromium)
     /** Muda a cada volta e a cada saída do app: verificações de tela agendadas numa volta antiga se cancelam sozinhas. */
     private int geracaoTela;
 
@@ -147,7 +148,13 @@ public class MainActivity extends Activity {
     private void montarTela(Bundle estado) {
         hostApp = Uri.parse(BuildConfig.START_URL).getHost();
         if (BuildConfig.TESTE) WebView.setWebContentsDebuggingEnabled(true);   // build de teste: o DevTools enxerga a página
-        web = new WebView(this);
+        web = new WebView(this) {
+            @Override
+            public boolean onTouchEvent(MotionEvent ev) {
+                if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) webRecebeuDown++;
+                return super.onTouchEvent(ev);
+            }
+        };
         web.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         web.setBackgroundColor(0xFF141517);
         setContentView(web);
@@ -293,16 +300,18 @@ public class MainActivity extends Activity {
             aguardandoToque = false;
             DiagTela.registrar(this, "1º toque, " + (SystemClock.elapsedRealtime() - voltouEm) + " ms depois do onResume");
         }
+        int antes = webRecebeuDown;
         boolean tratou = super.dispatchTouchEvent(ev);
-        anotarToqueNativo(ev, tratou);
+        anotarToqueNativo(ev, tratou, webRecebeuDown != antes);
         return tratou;
     }
 
     /**
      * Guarda (60 linhas) cada dedo que desce/sobe/é cancelado, em dp (= px do CSS da página), com a hora e, na descida,
-     * se alguém na janela aceitou o toque (true = o WebView tratou; false = ninguém quis, e a página não recebe nada).
+     * se alguém na janela aceitou o toque (true = o WebView tratou; false = ninguém quis, e a página não recebe nada) e
+     * se o toque chegou a WebView.onTouchEvent (se não chegou, o sumiço é entre a janela e o WebView; se chegou, é dentro do Chromium).
      */
-    private void anotarToqueNativo(MotionEvent ev, boolean tratou) {
+    private void anotarToqueNativo(MotionEvent ev, boolean tratou, boolean chegouNoWebView) {
         int acao = ev.getActionMasked();
         if (acao != MotionEvent.ACTION_DOWN && acao != MotionEvent.ACTION_UP && acao != MotionEvent.ACTION_CANCEL) return;
         float d = getResources().getDisplayMetrics().density;
@@ -311,7 +320,7 @@ public class MainActivity extends Activity {
         if (acao == MotionEvent.ACTION_DOWN) {
             toqueBaixoEm = ev.getEventTime();
             linha = hora + "  dedo desceu em " + Math.round(ev.getX() / d) + "," + Math.round(ev.getY() / d)
-                + " · " + (tratou ? "aceito" : "NÃO ACEITO pela janela") + " · foco do WebView=" + (web != null && web.hasFocus())
+                + " · " + (tratou ? "aceito" : "NÃO ACEITO pela janela") + " · " + (chegouNoWebView ? "WebView.onTouchEvent recebeu" : "WebView.onTouchEvent NÃO recebeu") + " · foco do WebView=" + (web != null && web.hasFocus())
                 + " · flags=0x" + Integer.toHexString(ev.getFlags()) + " (1=janela coberta por outra, 2=coberta em parte)"
                 + " · tamanho do toque=" + String.format(java.util.Locale.US, "%.2f", ev.getSize());
         } else {
