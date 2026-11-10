@@ -28,4 +28,16 @@ adb shell pkill -2 screenrecord
 sleep 3
 adb pull /sdcard/roteiro.mp4 "$SAIDA/" || true
 echo "roteiro terminou com código $CODIGO"
+
+# Os arquivos de resultado também vão pro log da execução (o log dá pra ler pela API do GitHub; os artefatos nem sempre).
+mostrar() { [ -s "$2" ] && { echo "::group::$1"; cat "$2"; echo "::endgroup::"; }; }
+mostrar "aparelho" "$SAIDA/aparelho.txt"
+mostrar "servidor de teste" "$SAIDA/servidor.log"
+echo "::group::logcat (WebView, rede, app)"
+grep -iE "chromium|cleartext|net::|ERR_|vortexsmart|AndroidRuntime|FATAL" "$SAIDA/logcat.txt" | tail -80
+echo "::endgroup::"
+mostrar "roteiro" "$SAIDA/roteiro.txt"
+mostrar "diagnóstico do app (seção 7)" "$SAIDA/diagnostico-android.txt"
+mostrar "toques que o Android entregou (seção 9)" "$SAIDA/toques-do-android.txt"
+mostrar "toques que chegaram na página (seção 8)" "$SAIDA/toques-da-pagina.txt"
 exit 0
