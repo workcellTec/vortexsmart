@@ -14,6 +14,8 @@
 //      (usuarios/{uid}/preferencias/…), porque precisam acompanhar
 //      o usuário se ele trocar de aparelho, não só esse dispositivo.
 //      Cada perfil tem os seus.
+// Só no APK do Android aparece ainda "Widgets do Android" (mostrar ou ocultar os valores
+// em dinheiro dos widgets da tela inicial): preferência do aparelho, guardada pelo próprio APK.
 //
 // Depende de (via window.*):
 //   showCustomModal, _usuarioPrefRef, _dbUpdate, _dbGet,
@@ -27,6 +29,9 @@
     const el    = id   => document.getElementById(id);
 
     let mounted = false;
+
+    // Só no APK do Android (ponte VortexAndroid): é ele que desenha os widgets da tela inicial.
+    const temWidgetsAndroid = () => !!window.VortexAndroid && typeof window.VortexAndroid.widgetsValoresVisiveis === 'function';
 
     function renderShell() {
         const wrap = el('configuracoesCustomizacoes');
@@ -63,6 +68,21 @@
                         </div>
                     </div>
                 </div>
+
+                ${temWidgetsAndroid() ? `
+                <div class="cz-sec-title">📱 Widgets do Android</div>
+                <div class="cz-item">
+                    <div class="cz-item-ic" style="background:linear-gradient(135deg,#60a5fa,#2563eb);">🙈</div>
+                    <div class="cz-item-body">
+                        <div class="cz-item-title">Valores nos widgets</div>
+                        <div class="cz-item-sub">Ocultos por padrão: quem pegar o celular não vê o dinheiro na tela inicial</div>
+                        <div class="stq-cats" id="cfgCustomWidgetsPills" style="padding:0;margin-top:10px;">
+                            <button type="button" class="stq-cat-pill" data-v="ocultos" style="color:var(--primary);">🙈 Ocultos</button>
+                            <button type="button" class="stq-cat-pill" data-v="visiveis" style="color:var(--primary);">👁 Visíveis</button>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
 
                 <div class="cz-sec-title">🧮 Calculadora</div>
                 <div class="cz-item cz-item-col">
@@ -113,6 +133,12 @@
         document.querySelectorAll('#cfgCustomCoresRow .cz-cor-swatch').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.v === corAtual);
         });
+        if (temWidgetsAndroid()) {
+            const visiveis = !!window.VortexAndroid.widgetsValoresVisiveis();
+            document.querySelectorAll('#cfgCustomWidgetsPills .stq-cat-pill').forEach(btn => {
+                btn.classList.toggle('active', (btn.dataset.v === 'visiveis') === visiveis);
+            });
+        }
     }
 
     function salvar() {
@@ -152,6 +178,13 @@
             btn.addEventListener('click', () => {
                 if (typeof window._aplicarCorDestaque === 'function') window._aplicarCorDestaque(btn.dataset.v);
                 document.querySelectorAll('#cfgCustomCoresRow .cz-cor-swatch').forEach(b => b.classList.toggle('active', b === btn));
+            });
+        });
+
+        document.querySelectorAll('#cfgCustomWidgetsPills .stq-cat-pill').forEach(btn => {
+            btn.addEventListener('click', () => {
+                window.VortexAndroid.widgetsMostrarValores(btn.dataset.v === 'visiveis');
+                document.querySelectorAll('#cfgCustomWidgetsPills .stq-cat-pill').forEach(b => b.classList.toggle('active', b === btn));
             });
         });
     }

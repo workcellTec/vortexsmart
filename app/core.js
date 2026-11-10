@@ -1804,6 +1804,9 @@ onAuthStateChanged(auth, async user => {
                 sessaoCarregada = true;
                 hideLoading();
                 abrirTelaInicial();
+                // Sessão pronta: quem pediu pra abrir direto numa tela (toque num widget do Android) já pode ser atendido.
+                window._vsSessaoPronta = true;
+                window._vsSessaoProntaAviso?.();
             })
             .catch(e => {
                 // Usuário autenticado mas sem loja vinculada — não dá
@@ -1816,6 +1819,7 @@ onAuthStateChanged(auth, async user => {
             });
     } else {
         mostrarTelaLogin();
+        window.VortexAndroid?.limparResumo?.();   // APK: os widgets deixam de mostrar números da conta que saiu
         if (sessaoCarregada) {
             sessaoCarregada = false;
             window.location.reload(); // após o reload não há sessão → cai no else com a flag false (sem loop)

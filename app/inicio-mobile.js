@@ -13,10 +13,13 @@
 // Escopo por papel (igual ao antigo resumo da Início): Gestor, ou Funcionário com a permissão
 // 'vendas_ver_todas', vê a loja inteira; Funcionário comum vê só as próprias vendas (única consulta
 // que a regra do servidor libera) e não vê a Meta, que é da loja.
-// A leitura é uma janela: vendas criadas desde o início do mês (ou de ontem, se for mais antigo)
-// + todas as pendentes. Parcela de carnê paga agora numa venda de meses atrás só aparece no Financeiro.
+// A leitura é uma janela: vendas criadas desde o início do mês (ou de 6 dias atrás, se for mais antigo:
+// o widget do Android mostra os últimos 7 dias) + todas as pendentes. Parcela de carnê paga agora numa venda de meses atrás só aparece no Financeiro.
 //
 // Meta do mês: configuracoes/metaMes (número, só o Gestor altera).
+//
+// Só no APK do Android: entrega o resumo dos widgets da tela inicial (hoje, 7 dias e concertos) pela
+// ponte window.VortexAndroid.salvarResumo — os números são os mesmos desta tela.
 //
 // Expõe via window.*: _vsInicioAtualizar, _vsInicioPerfil, _vsAbrirConta, _vsLogoLojaAtualizar
 // Depende de (via window.*): _lojaId, _lojaRef, _dbGet, _dbQuery, _dbOrderByChild, _dbStartAt, _dbEqualTo,
@@ -126,6 +129,22 @@
         return total;
     }
 
+    // ── Widgets do Android (só no APK) ─────────────────────────
+    // O APK desenha os widgets da tela inicial do celular. Aqui só entregamos a ele o resumo já calculado
+    // (mesmas regras e mesmo escopo por papel da Início). Sem o APK (PWA, PC) não faz nada.
+    const widgetResumo = { hoje: null, concertos: null };
+    let widgetAgendado = null;
+    function publicarWidgets() {
+        const ponte = window.VortexAndroid;
+        if (!ponte || typeof ponte.salvarResumo !== 'function') return;
+        clearTimeout(widgetAgendado);
+        widgetAgendado = setTimeout(() => {   // junta as duas leituras (vendas e concertos) numa entrega só
+            try {
+                ponte.salvarResumo(JSON.stringify({ v: 1, ts: Date.now(), proprio: !veTodas(), hoje: widgetResumo.hoje, concertos: widgetResumo.concertos }));
+            } catch (e) { console.warn('[Widgets] não consegui entregar o resumo:', e); }
+        }, 300);
+    }
+
     function desenharDia(vendas, pendentes) {
         const agora = new Date();
         const ini = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).getTime();
@@ -133,6 +152,11 @@
         const hoje = somarEntradas(vendas, ini, fim);
         const ontem = somarEntradas(vendas, ini - DIA, ini - 1);
         const lancadasHoje = vendas.filter(v => (v.status === 'fechada' || v.status === 'pendente') && (v.criadoEm || 0) >= ini && (v.criadoEm || 0) <= fim).length;
+        // Widget do Android: últimos 7 dias (do mais antigo ao de hoje) e variação sobre ontem.
+        const serie = [];
+        for (let i = 6; i >= 0; i--) serie.push(somarEntradas(vendas, ini - i * DIA, ini - i * DIA + DIA - 1));
+        widgetResumo.hoje = { valor: hoje, vendas: lancadasHoje, pct: ontem > 0 ? (hoje - ontem) / ontem * 100 : null, serie };
+        publicarWidgets();
 
         el('vsIniRotulo').textContent = `${veTodas() ? 'Entrou hoje' : 'Você vendeu hoje'} · ${plural(lancadasHoje, 'venda', 'vendas')}` +
             (pendentes > 0 ? ` · ${plural(pendentes, 'pendente', 'pendentes')}` : '');
@@ -278,6 +302,8 @@
     function desenharConcertos(ordens) {
         const modo = (window._reparosConfig || {}).modo || null;
         if (!modo) {   // Gestor ainda não escolheu o fluxo: o card leva direto pra configuração
+            widgetResumo.concertos = { estado: 'configurar' };
+            publicarWidgets();
             el('vsIniConcN').textContent = '–';
             const aviso = el('vsIniConcSub');
             aviso.textContent = 'configure pra liberar';
@@ -290,6 +316,10 @@
         const ativos = ordens.filter(o => o && o.status !== 'entregue');
         const prontos = ativos.filter(o => ETAPAS_PRONTO.includes(o.status)).length;
         const atrasados = ativos.filter(o => o.prazoTs && o.prazoTs < Date.now()).length;
+        const fimDoDia = new Date().setHours(23, 59, 59, 999);
+        const vencemHoje = ativos.filter(o => o.prazoTs && o.prazoTs >= Date.now() && o.prazoTs <= fimDoDia).length;
+        widgetResumo.concertos = { andamento: ativos.length, atrasados, vencemHoje };
+        publicarWidgets();
 
         const partes = [];
         if (prontos) partes.push(plural(prontos, 'pronto', 'prontos'));
@@ -365,7 +395,8 @@
 
         const agora = new Date();
         const inicioHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).getTime();
-        const desde = Math.min(new Date(agora.getFullYear(), agora.getMonth(), 1).getTime(), inicioHoje - DIA);
+        // Início do mês, ou 6 dias atrás se for mais antigo (ontem pra variação do dia e os 7 dias do widget).
+        const desde = Math.min(new Date(agora.getFullYear(), agora.getMonth(), 1).getTime(), inicioHoje - 6 * DIA);
         const todas = veTodas();
         const consulta = todas
             ? window._dbQuery(window._lojaRef('vendas'), window._dbOrderByChild('criadoEm'), window._dbStartAt(desde))
@@ -406,6 +437,9 @@
             else window._reparosAguardar().then(ordens => {
                 if (ativa()) desenharConcertos(ordens);
             }).catch(() => {});
+        } else {
+            widgetResumo.concertos = { estado: 'sem-acesso' };   // módulo fechado pra este usuário
+            publicarWidgets();
         }
 
         window._dbGet(window._lojaRef('reposicao/itens')).then(snap => {

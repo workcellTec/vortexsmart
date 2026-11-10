@@ -22,7 +22,9 @@
 // Ele só dispara o botão de criar que a própria tela já tem, então permissão e regra de cada
 // módulo continuam sendo as do módulo.
 //
-// Expõe via window.*: _vsBarraRender, _vsBarraAtiva, _vsBarraCentro, _vsBarraSincronizar, _vsAbas
+// Abrir direto numa tela (toque num widget do Android): window._vsAbrirDestino('venda:nova'…), mais abaixo.
+//
+// Expõe via window.*: _vsBarraRender, _vsBarraAtiva, _vsBarraCentro, _vsBarraSincronizar, _vsAbas, _vsAbrirDestino
 // Depende de (via window.*): _usuarioPrefRef, _dbUpdate, _firebaseAuthUid, _nomeUsuario,
 //   _configCustomizacoes, openVendaSection, openEstoqueSection, openDocumentosSection,
 //   openCalculatorSection, _temPermissao, _papelUsuario, _vsPedirTransicao, safeStorage
@@ -364,6 +366,40 @@
         },
     };
 
+    // ── Abrir direto numa tela (widgets do Android) ────────────
+    // O APK chama window._vsAbrirDestino('venda:nova') quando alguém toca num widget da tela inicial.
+    // Cada destino usa o mesmo caminho do botão correspondente da Início, então permissão e módulo
+    // liberado/fechado seguem valendo. Sem sessão pronta (app abrindo, login), guarda por 60 s e
+    // executa assim que a Início abre (core.js avisa em _vsSessaoProntaAviso).
+    const botaoLigado = id => { const b = el(id); return !!b && b.style.display !== 'none' && !b.disabled; };
+    const clicarSeLigado = id => () => { if (botaoLigado(id)) el(id).click(); };
+    const DESTINOS = {
+        'venda:nova':      () => window.openVendaSection?.('lancarVenda'),
+        'venda:escanear':  () => {
+            window.openVendaSection?.('lancarVenda');
+            setTimeout(() => el('vendaLerCameraBtn')?.click(), 350);   // espera a tela de venda montar
+        },
+        'venda:historico': clicarSeLigado('goToVenda'),
+        'reparos:novo':    () => { if (podeEm('reparos_criar')) window.openReparosSection?.('reparosForm'); },
+        'reparos:lista':   clicarSeLigado('goToReparos'),
+        'calculadora':     clicarSeLigado('goToCalculator'),
+        'inicio':          () => window._vsInicioAtualizar?.(),
+    };
+    let destinoPendente = null;
+    function executarDestino() {
+        if (!destinoPendente || !window._vsSessaoPronta) return;
+        const { nome, ts } = destinoPendente;
+        destinoPendente = null;
+        if (Date.now() - ts > 60000) return;
+        const f = DESTINOS[nome];
+        if (f) f();
+    }
+    window._vsAbrirDestino = function (nome) {
+        destinoPendente = nome ? { nome, ts: Date.now() } : null;
+        executarDestino();
+    };
+    window._vsSessaoProntaAviso = executarDestino;
+
     // ── Deslizar pro lado troca de aba ─────────────────────────
     const FORA_DO_GESTO = 'input, textarea, select, canvas, video, [contenteditable="true"], .no-swipe, .vs-abas';
     function rolaNaHorizontal(n) {
@@ -416,7 +452,7 @@
         '📥': 'box-arrow-in-down', '👑': 'award-fill', '👤': 'person-fill', '📓': 'journal-text',
         '💵': 'cash-stack', '⚡': 'lightning-charge-fill', '🗓': 'calendar3', '📆': 'calendar-event',
         '✅': 'check-circle-fill', '✕': 'x-lg', '✏': 'pencil-fill', '🗑': 'trash3-fill',
-        '🙈': 'eye-slash-fill', '👁': 'eye-fill', '⬇': 'download', '⬆': 'upload', '⚠': 'exclamation-triangle-fill',
+        '📱': 'phone-fill', '🙈': 'eye-slash-fill', '👁': 'eye-fill', '⬇': 'download', '⬆': 'upload', '⚠': 'exclamation-triangle-fill',
     };
     const ALVOS_EMOJI = [
         '.cfgA-icon', '.cz-item-ic', '.cz-sec-title', '.cb-hero-ic', '.cb-block-ic', '.ctx-machine-ic',
