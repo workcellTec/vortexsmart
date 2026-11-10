@@ -13,6 +13,14 @@ on:
         description: 'Endereço que o app abre (oficial por padrão; use o link do GitHub Pages pra um APK de teste)'
         required: true
         default: 'https://vortex-b3761.web.app/'
+      novidades:
+        description: 'O que mudou (aparece pro cliente na janela de atualização do app)'
+        required: true
+        default: 'Melhorias e correções.'
+      obrigatoria:
+        description: 'Atualização obrigatória? (o cliente não consegue tocar em "Depois")'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -73,13 +81,33 @@ jobs:
             -PksSenha="$APK_SENHA"
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/VortexSmart.apk"
 
+      # apk-versao.json: o app instalado consulta este arquivo pra saber se há versão nova (ver Atualizador.java).
+      - name: Descrever a versão
+        env:
+          NOVIDADES: ${{ inputs.novidades }}
+          OBRIGATORIA: ${{ inputs.obrigatoria }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          t = os.environ['RUNNER_TEMP']
+          apk = open(t + '/VortexSmart.apk', 'rb').read()
+          json.dump({
+              'versionCode': int('${{ github.run_number }}'),
+              'versionName': '1.0.${{ github.run_number }}',
+              'notas': os.environ['NOVIDADES'].strip(),
+              'obrigatoria': os.environ['OBRIGATORIA'] == 'true',
+              'tamanho': len(apk),
+              'sha256': hashlib.sha256(apk).hexdigest(),
+          }, open(t + '/apk-versao.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+          PY
+
       - name: Publicar em Releases
         env:
           GH_TOKEN: ${{ github.token }}
           ENDERECO: ${{ inputs.endereco }}
         run: |
           gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create apk-latest "$RUNNER_TEMP/VortexSmart.apk" \
+          gh release create apk-latest "$RUNNER_TEMP/VortexSmart.apk" "$RUNNER_TEMP/apk-versao.json" \
             --title "VortexSmart APK" \
             --notes "APK 1.0.${{ github.run_number }} (commit ${GITHUB_SHA::7}) — abre $ENDERECO" \
             --target "$GITHUB_SHA"

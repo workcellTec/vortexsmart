@@ -77,6 +77,7 @@ public class MainActivity extends Activity {
     private String hostApp;
     private ValueCallback<Uri[]> retornoArquivo;
     private PermissionRequest pedidoPermissao;
+    private Atualizador atualizador;
 
     @Override
     protected void onCreate(Bundle estado) {
@@ -116,6 +117,9 @@ public class MainActivity extends Activity {
 
         if (estado != null) web.restoreState(estado);
         else web.loadUrl(BuildConfig.START_URL);
+
+        atualizador = new Atualizador(this);
+        if (estado == null) atualizador.aoAbrir();
     }
 
     @Override
@@ -128,6 +132,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         web.onResume();
+        if (atualizador != null) atualizador.aoVoltar();
     }
 
     @Override

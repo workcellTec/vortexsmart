@@ -5,6 +5,6 @@ separados do Chrome. Leva junto as coisas que o WebView não faz sozinho: câmer
 escolher foto/arquivo, baixar e compartilhar PDF/imagem, abrir WhatsApp/links fora, botão voltar.
 
 - Gerar: GitHub › Actions › **Gerar APK (Android)** › Run workflow. O arquivo sai em Releases › "VortexSmart APK".
-- O app abre o endereço oficial; cada deploy do site já atualiza o app. APK novo só se mudar ícone/nome/permissões.
+- O app abre o endereço oficial; cada deploy do site já atualiza o app. APK novo só se mudar a parte Android (ícone/nome/permissões/ponte). Quem tem APK instalado recebe o aviso de versão nova sozinho (`Atualizador.java` + `apk-versao.json` da Release): preencha "novidades" e, se quiser, marque "obrigatória" ao rodar o workflow.
 - Assinatura: chave criada na 1ª execução e guardada criptografada em `vortexsmart.jks.enc`; a senha é o segredo `APK_SENHA` (você escolhe).
   **Guarde a chave e a senha**: sem elas não dá pra atualizar um APK já instalado (teria de desinstalar).
