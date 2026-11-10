@@ -4,8 +4,8 @@
 // realmente está vendo neste computador: versão, arquivos carregados, sessão,
 // o que está na memória × o que o banco tem de verdade (lido na hora),
 // leituras negadas, impressoras, os erros capturados desde que o app abriu e,
-// só no APK, o registro do ciclo de vida da tela (pausa/volta, JS, quadro desenhado, toque).
-// o registro dos últimos toques nos botões dos Concertos (seção 8).
+// só no APK, o registro do ciclo de vida da tela (pausa/volta, JS, quadro desenhado, toque),
+// o registro dos últimos toques que chegaram na página (seção 8) e os que o aparelho entregou ao app (seção 9).
 // Só LÊ — não grava nada.
 // Abrir: Configurações → Diagnóstico do sistema, ou Ctrl+Alt+D.
 // ================================================================
@@ -22,31 +22,59 @@
     const PASTAS_DA_LOJA = ['clientes', 'products', 'rates', 'maquininhasConfig', 'formasPagamentoConfig', 'vendas'];
     const CHAVES_IMPRESSORA = { recibo: 'vsmart_impressora_termica_escolhida', etiqueta: 'vsmart_impressora_etiqueta_escolhida' };
 
-    // Registro dos toques nos botões de ação dos Concertos (Iniciar reparo, Finalizar, folhas de baixo...): mostra, pra cada toque,
-    // se o dedo se mexeu, se o botão foi trocado na tela no meio do toque e se a folha abriu. Fica na memória (120 linhas) e sai na seção 8.
+    // Registro de TODOS os toques que chegam na página (seção 8): uma linha por toque, com o alvo, quanto o dedo andou, se o botão foi
+    // trocado na tela no meio do toque e, principalmente, se o toque virou clique. "clique NÃO" = a página recebeu o dedo e nada aconteceu;
+    // toque que nem aparece aqui mas aparece na seção 9 (APK) = o aparelho entregou ao app e o WebView não passou pra página.
+    // Fica salvo no aparelho (120 linhas) pra sobreviver a recarregamentos da página, que antes apagavam a evidência.
+    const CHAVE_TOQUES = 'vs_diag_toques';
     const toques = [];
-    window._vsAnotarToque = t => { toques.push(new Date().toTimeString().slice(0, 8) + '.' + String(Date.now() % 1000).padStart(3, '0') + '  ' + t); if (toques.length > 120) toques.shift(); };
+    try { JSON.parse(localStorage.getItem(CHAVE_TOQUES) || '[]').forEach(l => toques.push(l)); } catch (_) { /* sem armazenamento: só memória */ }
+    window._vsAnotarToque = t => {
+        toques.push(new Date().toTimeString().slice(0, 8) + '.' + String(Date.now() % 1000).padStart(3, '0') + '  ' + t);
+        if (toques.length > 120) toques.shift();
+        try { localStorage.setItem(CHAVE_TOQUES, JSON.stringify(toques)); } catch (_) { /* idem */ }
+    };
+    window._vsAnotarToque('── página carregada, versão ' + (window._VS_VERSAO || '?') + ' ──');
     (function () {
         const ALVO = '.rep-btn-pri, .rep-btn-sq, .rep-pular, .rep-duo button, .rep-tb, #repFolha button';
-        const nome = b => ((b.dataset && b.dataset.action) || b.id || String(b.className).split(' ')[0]) + ' "' + (b.textContent || '').trim().slice(0, 18) + '"';
-        let baixo = null;
-        ['pointerdown', 'pointerup', 'pointercancel', 'click'].forEach(tipo => document.addEventListener(tipo, e => {
-            const b = e.target.closest && e.target.closest(ALVO);
-            if (tipo === 'pointerdown') baixo = b ? { b, x: e.clientX, y: e.clientY, t: performance.now() } : null;
-            // Toque em qualquer lugar com a página "oculta" (o app está aberto mas o WebView parou de desenhar): é o caso que parece botão morto.
-            // Todo toque que chega na página fica anotado (posição em px do CSS): sem esta linha, "o app recebeu o toque e a página não" não se separa de "o toque nem chegou".
-            if (!b && tipo === 'pointerdown') window._vsAnotarToque('toque na página em ' + Math.round(e.clientX) + ',' + Math.round(e.clientY) + ' → ' + ((e.target.tagName || '?').toLowerCase() + (e.target.className && typeof e.target.className === 'string' ? '.' + e.target.className.split(' ')[0] : '')));
-            if (!b) { if (tipo === 'pointerdown' && document.hidden) window._vsAnotarToque('pointerdown em ' + (e.target.tagName || '?').toLowerCase() + ' com a página OCULTA (visibilityState=' + document.visibilityState + ')'); return; }
-            let extra = document.hidden ? ' · página OCULTA (' + document.visibilityState + ')' : '';
-            if (tipo !== 'pointerdown' && baixo) {
-                extra += ' · dedo andou ' + Math.round(Math.hypot(e.clientX - baixo.x, e.clientY - baixo.y)) + 'px em ' + Math.round(performance.now() - baixo.t) + ' ms';
-                if (baixo.b !== b) extra += ' · BOTÃO DIFERENTE do início do toque';
-                if (!baixo.b.isConnected) extra += ' · o botão do início do toque foi SUBSTITUÍDO na tela';
-            }
-            window._vsAnotarToque(tipo + ' ' + nome(b) + extra);
-            if (tipo === 'click') setTimeout(() => window._vsAnotarToque('   400 ms depois do clique: folha ' + (document.querySelector('#repFolha.active') ? 'ABERTA' : 'fechada') + (document.documentElement.classList.contains('vs-scroll-locked') ? ' · rolagem TRAVADA' : '')), 400);
-        }, true));
-        document.addEventListener('touchcancel', e => { if (baixo) window._vsAnotarToque('touchcancel (o navegador cancelou o toque) em ' + nome(baixo.b)); }, true);
+        const nome = el => {
+            if (!el || !el.tagName) return '?';
+            const b = (el.closest && el.closest(ALVO)) || el;
+            const id = (b.dataset && b.dataset.action) || b.id || (typeof b.className === 'string' ? b.className.split(' ')[0] : '');
+            const texto = b.matches && b.matches('button, a, [role=button]') ? ' "' + (b.textContent || '').trim().slice(0, 18) + '"' : '';
+            return b.tagName.toLowerCase() + (id ? '.' + id : '') + texto;
+        };
+        let t = null;
+        const fechar = (x, motivo) => {
+            if (x.fim) return;
+            x.fim = true;
+            const ms = Math.round((x.tUp || performance.now()) - x.t0);
+            let l = 'toque ' + Math.round(x.x) + ',' + Math.round(x.y) + ' em ' + x.nome + ' · ' + ms + ' ms · dedo andou ' + Math.round(x.dist) + 'px';
+            if (x.btn && !x.btn.isConnected) l += ' · botão SUBSTITUÍDO na tela no meio do toque';
+            if (x.soltouEm && x.soltouEm !== x.nome) l += ' · soltou em ' + x.soltouEm;
+            l += motivo ? ' · ' + motivo : x.cancelado ? ' · CANCELADO pelo navegador (rolagem?)' : x.clicou ? ' · clique SIM' : ' · clique NÃO';
+            if (x.oculta) l += ' · página OCULTA';
+            window._vsAnotarToque(l);
+            if (x.clicou && x.btn) setTimeout(() => window._vsAnotarToque('   400 ms depois: folha ' + (document.querySelector('#repFolha.active') ? 'ABERTA' : 'fechada') + (document.documentElement.classList.contains('vs-scroll-locked') ? ' · rolagem TRAVADA' : '')), 400);
+        };
+        document.addEventListener('pointerdown', e => {
+            if (t) fechar(t, 'sem fim antes do toque seguinte');
+            t = { x: e.clientX, y: e.clientY, t0: performance.now(), dist: 0, nome: nome(e.target), btn: e.target.closest && e.target.closest(ALVO), oculta: document.hidden };
+            const meu = t;
+            setTimeout(() => fechar(meu, 'sem soltar nem cancelar em 3 s'), 3000);
+        }, true);
+        document.addEventListener('pointerup', e => {
+            if (!t) return;
+            const meu = t;
+            meu.tUp = performance.now();
+            meu.dist = Math.hypot(e.clientX - meu.x, e.clientY - meu.y);
+            meu.soltouEm = nome(e.target);
+            setTimeout(() => fechar(meu), 450);   // dá tempo do "click" chegar
+        }, true);
+        document.addEventListener('click', e => { if (t) { t.clicou = true; if (!t.soltouEm) t.soltouEm = nome(e.target); } }, true);
+        const cancelou = () => { if (t) { t.cancelado = true; t.tUp = performance.now(); fechar(t); } };
+        document.addEventListener('pointercancel', cancelou, true);
+        document.addEventListener('touchcancel', cancelou, true);
     })();
 
     const comTempo = (promessa, ms) => Promise.race([promessa, new Promise((_, rej) => setTimeout(() => rej(new Error('sem resposta em ' + (ms / 1000) + 's')), ms))]);
@@ -199,7 +227,7 @@
             L.push((window.VortexAndroid.lerDiagnosticoTela() || '').trim() || '(nada registrado ainda)');
         });
 
-        await secao('8) Toques nos botões dos Concertos (precisa tocar várias vezes)', async () => {
+        await secao('8) Toques que chegaram na página (cada linha = um toque; "clique NÃO" = não virou clique)', async () => {
             L.push(toques.length ? toques.join('\n') : '(nenhum toque registrado ainda — use os botões de Concertos e gere o relatório de novo)');
         });
 
