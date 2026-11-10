@@ -183,8 +183,12 @@ final class RastroToque {
             return;
         }
         String low = nome.toLowerCase(Locale.ROOT);
-        boolean entrada = cat.contains("input") || cat.contains("latency")
-                || low.contains("touch") || low.contains("gesture") || low.contains("pointer") || low.contains("fling") || low.contains("scroll");
+        // Só o caminho do toque dentro do Chromium (a categoria "input" também traz edição de texto/cursor, que é ruído).
+        boolean entrada = low.contains("touch") || low.contains("gesture") || low.contains("inputrouter") || low.contains("inputevent")
+                || low.contains("fling") || low.contains("widgetinputhandler") || low.contains("mainthreadeventqueue") || low.contains("inputlatency")
+                || low.contains("eventlatency") || low.contains("allowed") || low.contains("pointer") || low.contains("currentlyscrolling")
+                || low.equals("generationtobrowsermain") || low.equals("browsermaintorenderercompositor")
+                || low.equals("renderercompositorqueueingdelay") || low.equals("renderermainprocessing");
         if (!entrada && dur < TAREFA_LONGA_US) return;
         if (r.linhas.size() >= MAX_EVENTOS) return;
         String quem = (r.nomeProcesso.containsKey(pid) ? r.nomeProcesso.get(pid) : "p" + pid) + "/" + (r.nomeThread.containsKey(pid + ":" + tid) ? r.nomeThread.get(pid + ":" + tid) : "t" + tid);

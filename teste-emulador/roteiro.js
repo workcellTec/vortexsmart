@@ -151,9 +151,9 @@ async function rastroExploracao() {
   const resumo = String(await ev('VortexAndroid.rastroLer()'));
   fs.writeFileSync(`${SAIDA}/rastro-resumo.txt`, resumo);
   log(`RESUMO DO APP (rastroLer): ${resumo.length} caracteres, ${resumo.split('\n').length} linhas`);
-  console.log('::group::rastro: resumo feito pelo app (primeiras 60 e últimas 60 linhas)');
   const ls = resumo.split('\n');
-  console.log(ls.slice(0, 60).join('\n') + '\n[…]\n' + ls.slice(-60).join('\n'));
+  console.log('::group::rastro: resumo feito pelo app (cabeçalho e as 80 primeiras linhas de toque)');
+  console.log(ls.slice(0, 2).join('\n').slice(0, 1500) + '\n' + ls.filter(l => /Touch|Gesture|InputRouter|EventForwarder|TouchAction|allowed/.test(l)).slice(0, 80).join('\n'));
   console.log('::endgroup::');
   try {
     const bruto = execFileSync('adb', ['exec-out', 'run-as', PACOTE, 'cat', 'files/rastro.json'], { maxBuffer: 1024 * 1024 * 1024 });
@@ -172,6 +172,11 @@ async function rastroExploracao() {
     const toque = ordem.filter(([k]) => /touch|gesture|pointer|input|tap/i.test(k));
     console.log('::group::rastro: nomes ligados a toque/entrada (' + toque.length + ')');
     console.log(toque.map(([k, v]) => `${v}\t${k}`).join('\n'));
+    console.log('::endgroup::');
+    const rel = ev0.filter(e => /EventForwarder::OnTouchEvent|ForwardTouchEvent|PassthroughTouchEventQueue::QueueEvent|FilterAndSendWebInputEvent|ProcessAckedTouchEvent|FilterGestureEvent|WebFrameWidgetImpl::HandleInputEvent|allowed_touch_action/.test(e.name)).sort((x, y) => x.ts - y.ts);
+    const t0 = rel.length ? rel[0].ts : 0;
+    console.log('::group::rastro: eventos brutos do caminho do toque (primeiros 70; tempo em ms desde o primeiro)');
+    console.log(rel.slice(0, 70).map(e => `${((e.ts - t0) / 1000).toFixed(1)}\t${nomesProc[e.pid] || e.pid}/${nomesThr[e.pid + ':' + e.tid] || e.tid}\t${e.ph}\t${e.name}\t${JSON.stringify(e.args || {}).slice(0, 160)}`).join('\n'));
     console.log('::endgroup::');
     console.log('::group::rastro: processos e threads');
     console.log(JSON.stringify(nomesProc) + '\n' + JSON.stringify(nomesThr));
