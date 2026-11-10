@@ -271,6 +271,10 @@ public class MainActivity extends Activity {
         aguardandoToque = true;
         final boolean[] respondeu = {false};
         DiagTela.registrar(this, "webview " + web.getWidth() + "x" + web.getHeight() + " visível=" + web.isShown() + " foco=" + hasWindowFocus());
+        android.app.ActivityManager.MemoryInfo mem = new android.app.ActivityManager.MemoryInfo();
+        ((android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(mem);
+        DiagTela.registrar(this, "memória do aparelho: livre " + mem.availMem / 1048576 + " MB de " + mem.totalMem / 1048576 + " MB, pouca memória=" + mem.lowMemory
+            + " · app usa " + ((android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE)).getProcessMemoryInfo(new int[]{android.os.Process.myPid()})[0].getTotalPss() / 1024 + " MB");
         web.evaluateJavascript("(function(){var t=Date.now(),ok=false;"
             + "requestAnimationFrame(function(){ok=true;VortexAndroid.diag('quadro desenhado '+(Date.now()-t)+' ms depois')});"
             + "setTimeout(function(){if(!ok)VortexAndroid.diag('NENHUM quadro desenhado em 2 s')},2000);"
