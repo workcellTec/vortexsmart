@@ -146,6 +146,7 @@ public class MainActivity extends Activity {
 
     private void montarTela(Bundle estado) {
         hostApp = Uri.parse(BuildConfig.START_URL).getHost();
+        if (BuildConfig.TESTE) WebView.setWebContentsDebuggingEnabled(true);   // build de teste: o DevTools enxerga a página
         web = new WebView(this);
         web.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         web.setBackgroundColor(0xFF141517);
@@ -182,8 +183,11 @@ public class MainActivity extends Activity {
         if (estado != null) web.restoreState(estado);
         else web.loadUrl(BuildConfig.START_URL);
 
-        atualizador = new Atualizador(this);
-        if (estado == null) atualizador.aoAbrir();
+        // Build de teste (emulador): sem janela de atualização por cima da tela.
+        if (!BuildConfig.TESTE) {
+            atualizador = new Atualizador(this);
+            if (estado == null) atualizador.aoAbrir();
+        }
         registrarAmbiente();
     }
 
@@ -687,6 +691,29 @@ public class MainActivity extends Activity {
             synchronized (toquesNativos) {
                 return android.text.TextUtils.join("\n", toquesNativos);
             }
+        }
+
+        // Rastro interno do WebView (o que o Chromium faz com cada toque). Começar/parar rodam na thread da tela, como o WebView exige.
+        @JavascriptInterface
+        public String rastroIniciar(String categorias) {
+            runOnUiThread(() -> RastroToque.iniciar(MainActivity.this, categorias));
+            return "iniciando";
+        }
+
+        @JavascriptInterface
+        public String rastroParar() {
+            runOnUiThread(() -> RastroToque.parar(MainActivity.this));
+            return "parando";
+        }
+
+        @JavascriptInterface
+        public String rastroEstado() {
+            return RastroToque.estado();
+        }
+
+        @JavascriptInterface
+        public String rastroLer() {
+            return RastroToque.ler(MainActivity.this);
         }
 
         @JavascriptInterface

@@ -1,0 +1,71 @@
+# Teste no emulador Android: roda o app de verdade (WebView de verdade, toques pelo caminho do dedo) contra um servidor local com
+# Firebase simulado, repete o roteiro de toques de Concertos e guarda vídeo, logcat e relatórios. NÃO publica nada: só gera artefatos.
+# Dispara a cada envio na branch "teste-emulador" (ou manualmente em Actions > "Teste no emulador (Android)").
+name: Teste no emulador (Android)
+
+on:
+  push:
+    branches: [teste-emulador]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [35, 36]
+        acessibilidade: [nao, sim]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Build de teste: abre o servidor local (10.0.2.2 = o computador, visto de dentro do emulador), aceita http e liga o DevTools.
+      - name: Compilar (build de teste)
+        working-directory: apk
+        run: |
+          gradle --no-daemon assembleDebug \
+            -Pcanal=beta -Pteste=sim \
+            -PstartUrl='http://10.0.2.2:8123/index.html?shell=mobile'
+
+      - name: Liberar o KVM (aceleração do emulador)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Rodar o roteiro no emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ACESSIBILIDADE: ${{ matrix.acessibilidade }}
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash teste-emulador/rodar.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: resultado-emulador-api${{ matrix.api }}-acess-${{ matrix.acessibilidade }}
+          path: resultado
+          if-no-files-found: warn
