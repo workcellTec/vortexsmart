@@ -182,6 +182,24 @@ public class MainActivity extends Activity {
 
         atualizador = new Atualizador(this);
         if (estado == null) atualizador.aoAbrir();
+        registrarAmbiente();
+    }
+
+    /** Uma linha com o que do aparelho costuma interferir em toque/desempenho de WebView: acessibilidade, preenchimento automático, economia de bateria. */
+    private void registrarAmbiente() {
+        try {
+            android.view.accessibility.AccessibilityManager am = (android.view.accessibility.AccessibilityManager) getSystemService(ACCESSIBILITY_SERVICE);
+            String servicos = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            android.view.autofill.AutofillManager af = getSystemService(android.view.autofill.AutofillManager.class);
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+            android.content.pm.PackageInfo wv = WebView.getCurrentWebViewPackage();
+            DiagTela.registrar(this, "ambiente: acessibilidade=" + (am != null && am.isEnabled()) + " exploração por toque=" + (am != null && am.isTouchExplorationEnabled())
+                + " serviços=" + (servicos == null ? "nenhum" : servicos) + " · autofill=" + (af != null && af.isEnabled())
+                + " · economia de bateria=" + pm.isPowerSaveMode() + " · WebView " + (wv != null ? wv.packageName + " " + wv.versionName : "?")
+                + " · tela " + getWindowManager().getDefaultDisplay().getRefreshRate() + " Hz");
+        } catch (Throwable erro) {
+            DiagTela.registrar(this, "ambiente: não deu pra ler (" + erro + ")");
+        }
     }
 
     // ── Widgets: abrir o app direto numa tela ─────────────────────
@@ -287,7 +305,9 @@ public class MainActivity extends Activity {
         if (acao == MotionEvent.ACTION_DOWN) {
             toqueBaixoEm = ev.getEventTime();
             linha = hora + "  dedo desceu em " + Math.round(ev.getX() / d) + "," + Math.round(ev.getY() / d)
-                + " · " + (tratou ? "aceito" : "NÃO ACEITO pela janela") + " · foco do WebView=" + (web != null && web.hasFocus());
+                + " · " + (tratou ? "aceito" : "NÃO ACEITO pela janela") + " · foco do WebView=" + (web != null && web.hasFocus())
+                + " · flags=0x" + Integer.toHexString(ev.getFlags()) + " (1=janela coberta por outra, 2=coberta em parte)"
+                + " · tamanho do toque=" + String.format(java.util.Locale.US, "%.2f", ev.getSize());
         } else {
             linha = hora + "  dedo " + (acao == MotionEvent.ACTION_UP ? "subiu" : "CANCELADO") + " após " + (ev.getEventTime() - toqueBaixoEm) + " ms";
         }

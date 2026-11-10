@@ -105,6 +105,13 @@
             ult = agora;
             if (!document.hidden && atraso > 150) nota('relógio da página atrasou ' + Math.round(atraso) + ' ms');
         }, 100);
+        // Quadros parados: pede um quadro a cada 0,5 s (quase não custa nada) e anota se demorou pra ser desenhado. Se a página
+        // não desenha por 1-2 s mas o relógio acima está em dia, o problema é o WebView sem produzir quadros, não a página ocupada.
+        setInterval(() => {
+            if (document.hidden) return;
+            const t0 = performance.now();
+            requestAnimationFrame(() => { const d = performance.now() - t0; if (d > 300 && !document.hidden) nota('quadro demorou ' + Math.round(d) + ' ms pra ser desenhado'); });
+        }, 500);
     })();
 
     const comTempo = (promessa, ms) => Promise.race([promessa, new Promise((_, rej) => setTimeout(() => rej(new Error('sem resposta em ' + (ms / 1000) + 's')), ms))]);
