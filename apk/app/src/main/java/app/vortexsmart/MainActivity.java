@@ -109,6 +109,9 @@ public class MainActivity extends Activity {
     private boolean aguardandoToque;
     /** true entre onResume e onPause; a ponte (outra thread) lê para saber se a página "oculta" é anormal. */
     private volatile boolean resumido;
+    /** Últimos toques que o sistema entregou ao app (antes do WebView), pra comparar com os que a página recebeu. */
+    private final java.util.ArrayDeque<String> toquesNativos = new java.util.ArrayDeque<>();
+    private long toqueBaixoEm;
     /** Muda a cada volta e a cada saída do app: verificações de tela agendadas numa volta antiga se cancelam sozinhas. */
     private int geracaoTela;
 
@@ -266,7 +269,27 @@ public class MainActivity extends Activity {
             aguardandoToque = false;
             DiagTela.registrar(this, "1º toque, " + (SystemClock.elapsedRealtime() - voltouEm) + " ms depois do onResume");
         }
+        anotarToqueNativo(ev);
         return super.dispatchTouchEvent(ev);
+    }
+
+    /** Guarda (60 linhas) cada dedo que desce/sobe/é cancelado, em dp (= px do CSS da página), com a hora. */
+    private void anotarToqueNativo(MotionEvent ev) {
+        int acao = ev.getActionMasked();
+        if (acao != MotionEvent.ACTION_DOWN && acao != MotionEvent.ACTION_UP && acao != MotionEvent.ACTION_CANCEL) return;
+        float d = getResources().getDisplayMetrics().density;
+        String hora = new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US).format(new java.util.Date());
+        String linha;
+        if (acao == MotionEvent.ACTION_DOWN) {
+            toqueBaixoEm = ev.getEventTime();
+            linha = hora + "  dedo desceu em " + Math.round(ev.getX() / d) + "," + Math.round(ev.getY() / d);
+        } else {
+            linha = hora + "  dedo " + (acao == MotionEvent.ACTION_UP ? "subiu" : "CANCELADO") + " após " + (ev.getEventTime() - toqueBaixoEm) + " ms";
+        }
+        synchronized (toquesNativos) {
+            toquesNativos.addLast(linha);
+            if (toquesNativos.size() > 60) toquesNativos.removeFirst();
+        }
     }
 
     /**
@@ -627,6 +650,13 @@ public class MainActivity extends Activity {
             if (resumido && m.startsWith("visibilitychange → hidden")) {
                 final int geracao = geracaoTela;
                 runOnUiThread(() -> paginaOcultaComAppAberto(geracao, 1));
+            }
+        }
+
+        @JavascriptInterface
+        public String lerToquesNativos() {
+            synchronized (toquesNativos) {
+                return android.text.TextUtils.join("\n", toquesNativos);
             }
         }
 

@@ -23,9 +23,9 @@
     const CHAVES_IMPRESSORA = { recibo: 'vsmart_impressora_termica_escolhida', etiqueta: 'vsmart_impressora_etiqueta_escolhida' };
 
     // Registro dos toques nos botões de ação dos Concertos (Iniciar reparo, Finalizar, folhas de baixo...): mostra, pra cada toque,
-    // se o dedo se mexeu, se o botão foi trocado na tela no meio do toque e se a folha abriu. Fica na memória (80 linhas) e sai na seção 8.
+    // se o dedo se mexeu, se o botão foi trocado na tela no meio do toque e se a folha abriu. Fica na memória (120 linhas) e sai na seção 8.
     const toques = [];
-    window._vsAnotarToque = t => { toques.push(new Date().toTimeString().slice(0, 8) + '.' + String(Date.now() % 1000).padStart(3, '0') + '  ' + t); if (toques.length > 80) toques.shift(); };
+    window._vsAnotarToque = t => { toques.push(new Date().toTimeString().slice(0, 8) + '.' + String(Date.now() % 1000).padStart(3, '0') + '  ' + t); if (toques.length > 120) toques.shift(); };
     (function () {
         const ALVO = '.rep-btn-pri, .rep-btn-sq, .rep-pular, .rep-duo button, .rep-tb, #repFolha button';
         const nome = b => ((b.dataset && b.dataset.action) || b.id || String(b.className).split(' ')[0]) + ' "' + (b.textContent || '').trim().slice(0, 18) + '"';
@@ -34,6 +34,8 @@
             const b = e.target.closest && e.target.closest(ALVO);
             if (tipo === 'pointerdown') baixo = b ? { b, x: e.clientX, y: e.clientY, t: performance.now() } : null;
             // Toque em qualquer lugar com a página "oculta" (o app está aberto mas o WebView parou de desenhar): é o caso que parece botão morto.
+            // Todo toque que chega na página fica anotado (posição em px do CSS): sem esta linha, "o app recebeu o toque e a página não" não se separa de "o toque nem chegou".
+            if (!b && tipo === 'pointerdown') window._vsAnotarToque('toque na página em ' + Math.round(e.clientX) + ',' + Math.round(e.clientY) + ' → ' + ((e.target.tagName || '?').toLowerCase() + (e.target.className && typeof e.target.className === 'string' ? '.' + e.target.className.split(' ')[0] : '')));
             if (!b) { if (tipo === 'pointerdown' && document.hidden) window._vsAnotarToque('pointerdown em ' + (e.target.tagName || '?').toLowerCase() + ' com a página OCULTA (visibilityState=' + document.visibilityState + ')'); return; }
             let extra = document.hidden ? ' · página OCULTA (' + document.visibilityState + ')' : '';
             if (tipo !== 'pointerdown' && baixo) {
@@ -199,6 +201,11 @@
 
         await secao('8) Toques nos botões dos Concertos (precisa tocar várias vezes)', async () => {
             L.push(toques.length ? toques.join('\n') : '(nenhum toque registrado ainda — use os botões de Concertos e gere o relatório de novo)');
+        });
+
+        await secao('9) Toques que o aparelho entregou ao app (Android) — compare com a seção 8', async () => {
+            if (!window.VortexAndroid || typeof window.VortexAndroid.lerToquesNativos !== 'function') { L.push('(só existe no app Android, versão nova)'); return; }
+            L.push((window.VortexAndroid.lerToquesNativos() || '').trim() || '(nenhum toque ainda)');
         });
 
         const topo = ['DIAGNÓSTICO DO SISTEMA — VortexSmart', 'Gerado em ' + new Date().toLocaleString('pt-BR'), ''];
