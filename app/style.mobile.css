@@ -2689,7 +2689,7 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 .rep-vazio b { display:block; font-size:16px; color:var(--text-strong); margin-bottom:4px; }
 
 /* Cartão */
-.rep-card { background:var(--surface); border:1px solid var(--border); border-radius:24px; overflow:hidden; scroll-margin-top:8px; content-visibility:auto; contain-intrinsic-size:auto 170px; }
+.rep-card { background:var(--surface); border:1px solid var(--border); border-radius:24px; overflow:hidden; scroll-margin-top:8px; }
 .rep-card.atrasada { border-color:color-mix(in srgb, var(--danger) 55%, var(--border)); background:color-mix(in srgb, var(--danger) 9%, var(--surface)); }
 .rep-card-main { cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .rep-card-top { display:flex; align-items:center; gap:12px; padding:12px 14px 10px 12px; }
