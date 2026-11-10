@@ -54,15 +54,21 @@ async function tocarFisico(px, py) {
 }
 async function calibrar() {
   dpr = await ev('devicePixelRatio');
+  log('página: ' + await ev('location.href') + ' · ' + JSON.stringify(await evSeguro(JS_ESTADO)) + ' · tela ' + await ev('innerWidth+"x"+innerHeight'));
+  if (MODO === 'adb') log('janela em foco: ' + adb('shell', 'dumpsys window | grep -E "mCurrentFocus|mFocusedApp" | head -3').trim().replace(/\n/g, ' | '));
   // Uma cobertura transparente segura o toque da calibragem: ele não aciona nada do sistema por baixo.
   await ev(`window.__pd=[];const c=document.createElement('div');c.id='__calib';c.style.cssText='position:fixed;inset:0;z-index:2147483647;background:transparent';
     c.addEventListener('pointerdown',e=>window.__pd.push([e.clientX,e.clientY]),true);document.body.appendChild(c);0`);
   const alvoX = 540, alvoY = 1200;
-  await tocarFisico(alvoX, alvoY);
-  await dorme(400);
-  const pd = await ev('window.__pd[window.__pd.length-1]');
+  let pd = null;
+  for (let tentativa = 1; tentativa <= 3 && !pd; tentativa++) {
+    await tocarFisico(alvoX, alvoY);
+    await dorme(1200);
+    pd = await ev('window.__pd[window.__pd.length-1]');
+    if (!pd) log(`calibragem: toque ${tentativa} não chegou na página`);
+  }
   await ev(`document.getElementById('__calib').remove();0`);
-  if (!pd) throw new Error('a calibragem não recebeu o toque');
+  if (!pd) { await captura('calibragem-falhou'); throw new Error('a calibragem não recebeu o toque'); }
   offX = alvoX - pd[0] * dpr; offY = alvoY - pd[1] * dpr;
   log(`calibragem: dpr=${dpr}, deslocamento da janela x=${offX.toFixed(1)} y=${offY.toFixed(1)} px (barra de status)`);
 }
@@ -77,10 +83,18 @@ async function posicao(sel) {
     if(r.top<60||r.bottom>innerHeight-90){e.scrollIntoView({block:'center',behavior:'instant'});r=e.getBoundingClientRect();}
     return {x:r.left+r.width/2,y:r.top+r.height/2}})()`);
 }
-const nomesCapturas = {}; let nCap = 0;
+let nCap = 0;
+// Print da tela (a de verdade, com barras e janelas do sistema). Vai pra pasta de resultados E, em texto (base64), pro log da execução,
+// que dá pra ler pela API do GitHub: decodificar as linhas "FOTO:<n>:<rotulo>:<parte>:" juntas gera o PNG.
 async function captura(rotulo) {
   if (MODO !== 'adb') return;
-  try { const png = execFileSync('adb', ['exec-out', 'screencap', '-p'], { maxBuffer: 64 * 1024 * 1024 }); fs.writeFileSync(`${SAIDA}/tela-${String(++nCap).padStart(2, '0')}-${rotulo.replace(/[^a-z0-9]+/gi, '_')}.png`, png); } catch (e) { log('captura falhou: ' + e.message); }
+  try {
+    const png = execFileSync('adb', ['exec-out', 'screencap', '-p'], { maxBuffer: 64 * 1024 * 1024 });
+    const n = String(++nCap).padStart(2, '0'), nome = rotulo.replace(/[^a-z0-9]+/gi, '_');
+    fs.writeFileSync(`${SAIDA}/tela-${n}-${nome}.png`, png);
+    const b64 = png.toString('base64');
+    for (let i = 0; i * 3000 < b64.length; i++) console.log(`FOTO:${n}:${nome}:${i}:${b64.slice(i * 3000, (i + 1) * 3000)}`);
+  } catch (e) { log('captura falhou: ' + e.message); }
 }
 
 const resultados = [];
@@ -136,6 +150,7 @@ async function segundoPlano(segundos) {
   await conectar();
   log('conectado ao DevTools do WebView');
   await dorme(1500);
+  await captura('inicio');
   await calibrar();
   await ciclo('1º uso (logo depois de abrir o app)', 'os5');
   await rajadaInicio(10);
