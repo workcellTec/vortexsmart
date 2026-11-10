@@ -5,6 +5,7 @@
 // o que está na memória × o que o banco tem de verdade (lido na hora),
 // leituras negadas, impressoras, os erros capturados desde que o app abriu e,
 // só no APK, o registro do ciclo de vida da tela (pausa/volta, JS, quadro desenhado, toque).
+// o registro dos últimos toques nos botões dos Concertos (seção 8).
 // Só LÊ — não grava nada.
 // Abrir: Configurações → Diagnóstico do sistema, ou Ctrl+Alt+D.
 // ================================================================
@@ -20,6 +21,30 @@
     const BIBLIOTECAS = [['Fuse (busca)', () => typeof window.Fuse, false], ['html2canvas', () => typeof window.html2canvas, true], ['jsPDF', () => typeof window.jspdf, true], ['JsBarcode', () => typeof window.JsBarcode, true]];
     const PASTAS_DA_LOJA = ['clientes', 'products', 'rates', 'maquininhasConfig', 'formasPagamentoConfig', 'vendas'];
     const CHAVES_IMPRESSORA = { recibo: 'vsmart_impressora_termica_escolhida', etiqueta: 'vsmart_impressora_etiqueta_escolhida' };
+
+    // Registro dos toques nos botões de ação dos Concertos (Iniciar reparo, Finalizar, folhas de baixo...): mostra, pra cada toque,
+    // se o dedo se mexeu, se o botão foi trocado na tela no meio do toque e se a folha abriu. Fica na memória (80 linhas) e sai na seção 8.
+    const toques = [];
+    window._vsAnotarToque = t => { toques.push(new Date().toTimeString().slice(0, 8) + '.' + String(Date.now() % 1000).padStart(3, '0') + '  ' + t); if (toques.length > 80) toques.shift(); };
+    (function () {
+        const ALVO = '.rep-btn-pri, .rep-btn-sq, .rep-pular, .rep-duo button, .rep-tb, #repFolha button';
+        const nome = b => ((b.dataset && b.dataset.action) || b.id || String(b.className).split(' ')[0]) + ' "' + (b.textContent || '').trim().slice(0, 18) + '"';
+        let baixo = null;
+        ['pointerdown', 'pointerup', 'pointercancel', 'click'].forEach(tipo => document.addEventListener(tipo, e => {
+            const b = e.target.closest && e.target.closest(ALVO);
+            if (tipo === 'pointerdown') baixo = b ? { b, x: e.clientX, y: e.clientY, t: performance.now() } : null;
+            if (!b) return;
+            let extra = '';
+            if (tipo !== 'pointerdown' && baixo) {
+                extra = ' · dedo andou ' + Math.round(Math.hypot(e.clientX - baixo.x, e.clientY - baixo.y)) + 'px em ' + Math.round(performance.now() - baixo.t) + ' ms';
+                if (baixo.b !== b) extra += ' · BOTÃO DIFERENTE do início do toque';
+                if (!baixo.b.isConnected) extra += ' · o botão do início do toque foi SUBSTITUÍDO na tela';
+            }
+            window._vsAnotarToque(tipo + ' ' + nome(b) + extra);
+            if (tipo === 'click') setTimeout(() => window._vsAnotarToque('   400 ms depois do clique: folha ' + (document.querySelector('#repFolha.active') ? 'ABERTA' : 'fechada') + (document.documentElement.classList.contains('vs-scroll-locked') ? ' · rolagem TRAVADA' : '')), 400);
+        }, true));
+        document.addEventListener('touchcancel', e => { if (baixo) window._vsAnotarToque('touchcancel (o navegador cancelou o toque) em ' + nome(baixo.b)); }, true);
+    })();
 
     const comTempo = (promessa, ms) => Promise.race([promessa, new Promise((_, rej) => setTimeout(() => rej(new Error('sem resposta em ' + (ms / 1000) + 's')), ms))]);
     const lista = (obj, max = 12) => { const ks = Object.keys(obj || {}); return ks.length ? ks.slice(0, max).join(', ') + (ks.length > max ? ` … (+${ks.length - max})` : '') : '(nenhum)'; };
@@ -169,6 +194,10 @@
         await secao('7) Tela do app Android (tela preta ao voltar do segundo plano)', async () => {
             if (!window.VortexAndroid || typeof window.VortexAndroid.lerDiagnosticoTela !== 'function') { L.push('(só existe no app Android)'); return; }
             L.push((window.VortexAndroid.lerDiagnosticoTela() || '').trim() || '(nada registrado ainda)');
+        });
+
+        await secao('8) Toques nos botões dos Concertos (precisa tocar várias vezes)', async () => {
+            L.push(toques.length ? toques.join('\n') : '(nenhum toque registrado ainda — use os botões de Concertos e gere o relatório de novo)');
         });
 
         const topo = ['DIAGNÓSTICO DO SISTEMA — VortexSmart', 'Gerado em ' + new Date().toLocaleString('pt-BR'), ''];

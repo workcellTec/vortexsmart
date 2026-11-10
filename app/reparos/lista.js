@@ -331,6 +331,7 @@
 
     // ── Lista ────────────────────────────────────────────────────
     function renderLista() {
+        if (typeof window._vsAnotarToque === 'function') window._vsAnotarToque('lista de Concertos refeita');
         // Celular: a OS aberta mudou de etapa (avançou, voltou, foi entregue) e saiu do filtro
         // atual. Em vez de sumir da tela, volta pra "Ativos" e mantém o cartão aberto;
         // entregue não aparece em "Ativos", então só fecha.
