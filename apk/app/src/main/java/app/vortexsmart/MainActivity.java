@@ -105,13 +105,14 @@ public class MainActivity extends Activity {
 
     private void montarTela(Bundle estado) {
         hostApp = Uri.parse(BuildConfig.START_URL).getHost();
-        String corGuardada = getPreferences(MODE_PRIVATE).getString("corBarras", null);
-        if (corGuardada != null) aplicarBarras(corGuardada, false);
-
         web = new WebView(this);
         web.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         web.setBackgroundColor(0xFF141517);
         setContentView(web);
+
+        // Só depois do setContentView: antes disso a janela ainda não tem DecorView e getInsetsController() dá NullPointerException (Android 17).
+        String corGuardada = getPreferences(MODE_PRIVATE).getString("corBarras", null);
+        if (corGuardada != null) aplicarBarras(corGuardada, false);
 
         WebSettings cfg = web.getSettings();
         cfg.setJavaScriptEnabled(true);
