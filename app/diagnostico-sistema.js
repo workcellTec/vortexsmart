@@ -64,6 +64,7 @@
             if (motivo) l += ' · ' + motivo;
             if (x.oculta) l += ' · página OCULTA';
             if (x.atraso > 60) l += ' · evento entregue com ' + x.atraso + ' ms de atraso (página ocupada)';
+            if (x.dedoReal !== undefined && Math.abs(ms - x.dedoReal) > 100) l += ' · pelo relógio do Android o dedo ficou ' + x.dedoReal + ' ms (a página demorou pra receber)';
             l += ' · [' + estadoTela() + ']';
             window._vsAnotarToque(l);
             if (x.clicou && x.btn) setTimeout(() => window._vsAnotarToque('   400 ms depois: folha ' + (document.querySelector('#repFolha.active') ? 'ABERTA' : 'fechada') + (document.documentElement.classList.contains('vs-scroll-locked') ? ' · rolagem TRAVADA' : '')), 400);
@@ -71,7 +72,7 @@
         document.addEventListener('pointerdown', e => {
             ultPD = performance.now();
             if (t) fechar(t, 'sem fim antes do toque seguinte');
-            t = { x: e.clientX, y: e.clientY, t0: performance.now(), dist: 0, nome: nome(e.target), btn: e.target.closest && e.target.closest(ALVO), oculta: document.hidden, atraso: Math.round(performance.now() - e.timeStamp) };
+            t = { x: e.clientX, y: e.clientY, t0: performance.now(), dist: 0, nome: nome(e.target), btn: e.target.closest && e.target.closest(ALVO), oculta: document.hidden, atraso: Math.round(performance.now() - e.timeStamp), ts: e.timeStamp };
             const meu = t;
             setTimeout(() => fechar(meu, 'sem soltar nem cancelar em 3 s'), 3000);
         }, true);
@@ -79,6 +80,7 @@
             if (!t) return;
             const meu = t;
             meu.tUp = performance.now();
+            meu.dedoReal = Math.round(e.timeStamp - meu.ts);
             ultUp = e.timeStamp;
             meu.dist = Math.hypot(e.clientX - meu.x, e.clientY - meu.y);
             meu.soltouEm = nome(e.target);
