@@ -1183,6 +1183,7 @@ function loadFinanceiroLancamentos() {
         window._financeiroLancamentos = financeiroLancamentos;
         if (typeof window._finOnLancamentosLoaded === 'function') window._finOnLancamentosLoaded();
         if (typeof window._finOnLancamentosLoadedGraficos === 'function') window._finOnLancamentosLoadedGraficos();
+        window._vsWidgetsDadosMudaram?.();
     });
 }
 window._loadFinanceiroLancamentos = loadFinanceiroLancamentos;
@@ -1194,9 +1195,37 @@ function loadFinanceiroRecorrentes() {
         financeiroRecorrentes = snap.val() || {};
         window._financeiroRecorrentes = financeiroRecorrentes;
         if (typeof window._finOnRecorrentesLoaded === 'function') window._finOnRecorrentesLoaded();
+        window._vsWidgetsDadosMudaram?.();
     });
 }
 window._loadFinanceiroRecorrentes = loadFinanceiroRecorrentes;
+
+// Contas fixas ATIVAS do mês que começa em `inicioMes` (Date), com "paga" e "venceu". Regra única: Movimentações do
+// Financeiro (financeiro/lancamentos.js) e widget "Contas de hoje" do Android (inicio-mobile.js) usam esta função.
+// "Paga" = já existe, nesse mês, um lançamento manual de despesa com o MESMO nome da conta fixa (não há campo próprio
+// no banco pra isso). Nada lança sozinho.
+window._financeiroContasFixas = function (inicioMes) {
+    const nomeNorm = t => String(t == null ? '' : t).trim().toLowerCase();
+    const inicio = inicioMes;
+    const fim = new Date(inicio.getFullYear(), inicio.getMonth() + 1, 1);
+    const pagas = new Set(Object.values(window._financeiroLancamentos || {})
+        .filter(l => l && l.tipo === 'despesa' && l.origem !== 'automatica' && (l.criadoEm || 0) >= inicio.getTime() && (l.criadoEm || 0) < fim.getTime())
+        .map(l => nomeNorm(l.descricao)));
+    const hoje = new Date();
+    const primeiroDoMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1).getTime();
+    const ehMesAtual = inicio.getTime() === primeiroDoMesAtual;
+    const ultimoDia = new Date(inicio.getFullYear(), inicio.getMonth() + 1, 0).getDate();
+    return Object.entries(window._financeiroRecorrentes || {})
+        .map(([id, r]) => ({ id, ...r }))
+        .filter(r => r.ativa)
+        .sort((a, b) => (a.diaDoMes || 0) - (b.diaDoMes || 0))
+        .map(r => {
+            const dia = Math.min(r.diaDoMes || 1, ultimoDia);
+            const paga = pagas.has(nomeNorm(r.nome));
+            const venceu = !paga && (inicio.getTime() < primeiroDoMesAtual || (ehMesAtual && dia < hoje.getDate()));
+            return { ...r, dia, paga, venceu, data: ehMesAtual ? hoje : new Date(inicio.getFullYear(), inicio.getMonth(), dia) };
+        });
+};
 
 // Registro/remoção de receita de venda no Financeiro NÃO tem mais
 // gancho aqui — vivia em financeiroRegistrarReceitaVenda/
@@ -1577,6 +1606,7 @@ function loadProducts() {
 
         // Notifica módulos dependentes (ex: Estoque)
         if (typeof window._onProductsUpdated === 'function') window._onProductsUpdated();
+        window._vsWidgetsDadosMudaram?.();
     });
 }
 

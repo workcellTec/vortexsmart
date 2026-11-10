@@ -383,7 +383,9 @@
         'reparos:novo':    () => { if (podeEm('reparos_criar')) window.openReparosSection?.('reparosForm'); },
         'reparos:lista':   clicarSeLigado('goToReparos'),
         'calculadora':     clicarSeLigado('goToCalculator'),
-        'inicio':          () => window._vsInicioAtualizar?.(),
+        'estoque':         clicarSeLigado('goToEstoque'),
+        'financeiro':      clicarSeLigado('goToFinanceiro'),
+        'inicio':          () => el('ctwNavHome')?.click(),
     };
     let destinoPendente = null;
     function executarDestino() {

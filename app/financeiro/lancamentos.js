@@ -384,25 +384,7 @@
     }
 
     function contasFixasDoMes() {
-        const inicio = mesDasFixas();
-        const fim = new Date(inicio.getFullYear(), inicio.getMonth() + 1, 1);
-        const pagas = new Set(todosLancamentos()
-            .filter(l => l.tipo === 'despesa' && l.origem !== 'automatica' && (l.criadoEm || 0) >= inicio.getTime() && (l.criadoEm || 0) < fim.getTime())
-            .map(l => nomeNorm(l.descricao)));
-        const hoje = new Date();
-        const primeiroDoMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1).getTime();
-        const ehMesAtual = inicio.getTime() === primeiroDoMesAtual;
-        const ultimoDia = new Date(inicio.getFullYear(), inicio.getMonth() + 1, 0).getDate();
-        return Object.entries(window._financeiroRecorrentes || {})
-            .map(([id, r]) => ({ id, ...r }))
-            .filter(r => r.ativa)
-            .sort((a, b) => (a.diaDoMes || 0) - (b.diaDoMes || 0))
-            .map(r => {
-                const dia = Math.min(r.diaDoMes || 1, ultimoDia);
-                const paga = pagas.has(nomeNorm(r.nome));
-                const venceu = !paga && (inicio.getTime() < primeiroDoMesAtual || (ehMesAtual && dia < hoje.getDate()));
-                return { ...r, dia, paga, venceu, data: ehMesAtual ? hoje : new Date(inicio.getFullYear(), inicio.getMonth(), dia) };
-            });
+        return window._financeiroContasFixas(mesDasFixas());   // regra compartilhada com o widget do Android (core.js)
     }
 
     function renderFixas() {

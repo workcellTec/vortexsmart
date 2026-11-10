@@ -18,10 +18,11 @@
 //
 // Meta do mês: configuracoes/metaMes (número, só o Gestor altera).
 //
-// Só no APK do Android: entrega o resumo dos widgets da tela inicial (hoje, 7 dias e concertos) pela
-// ponte window.VortexAndroid.salvarResumo — os números são os mesmos desta tela.
+// Só no APK do Android: entrega o resumo dos widgets da tela inicial (hoje com 7 dias, concertos, meta, formas de
+// pagamento, estoque e contas de hoje) pela ponte window.VortexAndroid.salvarResumo — mesmos números e mesmo escopo
+// por papel desta tela; meta, formas de pagamento e contas só o Gestor recebe.
 //
-// Expõe via window.*: _vsInicioAtualizar, _vsInicioPerfil, _vsAbrirConta, _vsLogoLojaAtualizar
+// Expõe via window.*: _vsInicioAtualizar, _vsInicioPerfil, _vsAbrirConta, _vsLogoLojaAtualizar, _vsWidgetsDadosMudaram
 // Depende de (via window.*): _lojaId, _lojaRef, _dbGet, _dbQuery, _dbOrderByChild, _dbStartAt, _dbEqualTo,
 //   _dbOnValue, _dbUpdate, _firebaseAuthUid, _papelUsuario, _papelAtual, _temPermissao, _nomeUsuario,
 //   _reparosConfig, _percorrerEntradas, _notificacoesRecebidas, _nomeLojaCadastrada, _confirmarSair, openConfiguracoesSection, showCustomModal
@@ -132,18 +133,63 @@
     // ── Widgets do Android (só no APK) ─────────────────────────
     // O APK desenha os widgets da tela inicial do celular. Aqui só entregamos a ele o resumo já calculado
     // (mesmas regras e mesmo escopo por papel da Início). Sem o APK (PWA, PC) não faz nada.
-    const widgetResumo = { hoje: null, concertos: null };
-    let widgetAgendado = null;
+    // Cada bloco leva o instante em que foi calculado (ts): o app pode ficar aberto de um dia pro outro, e o widget precisa saber
+    // que o "Hoje" de ontem é velho mesmo que outro bloco (estoque, contas) tenha sido recalculado agora.
+    const widgetResumo = { hoje: null, concertos: null, meta: null, pagamentos: null, estoque: null, contas: null };
+    const marca = bloco => Object.assign(bloco, { ts: Date.now() });
+    let widgetAgendado = null, contaDoResumo = null;
     function publicarWidgets() {
         const ponte = window.VortexAndroid;
         if (!ponte || typeof ponte.salvarResumo !== 'function') return;
         clearTimeout(widgetAgendado);
         widgetAgendado = setTimeout(() => {   // junta as duas leituras (vendas e concertos) numa entrega só
             try {
-                ponte.salvarResumo(JSON.stringify({ v: 1, ts: Date.now(), proprio: !veTodas(), hoje: widgetResumo.hoje, concertos: widgetResumo.concertos }));
+                ponte.salvarResumo(JSON.stringify(Object.assign({ v: 1, ts: Date.now() }, widgetResumo)));
             } catch (e) { console.warn('[Widgets] não consegui entregar o resumo:', e); }
         }, 300);
     }
+
+    // Estoque e Contas de hoje saem de dados que o app já mantém em tempo real (window.products e o Financeiro do Gestor, ambos
+    // lidos no boot pelo core.js). O core.js chama _vsWidgetsDadosMudaram a cada mudança; aqui só se recalcula e se entrega.
+    // Esgotado = quantidade <= 0 (igual à tela de Estoque); baixo = 1 até o limite dos avisos de estoque (Configurações ›
+    // Notificações, padrão 2), sem os produtos com aviso desligado — mesma regra do aviso diário (functions/index.js).
+    let limiteBaixo = 2, limiteDaLoja = null;
+    function lerLimiteBaixo() {
+        if (!window._lojaId || limiteDaLoja === window._lojaId || typeof window._dbGet !== 'function') return;
+        limiteDaLoja = window._lojaId;
+        window._dbGet(window._lojaRef('notificacoesConfig/estoqueLimiteBaixo')).then(snap => {
+            const v = Number(snap.val());
+            limiteBaixo = snap.val() != null && Number.isFinite(v) && v >= 0 ? v : 2;
+            window._vsWidgetsDadosMudaram();
+        }).catch(() => { /* sem permissão: fica o padrão */ });
+    }
+    function calcularWidgetEstoque() {
+        if (!Array.isArray(window.products)) return;   // 1ª leitura ainda não chegou: não publica "tudo em dia" por engano
+        const lista = window.products.filter(p => p && !p.arquivado);
+        const esgotados = lista.filter(p => (p.quantidade || 0) <= 0);
+        const baixos = lista.filter(p => !p.notificacaoEstoqueDesativada && (p.quantidade || 0) > 0 && p.quantidade <= limiteBaixo);
+        const itens = esgotados.concat(baixos.sort((a, b) => a.quantidade - b.quantidade)).slice(0, 2)
+            .map(p => ({ n: String(p.nome || 'Produto').slice(0, 40), q: p.quantidade || 0 }));
+        widgetResumo.estoque = marca({ esgotados: esgotados.length, baixos: baixos.length, itens });
+    }
+    function calcularWidgetContas() {
+        if (!ehGestor()) { widgetResumo.contas = marca({ estado: 'sem-acesso' }); return; }
+        if (!window._financeiroRecorrentes || !window._financeiroLancamentos || typeof window._financeiroContasFixas !== 'function') return;   // Financeiro ainda lendo
+        const agora = new Date();
+        const dia = agora.getDate();
+        // d = 0: vence hoje · d > 0: dias de atraso (só do mês corrente; "paga" segue a regra do Financeiro)
+        const devidas = window._financeiroContasFixas(new Date(agora.getFullYear(), agora.getMonth(), 1))
+            .filter(c => !c.paga && c.dia <= dia)
+            .map(c => ({ n: String(c.nome || 'Conta').slice(0, 40), v: Number(c.valor) || 0, d: dia - c.dia }))
+            .sort((a, b) => b.d - a.d);
+        widgetResumo.contas = marca({ total: devidas.reduce((t, c) => t + c.v, 0), qtd: devidas.length, itens: devidas.slice(0, 3) });
+    }
+    window._vsWidgetsDadosMudaram = function () {
+        if (!window.VortexAndroid || typeof window.VortexAndroid.salvarResumo !== 'function') return;
+        calcularWidgetEstoque();
+        calcularWidgetContas();
+        publicarWidgets();
+    };
 
     function desenharDia(vendas, pendentes) {
         const agora = new Date();
@@ -155,7 +201,7 @@
         // Widget do Android: últimos 7 dias (do mais antigo ao de hoje) e variação sobre ontem.
         const serie = [];
         for (let i = 6; i >= 0; i--) serie.push(somarEntradas(vendas, ini - i * DIA, ini - i * DIA + DIA - 1));
-        widgetResumo.hoje = { valor: hoje, vendas: lancadasHoje, pct: ontem > 0 ? (hoje - ontem) / ontem * 100 : null, serie };
+        widgetResumo.hoje = marca({ proprio: !veTodas(), valor: hoje, vendas: lancadasHoje, pct: ontem > 0 ? (hoje - ontem) / ontem * 100 : null, serie });
         publicarWidgets();
 
         el('vsIniRotulo').textContent = `${veTodas() ? 'Entrou hoje' : 'Você vendeu hoje'} · ${plural(lancadasHoje, 'venda', 'vendas')}` +
@@ -174,12 +220,14 @@
     }
 
     let totalMes = 0;   // entrou no mês: alimenta o centro da rosca e a barra da meta
+    let totalMesPronto = false;   // só depois da 1ª leitura das vendas: antes disso a meta mostraria 0% por engano (e iria pro widget)
     function desenharRosca(vendas) {
         const agora = new Date();
         const iniMes = new Date(agora.getFullYear(), agora.getMonth(), 1).getTime();
         const fimMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 1).getTime() - 1;
         const porForma = {};
         totalMes = somarEntradas(vendas, iniMes, fimMes, porForma);
+        totalMesPronto = true;
         desenharMeta();
 
         el('vsIniRoscaTotal').textContent = brlCurto(totalMes);
@@ -188,6 +236,9 @@
         leg.innerHTML = '';
 
         const fatias = Object.keys(porForma).filter(k => porForma[k] > 0.004).sort((a, b) => porForma[b] - porForma[a]);
+        // Widget do Android: forma de pagamento do mês é da loja toda, então só o Gestor recebe.
+        widgetResumo.pagamentos = marca(ehGestor() ? { total: totalMes, formas: fatias.slice(0, 4).map(k => ({ k, v: porForma[k] })) } : { estado: 'sem-acesso' });
+        publicarWidgets();
         if (!fatias.length) {
             const v = document.createElement('div');
             v.className = 'vs-ini-vazio';
@@ -240,6 +291,10 @@
         const pctEl = el('vsIniMetaPct'), barra = el('vsIniMetaBarra'), txt = el('vsIniMetaTxt'), card = el('vsIniMeta');
         if (!pctEl) return;
         card.disabled = !ehGestor();
+        if (totalMesPronto) {   // widget do Android: meta é da loja, só o Gestor recebe
+            widgetResumo.meta = marca(!ehGestor() ? { estado: 'sem-acesso' } : metaMes > 0 ? { total, meta: metaMes } : { estado: 'sem-meta' });
+            publicarWidgets();
+        }
         if (metaMes > 0) {
             pctEl.textContent = Math.round(total / metaMes * 100) + '%';
             barra.style.width = Math.min(100, total / metaMes * 100) + '%';
@@ -302,7 +357,7 @@
     function desenharConcertos(ordens) {
         const modo = (window._reparosConfig || {}).modo || null;
         if (!modo) {   // Gestor ainda não escolheu o fluxo: o card leva direto pra configuração
-            widgetResumo.concertos = { estado: 'configurar' };
+            widgetResumo.concertos = marca({ estado: 'configurar' });
             publicarWidgets();
             el('vsIniConcN').textContent = '–';
             const aviso = el('vsIniConcSub');
@@ -318,7 +373,7 @@
         const atrasados = ativos.filter(o => o.prazoTs && o.prazoTs < Date.now()).length;
         const fimDoDia = new Date().setHours(23, 59, 59, 999);
         const vencemHoje = ativos.filter(o => o.prazoTs && o.prazoTs >= Date.now() && o.prazoTs <= fimDoDia).length;
-        widgetResumo.concertos = { andamento: ativos.length, atrasados, vencemHoje };
+        widgetResumo.concertos = marca({ andamento: ativos.length, atrasados, vencemHoje });
         publicarWidgets();
 
         const partes = [];
@@ -388,8 +443,17 @@
     window._vsInicioAtualizar = function () {
         window._vsInicioPerfil();
         if (!window._lojaId || typeof window._dbGet !== 'function' || typeof window._percorrerEntradas !== 'function') return;
+        // Outra conta entrou nesta mesma página (sem recarregar): números do widget da conta anterior não podem vazar.
+        const conta = `${window._firebaseAuthUid}|${window._lojaId}`;
+        if (contaDoResumo !== conta) {
+            contaDoResumo = conta;
+            Object.keys(widgetResumo).forEach(k => { widgetResumo[k] = null; });
+            totalMesPronto = false;
+        }
         conferirLogo();
         ouvirMeta();
+        lerLimiteBaixo();
+        window._vsWidgetsDadosMudaram();
         const minha = ++seq;
         const ativa = () => minha === seq;
 
@@ -438,7 +502,7 @@
                 if (ativa()) desenharConcertos(ordens);
             }).catch(() => {});
         } else {
-            widgetResumo.concertos = { estado: 'sem-acesso' };   // módulo fechado pra este usuário
+            widgetResumo.concertos = marca({ estado: 'sem-acesso' });   // módulo fechado pra este usuário
             publicarWidgets();
         }
 
