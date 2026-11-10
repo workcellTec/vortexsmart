@@ -693,6 +693,29 @@ public class MainActivity extends Activity {
             }
         }
 
+        // Rastro interno do WebView (o que o Chromium faz com cada toque). Começar/parar rodam na thread da tela, como o WebView exige.
+        @JavascriptInterface
+        public String rastroIniciar(String categorias) {
+            runOnUiThread(() -> RastroToque.iniciar(MainActivity.this, categorias));
+            return "iniciando";
+        }
+
+        @JavascriptInterface
+        public String rastroParar() {
+            runOnUiThread(() -> RastroToque.parar(MainActivity.this));
+            return "parando";
+        }
+
+        @JavascriptInterface
+        public String rastroEstado() {
+            return RastroToque.estado();
+        }
+
+        @JavascriptInterface
+        public String rastroLer() {
+            return RastroToque.ler(MainActivity.this);
+        }
+
         @JavascriptInterface
         public String lerDiagnosticoTela() {
             return DiagTela.ler(MainActivity.this);

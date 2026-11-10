@@ -314,6 +314,14 @@
             L.push((window.VortexAndroid.lerToquesNativos() || '').trim() || '(nenhum toque ainda)');
         });
 
+        await secao('10) Rastro interno do toque (Chromium): o que o WebView fez com cada toque', async () => {
+            const A = window.VortexAndroid;
+            if (!A || typeof A.rastroLer !== 'function') { L.push('(só existe no app Android, versão nova)'); return; }
+            if (A.rastroEstado() === 'gravando') A.rastroParar();   // gerar o relatório para a gravação e resume o que foi gravado
+            for (let i = 0; i < 40 && ['gravando', 'salvando'].indexOf(A.rastroEstado()) >= 0; i++) await new Promise(r => setTimeout(r, 250));
+            L.push(A.rastroLer());
+        });
+
         const topo = ['DIAGNÓSTICO DO SISTEMA — VortexSmart', 'Gerado em ' + new Date().toLocaleString('pt-BR'), ''];
         topo.push(alertas.length ? 'PROBLEMAS ENCONTRADOS (' + alertas.length + '):' : 'NENHUM PROBLEMA ENCONTRADO pelo diagnóstico.');
         alertas.forEach(a => topo.push('  ⚠ ' + a));
@@ -404,6 +412,7 @@
                 <textarea id="vsDiagTexto" readonly spellcheck="false" style="flex:1;min-height:50dvh;width:100%;font:12px/1.45 Consolas,monospace;background:#0a0818;color:#d7d3ff;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px;resize:none;white-space:pre;">Lendo o sistema e o banco… (até alguns segundos)</textarea>
                 <div style="display:flex;gap:8px;"><button type="button" id="vsDiagCopiar" class="btn btn-ok" style="flex:1;" disabled>Copiar relatório</button><button type="button" id="vsDiagAtualizar" class="btn" style="flex:0 0 auto;">Atualizar</button></div>
                 <button type="button" id="vsDiagStorage" class="btn btn-secondary" style="width:100%;">Testar envio de imagem (Storage)</button>
+                <button type="button" id="vsDiagRastro" class="btn btn-secondary" style="width:100%;">Gravar rastro dos toques (depois gere o relatório de novo)</button>
             </div>`;
         document.body.appendChild(fundo);
         el('vsDiagFechar').addEventListener('click', fechar);
@@ -428,6 +437,13 @@
             ta.value = ta.value + '\n' + extra; ta.scrollTop = ta.scrollHeight;
             if (copiarBtn) { const texto = ta.value; copiarBtn.onclick = () => copiar(texto, copiarBtn); }
             botao.disabled = false; botao.textContent = 'Testar envio de imagem (Storage)';
+        });
+        el('vsDiagRastro').addEventListener('click', () => {
+            const A = window.VortexAndroid, botao = el('vsDiagRastro');
+            if (!A || typeof A.rastroIniciar !== 'function') { botao.textContent = 'Só existe no app Android (versão nova)'; return; }
+            A.rastroIniciar('');
+            botao.textContent = '● Gravando… use o app e depois gere o relatório';
+            setTimeout(fechar, 900);
         });
         await preencher();
     };
