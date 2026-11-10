@@ -134,31 +134,41 @@ async function rajadaInicio(n) {
   await dorme(700);
   log('depois da rajada: ' + JSON.stringify(await estado()));
 }
-// Ritmo do usuário: toques rápidos e sem esperar o efeito (card, Iniciar reparo, Pular sem foto, em sequência), sem repetir o toque que falhou.
-// Cada toque é conferido na página (o pointerdown chegou?). Reproduz o que o relatório de 18:57 mostrou: o Android entrega o toque ao app e a
-// página não recebe nada, por alguns segundos, depois de um toque cancelado pelo navegador.
-async function ritmoUsuario(rodadas = 3) {
-  log(`── RITMO DO USUÁRIO: ${rodadas} rodadas de toques rápidos, sem repetir os que falharem`);
-  await passo('abrir Concertos (ritmo)', '#goToReparos', (a, d) => d.tela === 'reparosContainer');
-  await dorme(800);
-  await ev(`window.__rit=window.__rit||(()=>{const r={n:0};document.addEventListener('pointerdown',()=>r.n++,true);return r})();0`);
-  let total = 0, perdidos = 0, seguidos = 0, maiorSeq = 0, semAlvo = 0;
-  for (let r = 1; r <= rodadas; r++) {
-    for (const id of ['os5', 'os6', 'os7', 'os8']) {
-      for (const sel of [`.rep-card[data-id="${id}"] .rep-card-main`, `.rep-card[data-id="${id}"] [data-action="avancar"]`, '#repFolhaPular']) {
+// Depois de um toque cancelado: o relatório de 18:57 mostrou o Android entregando 5 toques seguidos ao app sem a página receber nenhum, logo depois
+// de um toque que o navegador cancelou (dedo que virou rolagem). Aqui: provoca o cancelamento (arrasto curto), segura o dedo parado, ou faz um toque normal
+// (controle) e em seguida toca 5 vezes num card, a cada ~0,5 s, contando em que posição da sequência o pointerdown deixou de chegar.
+async function aposCancelamento(n = 8) {
+  log(`── APÓS CANCELAMENTO: ${n} sequências por condição, 5 toques de 60 ms depois de cada gatilho`);
+  await passo('abrir Concertos (cancelamento)', '#goToReparos', (a, d) => d.tela === 'reparosContainer');
+  await dorme(1000);
+  await ev(`window.__rit=window.__rit||(()=>{const r={n:0,c:0};document.addEventListener('pointerdown',()=>r.n++,true);document.addEventListener('pointercancel',()=>r.c++,true);return r})();0`);
+  const sel = '.rep-card[data-id="os6"] .rep-card-main';
+  const gatilhos = [
+    { nome: 'toque normal (controle)', cmd: (x, y) => ['swipe', x, y, x, y, '60'] },
+    { nome: 'dedo parado 300 ms', cmd: (x, y) => ['swipe', x, y, x, y, '300'] },
+    { nome: 'arrasto curto de 14 px (vira rolagem)', cmd: (x, y) => ['swipe', x, y, x, String(+y - 14), '150'] },
+    { nome: 'arrasto de 40 px (rolagem de verdade)', cmd: (x, y) => ['swipe', x, y, x, String(+y - 40), '120'] },
+  ];
+  for (const g of gatilhos) {
+    const perdidosPorPosicao = [0, 0, 0, 0, 0]; let cancelados = 0;
+    for (let k = 0; k < n; k++) {
+      const p0 = await posicao(sel);
+      const x0 = String(Math.round(p0.x * dpr + offX)), y0 = String(Math.round(p0.y * dpr + offY));
+      await ev('window.__rit.c=0;0');
+      adb('shell', 'input', ...g.cmd(x0, y0));
+      cancelados += (await ev('window.__rit.c')) > 0 ? 1 : 0;
+      for (let i = 0; i < 5; i++) {
+        await dorme(150 + Math.floor(Math.random() * 300));
         const p = await posicao(sel);
-        if (!p) { semAlvo++; continue; }
         const antes = await ev('window.__rit.n');
         await tocarFisico(p.x * dpr + offX, p.y * dpr + offY);
-        await dorme(120 + Math.floor(Math.random() * 380));
-        const chegou = (await ev('window.__rit.n')) > antes;
-        total++;
-        if (chegou) seguidos = 0;
-        else { perdidos++; seguidos++; maiorSeq = Math.max(maiorSeq, seguidos); log(`PERDIDO: toque ${total} em ${sel} não chegou na página · ${seguidos} seguido(s) · ${JSON.stringify(await estado())}`); log('   últimas linhas do relatório da página:\n      ' + String(await evSeguro(`JSON.parse(localStorage.getItem('vs_diag_toques')||'[]').slice(-8).join('\\n      ')`))); }
+        await dorme(150);
+        if ((await ev('window.__rit.n')) <= antes) perdidosPorPosicao[i]++;
       }
+      await dorme(800);
     }
+    log(`CANCELAMENTO  ${g.nome.padEnd(40)} cancelados pelo navegador: ${cancelados}/${n} · toques perdidos por posição 1..5: ${perdidosPorPosicao.join(' ')}`);
   }
-  log(`RITMO  ${total} toques, ${perdidos} perdidos (nenhum pointerdown), maior sequência de perdidos: ${maiorSeq}, sem alvo na tela: ${semAlvo}`);
 }
 async function segundoPlano(segundos) {
   log(`── app em segundo plano por ${segundos} s e volta`);
@@ -185,7 +195,7 @@ async function segundoPlano(segundos) {
   await ciclo('3º uso (depois de voltar do segundo plano)', 'os7');
   await segundoPlano(25);
   await ciclo('4º uso (depois de 25 s fora)', 'os8');
-  await ritmoUsuario();
+  await aposCancelamento();
 
   const ruins = resultados.filter(r => !r.ok || r.toques > 1);
   log(`\nRESUMO: ${resultados.length} passos, ${ruins.length} com problema (precisaram de mais de 1 toque ou falharam)`);
