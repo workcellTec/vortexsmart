@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-09.20';
+        window._VS_VERSAO = '2026-11-09.21';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -88,6 +88,27 @@
             document.write('<link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>');
             document.write('<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" crossorigin="anonymous"/>');
         }
+    </script>
+    <script>
+        // Barreira de entrada: abrir o sistema sem internet deixaria a tela de carregamento rodando pra sempre.
+        // Só vale na ABERTURA — se a rede cair com o sistema em uso, nada muda (pode ser só uma queda rápida).
+        // Voltou a rede: recarrega sozinho. (navigator.onLine só é falso quando o aparelho está realmente sem conexão.)
+        (function () {
+            if (navigator.onLine !== false) return;
+            var claro = false;
+            try { claro = localStorage.getItem('vsTema') === 'claro' && document.documentElement.getAttribute('data-shell') === 'mobile'; } catch (e) { /* sem storage: escuro */ }
+            var d = document.createElement('div');
+            d.id = 'vsSemInternet';
+            d.setAttribute('role', 'alert');
+            d.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;box-sizing:border-box;text-align:center;font-family:system-ui,-apple-system,Roboto,sans-serif;background:' + (claro ? '#EEEFF1' : '#141517') + ';color:' + (claro ? '#17181a' : '#e8eaed');
+            d.innerHTML = '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 4.2-2.6M22 8.8A15 15 0 0 0 10.5 5"/><path d="M5 12.5a10 10 0 0 1 3.2-2M19 12.5a10 10 0 0 0-4.6-2.6"/><path d="M8.5 16.2a5 5 0 0 1 2.4-1.2M15.5 16.2a5 5 0 0 0-1-.9"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/><path d="M3 3l18 18"/></svg>'
+                + '<h1 style="margin:0;font-size:1.3rem">Sem internet</h1>'
+                + '<p style="margin:0;max-width:300px;line-height:1.45;opacity:.7">Tente novamente quando estiver conectado à rede.</p>'
+                + '<button type="button" style="margin-top:8px;border:0;border-radius:14px;padding:14px 28px;font-size:1rem;font-weight:600;color:#fff;background:#2f6bf0">Tentar de novo</button>';
+            d.querySelector('button').onclick = function () { location.reload(); };
+            document.documentElement.appendChild(d);
+            window.addEventListener('online', function () { location.reload(); });
+        })();
     </script>
 </head>
 <body>
@@ -1268,7 +1289,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v45';
+  const SW_VERSION = 'v46';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;
