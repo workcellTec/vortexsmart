@@ -26,57 +26,31 @@ public class WidgetHoje extends WidgetBase {
         abrir(ctx, rv, R.id.rodape, "inicio");
 
         JSONObject resumo = WidgetsDados.resumo(ctx);
-        JSONObject hoje = resumo == null ? null : resumo.optJSONObject("hoje");
-        if (hoje == null) {
-            if (WidgetsDados.deslogado(ctx)) estado(rv, "Entre no VortexSmart", "para ver as vendas");
-            else estado(rv, "Abra o VortexSmart", "para carregar os números");
-            abrir(ctx, rv, R.id.raiz, "inicio");
-            return rv;
-        }
+        JSONObject hoje = bloco(resumo, "hoje");
+        if (semBloco(ctx, rv, hoje, "as vendas")) return rv;
 
-        long ts = resumo.optLong("ts");
-        boolean diaAtual = ehHoje(ts);
+        long ts = tsDoBloco(resumo, hoje);
         boolean mostrar = WidgetsDados.valoresVisiveis(ctx);
-        int vendas = hoje.optInt("vendas");
-        String qtd = vendas == 1 ? "1 venda" : vendas + " vendas";
 
         rv.setViewVisibility(R.id.conteudo, View.VISIBLE);
         rv.setViewVisibility(R.id.estado, View.GONE);
-        rv.setViewVisibility(R.id.delta_alta, View.GONE);
-        rv.setViewVisibility(R.id.delta_queda, View.GONE);
-        rv.setViewVisibility(R.id.delta_neutro, View.GONE);
+        rv.setTextViewText(R.id.atualizado, atualizadoEm(ts));
 
-        if (!diaAtual) {
+        if (!ehHoje(ts)) {
             // O resumo é de outro dia (app não foi aberto hoje): mostrar o valor de ontem como se fosse de hoje enganaria.
             rv.setTextViewText(R.id.titulo, "Hoje");
             rv.setTextViewText(R.id.valor, "–");
+            rv.setViewVisibility(R.id.delta_alta, View.GONE);
+            rv.setViewVisibility(R.id.delta_queda, View.GONE);
             rv.setTextViewText(R.id.delta_neutro, "Abra o app p/ atualizar");
             rv.setViewVisibility(R.id.delta_neutro, View.VISIBLE);
             rv.setViewVisibility(R.id.barras, View.INVISIBLE);
-            rv.setTextViewText(R.id.atualizado, atualizadoEm(ts));
             return rv;
         }
 
-        rv.setTextViewText(R.id.titulo, (resumo.optBoolean("proprio") ? "Você vendeu" : "Entrou hoje") + " · " + qtd);
+        rv.setTextViewText(R.id.titulo, tituloHoje(hoje));
         rv.setTextViewText(R.id.valor, mostrar ? dinheiro(hoje.optDouble("valor")) : "R$ ••••");
-
-        if (hoje.isNull("pct")) {
-            rv.setTextViewText(R.id.delta_neutro, "sem vendas ontem");
-            rv.setViewVisibility(R.id.delta_neutro, View.VISIBLE);
-        } else {
-            double pct = hoje.optDouble("pct");
-            String numero = mostrar ? percentual(pct) + "%" : "•••";
-            if (Math.abs(pct) < 0.05) {
-                rv.setTextViewText(R.id.delta_neutro, "igual a ontem");
-                rv.setViewVisibility(R.id.delta_neutro, View.VISIBLE);
-            } else if (pct > 0) {
-                rv.setTextViewText(R.id.delta_alta, "▲ " + numero + " vs. ontem");
-                rv.setViewVisibility(R.id.delta_alta, View.VISIBLE);
-            } else {
-                rv.setTextViewText(R.id.delta_queda, "▼ " + numero + " vs. ontem");
-                rv.setViewVisibility(R.id.delta_queda, View.VISIBLE);
-            }
-        }
+        deltaVsOntem(rv, hoje, mostrar);
 
         // Valores ocultos: as barras também entregam o faturamento (altura relativa), então somem junto.
         Bitmap barras = mostrar ? desenharBarras(hoje.optJSONArray("serie")) : null;
@@ -86,7 +60,6 @@ public class WidgetHoje extends WidgetBase {
         } else {
             rv.setViewVisibility(R.id.barras, View.INVISIBLE);
         }
-        rv.setTextViewText(R.id.atualizado, atualizadoEm(ts));
         return rv;
     }
 

@@ -16,13 +16,8 @@ public class WidgetConcertos extends WidgetBase {
         abrir(ctx, rv, R.id.rodape, "inicio");
 
         JSONObject resumo = WidgetsDados.resumo(ctx);
-        JSONObject c = resumo == null ? null : resumo.optJSONObject("concertos");
-        if (c == null) {
-            if (WidgetsDados.deslogado(ctx)) estado(rv, "Entre no VortexSmart", "para ver os concertos");
-            else estado(rv, "Abra o VortexSmart", "para carregar os números");
-            abrir(ctx, rv, R.id.raiz, "inicio");
-            return rv;
-        }
+        JSONObject c = bloco(resumo, "concertos");
+        if (semBloco(ctx, rv, c, "os concertos")) return rv;
         String situacao = c.optString("estado", "");
         if ("configurar".equals(situacao)) {
             estado(rv, "Configure no app", "o modo de concertos");
@@ -35,7 +30,7 @@ public class WidgetConcertos extends WidgetBase {
             return rv;
         }
 
-        long ts = resumo.optLong("ts");
+        long ts = tsDoBloco(resumo, c);
         int andamento = c.optInt("andamento");
         int atrasados = c.optInt("atrasados");
         // "Vence hoje" é contado em relação ao dia em que o app mandou o resumo: de outro dia, o número não vale mais.
@@ -44,7 +39,7 @@ public class WidgetConcertos extends WidgetBase {
         rv.setViewVisibility(R.id.conteudo, View.VISIBLE);
         rv.setViewVisibility(R.id.estado, View.GONE);
         rv.setTextViewText(R.id.numero, String.valueOf(andamento));
-        rv.setTextViewText(R.id.chip_atrasado, atrasados == 1 ? "1 atrasado" : atrasados + " atrasados");
+        rv.setTextViewText(R.id.chip_atrasado, plural(atrasados, "atrasado", "atrasados"));
         rv.setViewVisibility(R.id.chip_atrasado, atrasados > 0 ? View.VISIBLE : View.GONE);
         rv.setTextViewText(R.id.chip_hoje, vencemHoje == 1 ? "1 vence hoje" : vencemHoje + " vencem hoje");
         rv.setViewVisibility(R.id.chip_hoje, vencemHoje > 0 ? View.VISIBLE : View.GONE);

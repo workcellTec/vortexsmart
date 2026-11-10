@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget "Resumo da loja" (4x2): Hoje + concertos à esquerda; formas de pagamento e meta (só Gestor) à direita. Textos de exemplo = prévia do seletor; em uso, WidgetResumo.java troca tudo. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/raiz"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_fundo">
+    <LinearLayout
+        android:id="@+id/conteudo"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:padding="12dp">
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView
+                android:id="@+id/titulo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="Entrou hoje · 3 vendas"
+                android:textColor="@color/w_suave"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/valor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="R$ 1.840"
+                android:textColor="@color/w_forte"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/delta_alta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="▲ 12,4% vs. ontem"
+                android:textColor="@color/w_ok"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/delta_queda"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="▼ 3,0% vs. ontem"
+                android:textColor="@color/w_perigo"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/delta_neutro"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="igual a ontem"
+                android:textColor="@color/w_suave"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/chip_conc_perigo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/widget_chip_perigo"
+                android:layout_marginTop="8dp"
+                android:paddingStart="8dp"
+                android:paddingTop="3dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="3dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="2 concertos · 1 atrasado"
+                android:textColor="@color/w_perigo"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/chip_conc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/widget_chip_neutro"
+                android:layout_marginTop="8dp"
+                android:paddingStart="8dp"
+                android:paddingTop="3dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="3dp"
+                android:visibility="gone"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="2 concertos"
+                android:textColor="@color/w_primaria"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <LinearLayout
+                android:id="@+id/rodape"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                    <TextView
+                        android:id="@+id/atualizado"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:text="Atualizado 11:42"
+                        android:textColor="@color/w_suave"
+                        android:textSize="9sp" />
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_w_atualizar" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/divisor"
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:background="@color/w_divisor" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+        <LinearLayout
+            android:id="@+id/dir_conteudo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="Forma de pagamento · mês"
+                android:textColor="@color/w_suave"
+                android:textSize="10sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <ImageView
+                    android:id="@+id/rosca"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/widget_rosca_exemplo" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:orientation="vertical">
+                <LinearLayout
+                    android:id="@+id/leg1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <ImageView
+                        android:id="@+id/leg1_ponto"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/widget_ponto" />
+
+                    <TextView
+                        android:id="@+id/leg1_nome"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="5dp"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:text="Crédito"
+                        android:textColor="@color/w_texto"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/leg1_pct"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:text="72%"
+                        android:textColor="@color/w_forte"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/leg2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <ImageView
+                        android:id="@+id/leg2_ponto"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/widget_ponto" />
+
+                    <TextView
+                        android:id="@+id/leg2_nome"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="5dp"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:text="Pix"
+                        android:textColor="@color/w_texto"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/leg2_pct"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:text="28%"
+                        android:textColor="@color/w_forte"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:text="Meta do mês"
+                    android:textColor="@color/w_texto"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/meta_pct"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:text="53%"
+                    android:textColor="@color/w_forte"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <ProgressBar
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:id="@+id/meta_barra"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="4dp"
+                android:max="100"
+                android:progress="53"
+                android:progressDrawable="@drawable/widget_progresso"
+                android:indeterminate="false" />
+
+            <TextView
+                android:id="@+id/meta_txt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="R$ 26,7k de R$ 50k"
+                android:textColor="@color/w_suave"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/dir_bloqueado"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+            <TextView
+                android:id="@+id/dir_bloq_titulo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="Meta e pagamentos"
+                android:textColor="@color/w_forte"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/dir_bloq_sub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:gravity="center"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="Só o Gestor vê"
+                android:textColor="@color/w_suave"
+                android:textSize="11sp" />
+        </LinearLayout>
+        </FrameLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/estado"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone">
+            <TextView
+                android:id="@+id/estado_titulo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="Abra o VortexSmart"
+                android:textColor="@color/w_forte"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/estado_sub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="para carregar os números"
+                android:textColor="@color/w_suave"
+                android:textSize="11sp" />
+    </LinearLayout>
+</FrameLayout>

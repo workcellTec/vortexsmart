@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Só a prévia do seletor: em uso, WidgetResumo.java desenha a rosca com as formas de pagamento reais. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="42dp"
+    android:height="42dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:pathData="M50.00,10.00 A40,40 0 1,1 10.99,58.86"
+        android:fillColor="#00000000"
+        android:strokeColor="#3B82F6"
+        android:strokeWidth="17" />
+    <path
+        android:pathData="M10.47,56.12 A40,40 0 0,1 50.00,10.00"
+        android:fillColor="#00000000"
+        android:strokeColor="#10B981"
+        android:strokeWidth="17" />
+</vector>

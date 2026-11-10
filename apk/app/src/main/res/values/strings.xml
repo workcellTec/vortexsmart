@@ -6,4 +6,12 @@
     <string name="widget_hoje_desc">Quanto entrou hoje e como está em relação a ontem, com os últimos 7 dias.</string>
     <string name="widget_concertos_nome">Concertos</string>
     <string name="widget_concertos_desc">Quantos estão em andamento, atrasados e vencendo hoje.</string>
+    <string name="widget_meta_nome">Meta do mês</string>
+    <string name="widget_meta_desc">Quanto falta para bater a meta e quantos dias restam. Só para o Gestor.</string>
+    <string name="widget_estoque_nome">Estoque</string>
+    <string name="widget_estoque_desc">Produtos esgotados e baixos, com os mais urgentes.</string>
+    <string name="widget_resumo_nome">Resumo da loja</string>
+    <string name="widget_resumo_desc">Hoje, concertos, formas de pagamento e meta num só widget.</string>
+    <string name="widget_contas_nome">Contas de hoje</string>
+    <string name="widget_contas_desc">Contas fixas que vencem hoje ou estão atrasadas. Só para o Gestor.</string>
 </resources>

@@ -64,6 +64,54 @@
                 android:resource="@xml/widget_concertos_info" />
         </receiver>
 
+        <receiver
+            android:name=".WidgetMeta"
+            android:exported="false"
+            android:label="@string/widget_meta_nome">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_meta_info" />
+        </receiver>
+
+        <receiver
+            android:name=".WidgetEstoque"
+            android:exported="false"
+            android:label="@string/widget_estoque_nome">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_estoque_info" />
+        </receiver>
+
+        <receiver
+            android:name=".WidgetResumo"
+            android:exported="false"
+            android:label="@string/widget_resumo_nome">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_resumo_info" />
+        </receiver>
+
+        <receiver
+            android:name=".WidgetContas"
+            android:exported="false"
+            android:label="@string/widget_contas_nome">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_contas_info" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.arquivos"

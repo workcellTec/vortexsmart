@@ -11,4 +11,5 @@
     <color name="w_perigo">#F87171</color>
     <color name="w_perigo_suave">#26F87171</color>
     <color name="w_ok">#34D399</color>
+    <color name="w_divisor">#2B2E33</color>
 </resources>

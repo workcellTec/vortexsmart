@@ -10,6 +10,8 @@ import android.net.Uri;
 import android.view.View;
 import android.widget.RemoteViews;
 
+import org.json.JSONObject;
+
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.SimpleDateFormat;
@@ -40,11 +42,15 @@ public abstract class WidgetBase extends AppWidgetProvider {
         }
     }
 
-    /** Redesenha todos os widgets de dados (Hoje, Concertos). Ações rápidas não dependem de dados. */
+    /** Redesenha todos os widgets de dados. Ações rápidas não dependem de dados. */
     static void atualizarTodos(Context ctx) {
         AppWidgetManager gerente = AppWidgetManager.getInstance(ctx);
         atualizarClasse(ctx, gerente, new WidgetHoje());
         atualizarClasse(ctx, gerente, new WidgetConcertos());
+        atualizarClasse(ctx, gerente, new WidgetMeta());
+        atualizarClasse(ctx, gerente, new WidgetEstoque());
+        atualizarClasse(ctx, gerente, new WidgetResumo());
+        atualizarClasse(ctx, gerente, new WidgetContas());
     }
 
     private static void atualizarClasse(Context ctx, AppWidgetManager gerente, WidgetBase widget) {
@@ -73,7 +79,80 @@ public abstract class WidgetBase extends AppWidgetProvider {
         rv.setTextViewText(R.id.estado_sub, sub);
     }
 
+    /**
+     * Bloco do resumo ainda não chegou (app nunca aberto logado) ou foi apagado (logout): mostra o aviso e devolve true.
+     * Quem chama só segue se devolver false.
+     */
+    static boolean semBloco(Context ctx, RemoteViews rv, JSONObject bloco, String paraVer) {
+        if (bloco != null) return false;
+        if (WidgetsDados.deslogado(ctx)) estado(rv, "Entre no VortexSmart", "para ver " + paraVer);
+        else estado(rv, "Abra o VortexSmart", "para carregar os números");
+        abrir(ctx, rv, R.id.raiz, "inicio");
+        return true;
+    }
+
+    static JSONObject bloco(JSONObject resumo, String nome) {
+        return resumo == null ? null : resumo.optJSONObject(nome);
+    }
+
+    /** Instante em que o bloco foi calculado pelo sistema (o app pode ficar aberto de um dia pro outro). */
+    static long tsDoBloco(JSONObject resumo, JSONObject bloco) {
+        return bloco.optLong("ts", resumo.optLong("ts"));
+    }
+
+    // ── Pedaços que Hoje e Resumo da loja repetem ─────────────────
+
+    /** "Entrou hoje · 3 vendas" (ou "Você vendeu" quando a pessoa só vê as próprias vendas). */
+    static String tituloHoje(JSONObject hoje) {
+        return (hoje.optBoolean("proprio") ? "Você vendeu" : "Entrou hoje") + " · " + plural(hoje.optInt("vendas"), "venda", "vendas");
+    }
+
+    /** ▲ 12,4% vs. ontem / ▼ 3,0% vs. ontem / igual a ontem / sem vendas ontem. Valores ocultos: o número vira •••. */
+    static void deltaVsOntem(RemoteViews rv, JSONObject hoje, boolean mostrar) {
+        rv.setViewVisibility(R.id.delta_alta, View.GONE);
+        rv.setViewVisibility(R.id.delta_queda, View.GONE);
+        rv.setViewVisibility(R.id.delta_neutro, View.GONE);
+        if (hoje.isNull("pct")) {
+            rv.setTextViewText(R.id.delta_neutro, "sem vendas ontem");
+            rv.setViewVisibility(R.id.delta_neutro, View.VISIBLE);
+            return;
+        }
+        double pct = hoje.optDouble("pct");
+        String numero = mostrar ? percentual(pct) + "%" : "•••";
+        if (Math.abs(pct) < 0.05) {
+            rv.setTextViewText(R.id.delta_neutro, "igual a ontem");
+            rv.setViewVisibility(R.id.delta_neutro, View.VISIBLE);
+        } else if (pct > 0) {
+            rv.setTextViewText(R.id.delta_alta, "▲ " + numero + " vs. ontem");
+            rv.setViewVisibility(R.id.delta_alta, View.VISIBLE);
+        } else {
+            rv.setTextViewText(R.id.delta_queda, "▼ " + numero + " vs. ontem");
+            rv.setViewVisibility(R.id.delta_queda, View.VISIBLE);
+        }
+    }
+
     // ── Formatação ────────────────────────────────────────────────
+
+    static String plural(int n, String um, String varios) {
+        return n == 1 ? "1 " + um : n + " " + varios;
+    }
+
+    /** R$ 850 · R$ 26,7k · R$ 1,3M — mesmo formato do "brlCurto" da Início. */
+    static String dinheiroCurto(double valor) {
+        DecimalFormat uma = new DecimalFormat("0.#", DecimalFormatSymbols.getInstance(PT_BR));
+        double abs = Math.abs(valor);
+        String sinal = valor < 0 ? "-" : "";
+        if (abs >= 1e6) return sinal + "R$ " + uma.format(abs / 1e6) + "M";
+        if (abs >= 1e3) return sinal + "R$ " + uma.format(abs / 1e3) + "k";
+        return sinal + "R$ " + Math.round(abs);
+    }
+
+    /** Dias que faltam pro fim do mês, no texto do widget da meta. */
+    static String diasParaFimDoMes() {
+        Calendar c = Calendar.getInstance();
+        int resto = c.getActualMaximum(Calendar.DAY_OF_MONTH) - c.get(Calendar.DAY_OF_MONTH);
+        return resto == 0 ? "último dia do mês" : resto == 1 ? "1 dia para o fim do mês" : resto + " dias para o fim do mês";
+    }
 
     /** R$ 84,50 · R$ 1.840 · R$ 123k (cabe no widget pequeno sem quebrar linha). */
     static String dinheiro(double valor) {
@@ -88,6 +167,15 @@ public abstract class WidgetBase extends AppWidgetProvider {
     /** 12,4 (sempre com uma casa) — o sinal e a seta ficam por conta de quem chama. */
     static String percentual(double pct) {
         return new DecimalFormat("0.0", DecimalFormatSymbols.getInstance(PT_BR)).format(Math.abs(pct));
+    }
+
+    /** O instante {@code ts} caiu no mês corrente, no fuso do aparelho? */
+    static boolean ehMesAtual(long ts) {
+        if (ts <= 0) return false;
+        Calendar a = Calendar.getInstance();
+        Calendar b = Calendar.getInstance();
+        b.setTimeInMillis(ts);
+        return a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.MONTH) == b.get(Calendar.MONTH);
     }
 
     /** O instante {@code ts} (milissegundos) caiu no dia de hoje, no fuso do aparelho? */
