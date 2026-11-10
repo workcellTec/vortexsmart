@@ -853,6 +853,16 @@
         window._vsDestravarScroll && window._vsDestravarScroll();
         if (folhaComHistorico) { folhaComHistorico = false; if (typeof window._vsFecharModal === 'function') window._vsFecharModal(); }
     }
+    // Fecha a folha sem mexer no histórico: pra quem vai navegar em seguida (o assistente de entrega abre Vendas/Documentos),
+    // porque o history.back() de fecharFolha é assíncrono e desfaria a navegação.
+    function fecharFolhaLimpo() {
+        if (!folhaEl || !folhaEl.classList.contains('active')) return;
+        folhaEl.classList.remove('active');
+        folhaTrava = false;
+        folhaComHistorico = false;
+        window._vsDestravarScroll && window._vsDestravarScroll();
+        if (typeof window._vsLimparModalSemVoltar === 'function') window._vsLimparModalSemVoltar();
+    }
     // Fecha a folha e SÓ DEPOIS abre outra janela com histórico própria (o assistente de entrega):
     // fechar desfaz uma entrada do histórico de forma assíncrona, e abrir antes disso faria o
     // "voltar" atrasado fechar a janela nova.
@@ -871,6 +881,8 @@
         folhaTrava = true;
         folhaEl.firstElementChild.innerHTML = `<div class="vs-folha-alca"></div><div class="rep-salvando"><div class="rep-spin"></div><span>${texto}</span></div>`;
     }
+    // A mesma folha, usada pelo assistente de entrega (reparos/finalizar-entrega.js) no celular.
+    window._reparosFolha = { abrir: abrirFolha, fechar: fecharFolha, fecharLimpo: fecharFolhaLimpo, salvando: folhaSalvando, travar: v => { folhaTrava = !!v; }, ic };
 
     function abrirFolhaFotoEtapa(os, novoStatus) {
         const info = czEtapa(os.modo, novoStatus);
@@ -1010,7 +1022,8 @@
                     if (MOB) card.querySelector('.rep-card-main').setAttribute('aria-expanded', 'true');
                     panel.style.display = 'block';
                     renderPainel(panel, os);
-                    if (MOB) requestAnimationFrame(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+                    // Instantâneo: na rolagem suave o botão "Iniciar reparo" andava por ~0,3 s e o toque nessa hora se perdia.
+                    if (MOB) requestAnimationFrame(() => card.scrollIntoView({ behavior: 'instant', block: 'start' }));
                 }
             };
             const cabeca = card.querySelector('[data-action="toggle"]');

@@ -2238,6 +2238,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pularPopstate) { pularPopstate = false; return; }
         const veioDeModal = voltandoDeModal;
         voltandoDeModal = false;
+        // Este popstate é o eco do history.back() que o próprio app deu ao fechar uma folha/modal (_vsFecharModal). Ele chega
+        // depois, e se outra folha já tiver aberto nesse intervalo, o eco a fechava na hora (o toque "não fazia nada").
+        // Fechar uma folha/modal só tira a entrada do histórico: a tela embaixo já está certa, então não há mais nada a fazer.
+        if (veioDeModal) return;
         if (window._vsOperacaoBloqueante) {
             history.pushState(e.state, ''); // reempurra o estado que acabamos de sair, anulando o "voltar" na prática
             if (typeof window.showCustomModal === 'function') window.showCustomModal({ message: operacaoBloqueanteMsg });
@@ -2251,11 +2255,6 @@ document.addEventListener('DOMContentLoaded', () => {
             modalFechandoViaPopstate = false;
             return; // não deixa cair pra navegação de seção normal também
         }
-
-        // Fechar folha/modal/câmera só tira a entrada do modal do histórico: a tela embaixo já está certa.
-        // Re-renderizá-la (restaurar vsFn) apagava o que a pessoa tinha na tela — ex: o carrinho da Nova Venda
-        // ao fechar o leitor de código de barras (a 2ª leitura "não somava").
-        if (veioDeModal) return;
 
         // Tela com alterações não salvas (ex: Configurações › Documentos) segura a saída e pergunta antes.
         if (typeof window._vsGuardaSaida === 'function' && window._vsGuardaSaida()) {
