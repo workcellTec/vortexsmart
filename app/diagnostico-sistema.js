@@ -25,13 +25,13 @@
     // Registro de TODOS os toques que chegam na página (seção 8): uma linha por toque, com o alvo, quanto o dedo andou, se o botão foi
     // trocado na tela no meio do toque e, principalmente, se o toque virou clique. "clique NÃO" = a página recebeu o dedo e nada aconteceu;
     // toque que nem aparece aqui mas aparece na seção 9 (APK) = o aparelho entregou ao app e o WebView não passou pra página.
-    // Fica salvo no aparelho (120 linhas) pra sobreviver a recarregamentos da página, que antes apagavam a evidência.
+    // Fica salvo no aparelho (200 linhas) pra sobreviver a recarregamentos da página, que antes apagavam a evidência.
     const CHAVE_TOQUES = 'vs_diag_toques';
     const toques = [];
     try { JSON.parse(localStorage.getItem(CHAVE_TOQUES) || '[]').forEach(l => toques.push(l)); } catch (_) { /* sem armazenamento: só memória */ }
     window._vsAnotarToque = t => {
         toques.push(new Date().toTimeString().slice(0, 8) + '.' + String(Date.now() % 1000).padStart(3, '0') + '  ' + t);
-        if (toques.length > 120) toques.shift();
+        if (toques.length > 200) toques.shift();
         try { localStorage.setItem(CHAVE_TOQUES, JSON.stringify(toques)); } catch (_) { /* idem */ }
     };
     window._vsAnotarToque('── página carregada, versão ' + (window._VS_VERSAO || '?') + ' ──');
@@ -50,6 +50,9 @@
                 .map(id => document.getElementById(id)).find(el => el && el.style.display !== 'none' && !el.classList.contains('hidden'));
             return e ? e.id : '?';
         };
+        // Estado que se acumula entre telas e pode "sujar" os botões: pilha do histórico, trava de rolagem, folha de baixo.
+        const estadoTela = () => 'pilha ' + history.length + ' · rolagem ' + (document.body.classList.contains('vs-scroll-locked') ? 'TRAVADA' : 'livre')
+            + ' · folha ' + (document.querySelector('#repFolha.active') ? 'ABERTA' : 'fechada') + ' · tela ' + secaoVisivel();
         const fechar = (x, motivo) => {
             if (x.fim) return;
             x.fim = true;
@@ -61,6 +64,7 @@
             if (motivo) l += ' · ' + motivo;
             if (x.oculta) l += ' · página OCULTA';
             if (x.atraso > 60) l += ' · evento entregue com ' + x.atraso + ' ms de atraso (página ocupada)';
+            l += ' · [' + estadoTela() + ']';
             window._vsAnotarToque(l);
             if (x.clicou && x.btn) setTimeout(() => window._vsAnotarToque('   400 ms depois: folha ' + (document.querySelector('#repFolha.active') ? 'ABERTA' : 'fechada') + (document.documentElement.classList.contains('vs-scroll-locked') ? ' · rolagem TRAVADA' : '')), 400);
         };
@@ -101,6 +105,23 @@
         const cancelou = () => { if (t) { t.cancelado = true; t.tUp = performance.now(); fechar(t); } };
         document.addEventListener('pointercancel', cancelou, true);
         document.addEventListener('touchcancel', cancelou, true);
+    })();
+
+    // Histórico do navegador: cada empilhar/voltar e a chegada do "popstate" (o eco do voltar). Mostra se o eco demora ou chega
+    // fora de hora (o app ignora o eco só por 600 ms) e se a pilha cresce a cada toque em Início.
+    (function () {
+        const nota = t => window._vsAnotarToque(t);
+        const resumo = st => !st ? 'null' : st.vsModal ? 'folha' : st.vsExitGuard ? 'guarda' : st.vsBase ? 'base' : (st.vsFn || '?');
+        const quem = () => { const f = (new Error().stack || '').split('\n')[3] || ''; const m = f.match(/at (?:async )?([\w$.<>]+)/); return m ? m[1] : '?'; };
+        ['pushState', 'replaceState'].forEach(nome => {
+            const orig = history[nome];
+            history[nome] = function (st) { const r = orig.apply(this, arguments); nota('   history.' + nome + ' ' + resumo(st) + ' · pilha ' + history.length + ' · por ' + quem()); return r; };
+        });
+        ['back', 'go'].forEach(nome => {
+            const orig = history[nome];
+            history[nome] = function () { nota('   history.' + nome + '(' + [].join.call(arguments, ',') + ') · estado atual ' + resumo(history.state) + ' · por ' + quem()); return orig.apply(this, arguments); };
+        });
+        window.addEventListener('popstate', e => nota('   popstate chegou → ' + resumo(e.state) + ' · pilha ' + history.length), true);
     })();
 
     // Saúde da página (mesmo registro da seção 8): rolagens (a com "embalo" continua depois que o dedo sai e pode engolir toques),
