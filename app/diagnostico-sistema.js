@@ -3,7 +3,8 @@
 // Mostra, num relatório que dá pra COPIAR e mandar pro suporte, o que o app
 // realmente está vendo neste computador: versão, arquivos carregados, sessão,
 // o que está na memória × o que o banco tem de verdade (lido na hora),
-// leituras negadas, impressoras e os erros capturados desde que o app abriu.
+// leituras negadas, impressoras, os erros capturados desde que o app abriu e,
+// só no APK, o registro do ciclo de vida da tela (pausa/volta, JS, quadro desenhado, toque).
 // Só LÊ — não grava nada.
 // Abrir: Configurações → Diagnóstico do sistema, ou Ctrl+Alt+D.
 // ================================================================
@@ -163,6 +164,11 @@
             const erros = (window.__vsErros || []).slice(-30);
             if (erros.length) { erros.forEach(e => L.push('• ' + e)); alertas.push(erros.length + ' erro(s) capturado(s) — veja a seção 6.'); }
             else L.push('Nenhum erro capturado.');
+        });
+
+        await secao('7) Tela do app Android (tela preta ao voltar do segundo plano)', async () => {
+            if (!window.VortexAndroid || typeof window.VortexAndroid.lerDiagnosticoTela !== 'function') { L.push('(só existe no app Android)'); return; }
+            L.push((window.VortexAndroid.lerDiagnosticoTela() || '').trim() || '(nada registrado ainda)');
         });
 
         const topo = ['DIAGNÓSTICO DO SISTEMA — VortexSmart', 'Gerado em ' + new Date().toLocaleString('pt-BR'), ''];

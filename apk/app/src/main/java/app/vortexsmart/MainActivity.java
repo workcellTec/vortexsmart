@@ -12,14 +12,17 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Message;
+import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.util.Base64;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsetsController;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -73,6 +76,7 @@ public class MainActivity extends Activity {
         + "function cor(){var m=document.querySelectorAll('meta[name=\"theme-color\"]');var c=m.length?m[m.length-1].content:'';if(c)VortexAndroid.corBarras(c)}"
         + "cor();new MutationObserver(cor).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['content']});"
         + "document.addEventListener('DOMContentLoaded',cor);"
+        + "document.addEventListener('visibilitychange',function(){VortexAndroid.diag('visibilitychange → '+document.visibilityState)});"
         + "})();";
 
     private WebView web;
@@ -82,6 +86,10 @@ public class MainActivity extends Activity {
     private Atualizador atualizador;
     /** Tela pedida por um toque num widget (ex.: "venda:nova"); entregue ao sistema assim que a página carrega. */
     private String destinoPendente;
+    // Diagnóstico da tela preta ao voltar do segundo plano (ver DiagTela).
+    private long pausadoEm;
+    private long voltouEm;
+    private boolean aguardandoToque;
 
     @Override
     protected void onCreate(Bundle estado) {
@@ -89,6 +97,7 @@ public class MainActivity extends Activity {
         RelatorioErro.instalar(this);
         // Só na abertura nova: se o sistema está restaurando o app, o extra do intent é de um toque antigo.
         if (estado == null) lerDestino(getIntent());
+        DiagTela.registrar(this, "onCreate " + (estado == null ? "abertura nova" : "RESTAURANDO estado salvo (o sistema tinha fechado o app)"));
         // Se o app caiu na vez anterior, mostra o motivo antes de abrir (e deixa abrir de novo se a pessoa quiser).
         String relatorio = RelatorioErro.lerEApagar(this);
         if (relatorio != null) {
@@ -189,18 +198,69 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        DiagTela.registrar(this, "onResume" + (pausadoEm > 0 ? " (fora da tela há " + (SystemClock.elapsedRealtime() - pausadoEm) / 1000 + " s)" : ""));
         if (web != null) {
             web.onResume();
             web.resumeTimers();
             repintar();
+            sondar();
         }
         if (atualizador != null) atualizador.aoVoltar();
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        DiagTela.registrar(this, "onStart");
+    }
+
+    @Override
+    protected void onStop() {
+        DiagTela.registrar(this, "onStop");
+        super.onStop();
+    }
+
+    @Override
+    public void onTrimMemory(int nivel) {
+        super.onTrimMemory(nivel);
+        DiagTela.registrar(this, "onTrimMemory nível " + nivel);
+    }
+
+    @Override
     public void onWindowFocusChanged(boolean temFoco) {
         super.onWindowFocusChanged(temFoco);
+        DiagTela.registrar(this, "foco da janela: " + temFoco);
         if (temFoco) repintar();
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (aguardandoToque && ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
+            aguardandoToque = false;
+            DiagTela.registrar(this, "1º toque, " + (SystemClock.elapsedRealtime() - voltouEm) + " ms depois do onResume");
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    /**
+     * Ao voltar do segundo plano, anota o que o WebView e a página estão fazendo: o JS responde? A página acha que está
+     * visível? Um quadro (requestAnimationFrame) é desenhado antes do toque? Com isso dá pra separar "página morta" de
+     * "página viva que o sistema só não desenhou".
+     */
+    private void sondar() {
+        final long inicio = SystemClock.elapsedRealtime();
+        voltouEm = inicio;
+        aguardandoToque = true;
+        final boolean[] respondeu = {false};
+        DiagTela.registrar(this, "webview " + web.getWidth() + "x" + web.getHeight() + " visível=" + web.isShown() + " foco=" + hasWindowFocus());
+        web.evaluateJavascript("(function(){var t=Date.now(),ok=false;"
+            + "requestAnimationFrame(function(){ok=true;VortexAndroid.diag('quadro desenhado '+(Date.now()-t)+' ms depois')});"
+            + "setTimeout(function(){if(!ok)VortexAndroid.diag('NENHUM quadro desenhado em 2 s')},2000);"
+            + "return document.visibilityState+' hidden='+document.hidden})()", resultado -> {
+                respondeu[0] = true;
+                DiagTela.registrar(this, "JS respondeu em " + (SystemClock.elapsedRealtime() - inicio) + " ms: " + resultado);
+            });
+        web.postDelayed(() -> { if (!respondeu[0]) DiagTela.registrar(this, "JS SEM resposta em 2 s"); }, 2000);
     }
 
     /** Ao voltar do segundo plano o WebView às vezes continua sem desenhar (tela preta) até o primeiro toque: força o redesenho. */
@@ -213,6 +273,8 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        pausadoEm = SystemClock.elapsedRealtime();
+        DiagTela.registrar(this, "onPause");
         if (web != null) {
             CookieManager.getInstance().flush();
             web.onPause();
@@ -296,6 +358,12 @@ public class MainActivity extends Activity {
         public void onPageFinished(WebView v, String url) {
             v.evaluateJavascript(JS_PONTE, null);
             entregarDestino();
+        }
+
+        @Override
+        public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail detalhe) {
+            DiagTela.registrar(MainActivity.this, "PROCESSO DO WEBVIEW MORREU (didCrash=" + detalhe.didCrash() + "; false = o sistema matou por falta de memória)");
+            return false;
         }
 
         @Override
@@ -399,6 +467,17 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void salvarResumo(String json) {
             if (WidgetsDados.salvarResumo(MainActivity.this, json)) WidgetBase.atualizarTodos(MainActivity.this);
+        }
+
+        // Diagnóstico da tela: a página avisa eventos (visibilidade, quadro desenhado) e o relatório lê tudo de volta.
+        @JavascriptInterface
+        public void diag(String mensagem) {
+            DiagTela.registrar(MainActivity.this, "página: " + (mensagem == null ? "" : mensagem.substring(0, Math.min(mensagem.length(), 200))));
+        }
+
+        @JavascriptInterface
+        public String lerDiagnosticoTela() {
+            return DiagTela.ler(MainActivity.this);
         }
 
         @JavascriptInterface
