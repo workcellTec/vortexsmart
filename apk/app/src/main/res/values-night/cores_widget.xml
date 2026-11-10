@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="w_fundo">#1D1F22</color>
+    <color name="w_texto">#E6E8EB</color>
+    <color name="w_forte">#FFFFFF</color>
+    <color name="w_suave">#8E939B</color>
+    <color name="w_primaria">#2979FF</color>
+    <color name="w_primaria_suave">#332979FF</color>
+    <color name="w_alerta">#FBBF24</color>
+    <color name="w_alerta_suave">#26FBBF24</color>
+    <color name="w_perigo">#F87171</color>
+    <color name="w_perigo_suave">#26F87171</color>
+    <color name="w_ok">#34D399</color>
+</resources>

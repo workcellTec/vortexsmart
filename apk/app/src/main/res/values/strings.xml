@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">VortexSmart</string>
+    <string name="widget_acoes_nome">Ações rápidas</string>
+    <string name="widget_acoes_desc">Vender, ler código de barras, novo concerto e calculadora a um toque.</string>
+    <string name="widget_hoje_nome">Hoje</string>
+    <string name="widget_hoje_desc">Quanto entrou hoje e como está em relação a ontem, com os últimos 7 dias.</string>
+    <string name="widget_concertos_nome">Concertos</string>
+    <string name="widget_concertos_desc">Quantos estão em andamento, atrasados e vencendo hoje.</string>
 </resources>

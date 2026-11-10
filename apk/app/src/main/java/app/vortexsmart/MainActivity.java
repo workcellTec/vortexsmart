@@ -31,6 +31,8 @@ import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
 
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
@@ -78,11 +80,15 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> retornoArquivo;
     private PermissionRequest pedidoPermissao;
     private Atualizador atualizador;
+    /** Tela pedida por um toque num widget (ex.: "venda:nova"); entregue ao sistema assim que a página carrega. */
+    private String destinoPendente;
 
     @Override
     protected void onCreate(Bundle estado) {
         super.onCreate(estado);
         RelatorioErro.instalar(this);
+        // Só na abertura nova: se o sistema está restaurando o app, o extra do intent é de um toque antigo.
+        if (estado == null) lerDestino(getIntent());
         // Se o app caiu na vez anterior, mostra o motivo antes de abrir (e deixa abrir de novo se a pessoa quiser).
         String relatorio = RelatorioErro.lerEApagar(this);
         if (relatorio != null) {
@@ -143,6 +149,35 @@ public class MainActivity extends Activity {
 
         atualizador = new Atualizador(this);
         if (estado == null) atualizador.aoAbrir();
+    }
+
+    // ── Widgets: abrir o app direto numa tela ─────────────────────
+
+    /** Guarda a tela pedida pelo widget e tira o extra do intent, pra não repetir se a Activity for recriada. */
+    private void lerDestino(Intent it) {
+        if (it == null) return;
+        String destino = it.getStringExtra("destino");
+        if (destino == null) return;
+        it.removeExtra("destino");
+        destinoPendente = destino;
+    }
+
+    /** Pede ao sistema pra abrir a tela. Se ele ainda estiver carregando (login, scripts), tenta de novo por até ~20 s. */
+    private void entregarDestino() {
+        if (destinoPendente == null || web == null) return;
+        String destino = JSONObject.quote(destinoPendente);
+        destinoPendente = null;
+        web.evaluateJavascript("(function(d){var n=0;(function t(){if(window._vsAbrirDestino)window._vsAbrirDestino(d);"
+            + "else if(n++<40)setTimeout(t,500)})()})(" + destino + ")", null);
+    }
+
+    /** Com o app já aberto, o toque no widget chega aqui (launchMode singleTask) em vez de abrir uma segunda janela. */
+    @Override
+    protected void onNewIntent(Intent it) {
+        super.onNewIntent(it);
+        setIntent(it);
+        lerDestino(it);
+        entregarDestino();
     }
 
     @Override
@@ -260,6 +295,7 @@ public class MainActivity extends Activity {
         @Override
         public void onPageFinished(WebView v, String url) {
             v.evaluateJavascript(JS_PONTE, null);
+            entregarDestino();
         }
 
         @Override
@@ -359,6 +395,29 @@ public class MainActivity extends Activity {
     }
 
     private class Ponte {
+        // Widgets: o sistema manda o resumo do dia (já calculado) e os widgets só desenham.
+        @JavascriptInterface
+        public void salvarResumo(String json) {
+            if (WidgetsDados.salvarResumo(MainActivity.this, json)) WidgetBase.atualizarTodos(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public void limparResumo() {
+            WidgetsDados.limpar(MainActivity.this);
+            WidgetBase.atualizarTodos(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public boolean widgetsValoresVisiveis() {
+            return WidgetsDados.valoresVisiveis(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public void widgetsMostrarValores(boolean visiveis) {
+            WidgetsDados.definirValoresVisiveis(MainActivity.this, visiveis);
+            WidgetBase.atualizarTodos(MainActivity.this);
+        }
+
         @JavascriptInterface
         public void corBarras(String hex) {
             runOnUiThread(() -> aplicarBarras(hex, true));

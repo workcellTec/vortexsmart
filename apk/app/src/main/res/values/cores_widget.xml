@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cores dos widgets da tela inicial (mesma paleta do celular do sistema; versão escura em values-night). -->
+<resources>
+    <color name="w_fundo">#FFFFFF</color>
+    <color name="w_texto">#1F2328</color>
+    <color name="w_forte">#0B0D10</color>
+    <color name="w_suave">#68707A</color>
+    <color name="w_primaria">#2563EB</color>
+    <color name="w_primaria_suave">#1F2563EB</color>
+    <color name="w_alerta">#D97706</color>
+    <color name="w_alerta_suave">#21D97706</color>
+    <color name="w_perigo">#DC2626</color>
+    <color name="w_perigo_suave">#1ADC2626</color>
+    <color name="w_ok">#059669</color>
+    <color name="w_branco">#FFFFFF</color>
+</resources>
