@@ -1,0 +1,39 @@
+# Publica o app (pasta app/) no Firebase Hosting: o endereço oficial vortex-b3761.web.app.
+# SÓ hosting — nunca mexe em functions, regras do banco ou Storage (esses só pelo PC).
+# Como usar: Actions > "Publicar no Firebase (hosting)" > Run workflow.
+# Requer o segredo FIREBASE_TOKEN (gerado no Termux com: firebase login:ci --no-localhost).
+name: Publicar no Firebase (hosting)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hosting:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir segredo
+        run: |
+          if [ -z "$FIREBASE_TOKEN" ]; then
+            echo "::error::Falta o segredo FIREBASE_TOKEN (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Versão que vai ao ar
+        run: |
+          V=$(grep -o "_VS_VERSAO = '[^']*'" app/index.html | head -1)
+          echo "Publicando $V"
+          echo "### Publicando $V em vortex-b3761.web.app" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar só o hosting
+        run: npx --yes firebase-tools@13 deploy --only hosting --config firebase.hosting.json --project vortex-b3761 --non-interactive
