@@ -9,6 +9,8 @@ def nomeVersao = (project.findProperty('versionName') ?: '1.0.0').toString()
 // Canal "beta": app separado (outro identificador e nome), instalável ao lado do oficial, que se atualiza pela Release "apk-beta".
 def beta = (project.findProperty('canal') ?: 'oficial').toString() == 'beta'
 def tagAtualizacao = beta ? 'apk-beta' : 'apk-latest'
+// Build de teste (só no emulador do GitHub, nunca vai pra Release): aceita http (o servidor local de teste) e liga a depuração do WebView.
+def teste = (project.findProperty('teste') ?: 'nao').toString() == 'sim'
 
 android {
     namespace 'app.vortexsmart'
@@ -21,6 +23,8 @@ android {
         versionCode codigoVersao
         versionName nomeVersao
         buildConfigField 'String', 'START_URL', "\"${enderecoApp}\""
+        buildConfigField 'boolean', 'TESTE', teste ? 'true' : 'false'
+        manifestPlaceholders = [cleartext: teste ? 'true' : 'false']
         buildConfigField 'String', 'URL_ATUALIZACAO', "\"https://github.com/workcellTec/vortexsmart/releases/download/${tagAtualizacao}/\""
         resValue('string', 'app_name', beta ? 'VortexSmart Beta' : 'VortexSmart')
     }
