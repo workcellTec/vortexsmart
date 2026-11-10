@@ -389,6 +389,11 @@
         if (tile) tile.textContent = prontos ? plural(prontos, 'pronto', 'prontos') : `${ativos.length} em aberto`;
     }
 
+    // A lista de Concertos avisa a cada mudança (nova OS, etapa, entrega): o card e o widget acompanham em tempo real.
+    window._vsReparosMudaram = ordens => {
+        if ((window._reparosConfig || {}).modo && concertosVisivel() && el('vsIniConcN')) desenharConcertos(ordens);
+    };
+
     // ── Conta (toque no avatar): folha de baixo ────────────────
     function fecharConta() { el('vsContaFolha')?.classList.remove('active'); }
     function linhaConta(icone, titulo, sub, extra, classe) {

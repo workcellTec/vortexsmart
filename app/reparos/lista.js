@@ -238,6 +238,7 @@
                 carregado = true;
                 ok(todasOS);
                 if (mounted) renderLista();
+                window._vsReparosMudaram?.(todasOS);   // a Início redesenha o card de Concertos a cada mudança, não só na 1ª leitura
             }, err => {
                 console.error('[Concertos] leitura da lista recusada:', err && err.code, err);
                 erroCarga = true;
@@ -250,7 +251,8 @@
         return assinatura;
     }
     window._reparosPreCarregar = carregarOS;
-    window._reparosAguardar = carregarOS;
+    // A promessa guarda só a 1ª leitura; quem aguarda recebe sempre a lista atual.
+    window._reparosAguardar = () => carregarOS().then(() => todasOS);
 
     // ── Prazo: calculado em cima do status, não é um status em si ──
     function prazoInfo(os) {
