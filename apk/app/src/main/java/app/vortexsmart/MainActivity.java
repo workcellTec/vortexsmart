@@ -187,8 +187,10 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, PEDIDO_CAMERA_INICIAL);
         }
 
-        if (estado != null) web.restoreState(estado);
-        else web.loadUrl(BuildConfig.START_URL);
+        // Não guardamos o estado do WebView (saveState): o histórico de 50 telas do app chegava a ~660 KB e o Android
+        // derruba o app com TransactionTooLargeException ao ir pra segundo plano. Se o sistema recria a Activity, a página
+        // recarrega do início (a sessão do Firebase continua) — a navegação de dentro é do próprio app (SPA).
+        web.loadUrl(BuildConfig.START_URL);
 
         // Build de teste (emulador): sem janela de atualização por cima da tela.
         if (!BuildConfig.TESTE) {
@@ -242,12 +244,6 @@ public class MainActivity extends Activity {
         setIntent(it);
         lerDestino(it);
         entregarDestino();
-    }
-
-    @Override
-    protected void onSaveInstanceState(Bundle saida) {
-        super.onSaveInstanceState(saida);
-        if (web != null) web.saveState(saida);
     }
 
     @Override
