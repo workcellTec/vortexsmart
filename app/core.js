@@ -920,48 +920,226 @@ function precarregarModulosOciosos() {
 }
 
 // ── Transição entre telas (só no celular) ────────────────────────
-// Dá a sensação de "empurrar" a tela: entrar numa tela desliza e
-// aparece vindo da direita, voltar vem da esquerda, e trocar de aba
-// só faz fade. Quem pede é quem navega (showMainSection, _vsPushNav,
-// _vsReplaceNav e o voltar do navegador); vários pedidos no mesmo
-// quadro viram UMA animação só (vale o mais forte: voltar > entrar >
-// fade). Anima só opacidade e transform (compostos pela GPU, não
-// refazem o layout). Respeita "reduzir movimento" do sistema.
+// Quem pede é quem navega (showMainSection, _vsPushNav, _vsReplaceNav e o
+// voltar do navegador); vários pedidos no mesmo quadro viram UMA animação
+// só (vale o mais forte: voltar > entrar > fade). Só anima opacidade e
+// transform (compostos pela GPU, não refazem o layout).
+//
+// Três modos, escolhidos por aparelho (Customizações → Animações de tela):
+//   completo — a tela nova COBRE a antiga, que recua e escurece; ao voltar,
+//              a que sai desliza pra direita descobrindo a de baixo. A tela
+//              que sai é uma cópia (cloneNode) tirada no instante do pedido,
+//              antes de quem navega trocar o conteúdo.
+//   leve     — só a tela nova desliza 24 px com fade; sem cópia, sem sombra.
+//   off      — sem animação.
+// "Automático" (padrão) começa no completo, ou já no leve em aparelho de
+// pouca memória/poucos núcleos/economia de dados, e mede os quadros reais:
+// três animações seguidas ruins rebaixam o modo (completo → leve → off) e a
+// medição fica salva neste aparelho. "Reduzir movimento" do sistema = off.
 // Enquanto anima, a classe vs-transicao esconde botões flutuantes
-// (position:fixed) que moram dentro da tela: com transform no
-// container eles se posicionam em relação a ele e "pulariam".
+// (position:fixed) que moram dentro da tela: com transform no container eles
+// se posicionam em relação a ele e "pulariam".
 const _VS_SECOES_PRINCIPAIS = ['mainMenu', 'calculatorContainer', 'documentosContainer', 'estoqueContainer', 'vendaContainer', 'configuracoesContainer', 'reparosContainer', 'reposicaoContainer', 'credscanContainer', 'financeiroContainer'];
 const _VS_PESO_TRANSICAO = { fade: 1, frente: 2, tras: 3 };
+const _VS_ANIM_PREF = 'vsAnimModo';   // auto | completo | leve | off (escolha da pessoa)
+const _VS_ANIM_AUTO = 'vsAnimAuto';   // completo | leve | off (resultado da medição, só vale em "auto")
+const _VS_ANIM_MAX_NOS = 3000;        // tela com mais elementos que isso não é copiada (cai pro leve nesse pedido)
+const _VS_ANIM_RECUO = 0.28;          // quanto a tela de baixo recua (fração da largura)
+const _VS_ANIM_ESCURO = 0.35;         // quanto a tela de baixo escurece
+const _VS_ANIM_CURVA = 'cubic-bezier(0.32, 0.72, 0, 1)';
 let _vsTransicaoPendente = null;
 let _vsTransicaoAgendada = false;
-let _vsTransicaoAtual = null;
-function _vsAnimarTransicao(direcao) {
-    const el = _VS_SECOES_PRINCIPAIS.map(id => document.getElementById(id))
-        .find(e => e && e.style.display !== 'none' && !e.classList.contains('hidden'));
-    if (!el || typeof el.animate !== 'function') return;
-    if (_vsTransicaoAtual) _vsTransicaoAtual.cancel();
-    const desloc = direcao === 'frente' ? 32 : direcao === 'tras' ? -32 : 0;
+let _vsTransicaoAtual = null;         // { anims, limpar } da animação em curso
+let _vsCapturaPendente = null;        // cópia da tela de saída, tirada no 1º pedido do quadro
+let _vsAnimRuins = 0;                 // animações ruins seguidas (medição)
+
+function _vsAnimPref() {
+    const v = safeStorage.getItem(_VS_ANIM_PREF);
+    return v === 'completo' || v === 'leve' || v === 'off' ? v : 'auto';
+}
+function _vsAnimModo() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 'off';
+    const pref = _vsAnimPref();
+    if (pref !== 'auto') return pref;
+    const medido = safeStorage.getItem(_VS_ANIM_AUTO);
+    if (medido === 'completo' || medido === 'leve' || medido === 'off') return medido;
+    const nav = navigator;
+    const fraco = (nav.deviceMemory && nav.deviceMemory <= 2) || (nav.hardwareConcurrency && nav.hardwareConcurrency <= 4) || (nav.connection && nav.connection.saveData);
+    return fraco ? 'leve' : 'completo';
+}
+window._vsAnimacao = {
+    preferencia: _vsAnimPref,
+    efetivo: _vsAnimModo,
+    medido: () => safeStorage.getItem(_VS_ANIM_AUTO) || '',
+    definir: v => {
+        if (v === 'auto') safeStorage.removeItem(_VS_ANIM_PREF); else safeStorage.setItem(_VS_ANIM_PREF, v);
+        safeStorage.removeItem(_VS_ANIM_AUTO);   // trocar a escolha (ou voltar pro automático) zera a medição
+        _vsAnimRuins = 0;
+    }
+};
+
+function _vsSecaoVisivel() {
+    return _VS_SECOES_PRINCIPAIS.map(id => document.getElementById(id))
+        .find(e => e && e.style.display !== 'none' && !e.classList.contains('hidden')) || null;
+}
+// "Impressão digital" barata da tela: se nada disso mudou entre o pedido e a animação, a tela não trocou de verdade
+// (ex.: voltar pra Início estando na Início) e cobrir seria deslizar uma tela por cima dela mesma.
+function _vsImpressaoTela(el) {
+    return el.getElementsByTagName('*').length + ':' + el.scrollHeight;
+}
+
+// Cópia estática da tela que está saindo. Roda ANTES de quem navega trocar o conteúdo (primeira linha de _vsPushNav).
+function _vsCapturarTela() {
+    const el = _vsSecaoVisivel();
+    if (!el || el.getElementsByTagName('*').length > _VS_ANIM_MAX_NOS) return null;
+    const t0 = performance.now();
+    const r = el.getBoundingClientRect();
+    const impressao = _vsImpressaoTela(el);
+    const copia = el.cloneNode(true);
+    // cloneNode não leva o que foi digitado/desenhado: copia valores, marcações e canvas.
+    const origem = el.querySelectorAll('input, textarea, canvas');
+    const destino = copia.querySelectorAll('input, textarea, canvas');
+    origem.forEach((o, i) => {
+        const d = destino[i];
+        if (!d) return;
+        if (o.tagName === 'CANVAS') { try { d.getContext('2d').drawImage(o, 0, 0); } catch (e) { /* canvas protegido: fica em branco */ } return; }
+        if (o.type === 'checkbox' || o.type === 'radio') d.checked = o.checked; else d.value = o.value;
+    });
+    // Rádios com o mesmo "name" formam um grupo no documento inteiro: a cópia desmarcaria os de verdade.
+    copia.querySelectorAll('input[type="radio"]').forEach(x => x.removeAttribute('name'));
+    return { el, copia, topo: r.top, esq: r.left, larg: r.width, impressao, quando: t0, custo: performance.now() - t0 };
+}
+
+// Mede os quadros da animação (só em "auto"). Duas ruins seguidas rebaixam o modo e a medição fica salva.
+function _vsMedirAnimacao(anim, modo, custoCopia) {
+    if (!anim.finished || _vsAnimPref() !== 'auto' || performance.now() < 6000) return;   // abertura do app ainda está ocupada
+    const deltas = [];
+    let ultimo = 0, ativo = true;
+    const passo = t => {
+        if (!ativo) return;
+        if (ultimo) deltas.push(t - ultimo);
+        ultimo = t;
+        requestAnimationFrame(passo);
+    };
+    requestAnimationFrame(passo);
+    anim.finished.then(() => {
+        ativo = false;
+        if (document.hidden || deltas.length < 5) return;
+        const lentos = deltas.filter(d => d > 26).length / deltas.length;
+        const ruim = lentos >= 0.4 || (modo === 'completo' && custoCopia > 25);
+        _vsAnimRuins = ruim ? _vsAnimRuins + 1 : 0;
+        if (_vsAnimRuins < 3) return;
+        _vsAnimRuins = 0;
+        safeStorage.setItem(_VS_ANIM_AUTO, modo === 'completo' ? 'leve' : 'off');
+    }, () => { ativo = false; });
+}
+
+function _vsFimTransicao() {
+    if (!_vsTransicaoAtual) return;
+    const atual = _vsTransicaoAtual;
+    _vsTransicaoAtual = null;
+    atual.anims.forEach(a => { try { a.cancel(); } catch (e) { /* já terminou */ } });
+    atual.limpar();
+}
+
+function _vsDiv(classe) {
+    const d = document.createElement('div');
+    d.className = classe;
+    return d;
+}
+
+// Modo completo: cobre (frente) ou descobre (tras) usando a cópia da tela que saiu.
+function _vsAnimarCobertura(direcao, el, cap) {
+    const frente = direcao === 'frente';
+    const L = window.innerWidth;
+    const camada = _vsDiv('vs-camada ' + (frente ? 'vs-camada-baixo' : 'vs-camada-cima'));
+    camada.setAttribute('aria-hidden', 'true');
+    camada.inert = true;
+    const painel = _vsDiv('vs-camada-painel');
+    const sombra = _vsDiv('vs-camada-sombra');
+    const escuro = _vsDiv('vs-camada-escuro');
+    Object.assign(cap.copia.style, { position: 'absolute', top: cap.topo + 'px', left: cap.esq + 'px', width: cap.larg + 'px', margin: '0', animation: 'none' });
+    painel.appendChild(cap.copia);
+    if (frente) camada.append(painel, escuro, sombra); else { painel.appendChild(sombra); camada.append(escuro, painel); }
+    document.body.appendChild(camada);
+
+    el.classList.add('vs-trans-real', 'vs-transicao');
+    if (frente) el.style.minHeight = Math.max(0, window.innerHeight - el.getBoundingClientRect().top) + 'px';   // a tela nova tem que tapar a de baixo inteira
+    const opc = { duration: frente ? 340 : 300, easing: _VS_ANIM_CURVA };
+    const par = (x0, x1) => [{ transform: `translate3d(${x0}px,0,0)` }, { transform: `translate3d(${x1}px,0,0)` }];
+    const anims = [];
+    if (frente) {
+        anims.push(el.animate(par(L, 0), opc));
+        anims.push(sombra.animate(par(L, 0), opc));
+        anims.push(painel.animate(par(0, -L * _VS_ANIM_RECUO), opc));
+        anims.push(escuro.animate([{ opacity: 0 }, { opacity: _VS_ANIM_ESCURO }], opc));
+    } else {
+        anims.push(painel.animate(par(0, L), opc));
+        anims.push(el.animate(par(-L * _VS_ANIM_RECUO, 0), opc));
+        anims.push(escuro.animate([{ opacity: _VS_ANIM_ESCURO }, { opacity: 0 }], opc));
+    }
+    // O cancelamento por quem interrompe passa por _vsFimTransicao, que chama limpar() uma vez só.
+    const principal = anims[0];
+    // Guarda: se o onfinish não vier (app foi pro segundo plano no meio), a camada não pode ficar cobrindo a tela.
+    const guarda = setTimeout(() => { if (_vsTransicaoAtual && _vsTransicaoAtual.anims[0] === principal) _vsFimTransicao(); }, opc.duration + 700);
+    _vsTransicaoAtual = {
+        anims,
+        limpar: () => { clearTimeout(guarda); camada.remove(); el.classList.remove('vs-trans-real', 'vs-transicao'); el.style.minHeight = ''; }
+    };
+    principal.onfinish = () => { if (_vsTransicaoAtual && _vsTransicaoAtual.anims[0] === principal) _vsFimTransicao(); };
+    return principal;
+}
+
+// Modo leve (e o fade de trocar de aba): só a tela nova, sem cópia.
+function _vsAnimarSimples(direcao, el) {
+    const desloc = direcao === 'frente' ? 24 : direcao === 'tras' ? -24 : 0;
     const quadros = desloc
         ? [{ opacity: 0, transform: `translate3d(${desloc}px,0,0)` }, { opacity: 1, transform: 'translate3d(0,0,0)' }]
         : [{ opacity: 0 }, { opacity: 1 }];
     el.classList.add('vs-transicao');
-    const anim = el.animate(quadros, { duration: desloc ? 240 : 160, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
-    _vsTransicaoAtual = anim;
-    const fim = () => { if (_vsTransicaoAtual === anim) _vsTransicaoAtual = null; el.classList.remove('vs-transicao'); };
-    anim.onfinish = fim;
-    anim.oncancel = fim;
+    const anim = el.animate(quadros, { duration: desloc ? 200 : 160, easing: _VS_ANIM_CURVA });
+    _vsTransicaoAtual = { anims: [anim], limpar: () => el.classList.remove('vs-transicao') };
+    anim.onfinish = () => { if (_vsTransicaoAtual && _vsTransicaoAtual.anims[0] === anim) _vsFimTransicao(); };
+    return anim;
 }
+
+function _vsAnimarTransicao(direcao, cap) {
+    const el = _vsSecaoVisivel();
+    if (!el || typeof el.animate !== 'function') return;
+    const modo = _vsAnimModo();
+    _vsFimTransicao();   // interrompida por outra: some com a camada e as classes antes de começar a nova
+    if (modo === 'off') return;
+    let anim;
+    if (modo === 'completo' && direcao !== 'fade' && cap && performance.now() - cap.quando < 1000) {
+        if (cap.el === el && cap.impressao === _vsImpressaoTela(el)) return;   // a tela não trocou de verdade
+        anim = _vsAnimarCobertura(direcao, el, cap);
+        _vsMedirAnimacao(anim, 'completo', cap.custo);
+    } else {
+        anim = _vsAnimarSimples(direcao, el);
+        // Só mede o que o modo escolhido de fato faz: o "simples" dentro do completo é um caso sem cópia (tela grande demais, pedido tardio).
+        if (direcao !== 'fade' && modo === 'leve') _vsMedirAnimacao(anim, 'leve', 0);
+    }
+}
+
+// Só a primeira cópia do quadro vale (as seguintes já veriam a tela trocada) e só no modo completo.
+function _vsPrepararCaptura() {
+    if (_vsTransicaoPendente || _vsCapturaPendente || document.documentElement.getAttribute('data-shell') !== 'mobile' || _vsAnimModo() !== 'completo') return;
+    _vsCapturaPendente = _vsCapturarTela();
+}
+
 function pedirTransicao(direcao) {
     if (document.documentElement.getAttribute('data-shell') !== 'mobile') return;
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (_vsAnimModo() === 'off') return;
+    if (direcao !== 'fade') _vsPrepararCaptura();
     if (!_vsTransicaoPendente || _VS_PESO_TRANSICAO[direcao] > _VS_PESO_TRANSICAO[_vsTransicaoPendente]) _vsTransicaoPendente = direcao;
     if (_vsTransicaoAgendada) return;
     _vsTransicaoAgendada = true;
     requestAnimationFrame(() => {
         _vsTransicaoAgendada = false;
-        const d = _vsTransicaoPendente;
+        const d = _vsTransicaoPendente, cap = _vsCapturaPendente;
         _vsTransicaoPendente = null;
-        if (d && !appInacessivel()) _vsAnimarTransicao(d);
+        _vsCapturaPendente = null;
+        if (d && !appInacessivel()) _vsAnimarTransicao(d, cap);
     });
 }
 window._vsPedirTransicao = pedirTransicao;
@@ -988,12 +1166,14 @@ function showMainSection(sectionId) {
         return;
     }
 
+    const map = { 'main': 'mainMenu', 'calculator': 'calculatorContainer', 'documentos': 'documentosContainer', 'estoque': 'estoqueContainer', 'venda': 'vendaContainer', 'configuracoes': 'configuracoesContainer', 'reparos': 'reparosContainer', 'reposicao': 'reposicaoContainer', 'credscan': 'credscanContainer', 'financeiro': 'financeiroContainer' };
+    const target = document.getElementById(map[sectionId] || sectionId);
+    // Os módulos chamam showMainSection ANTES de _vsPushNav e de trocar a sub-tela: esta é a última chance de copiar a tela que está saindo.
+    _vsPrepararCaptura();
     _VS_SECOES_PRINCIPAIS.forEach(id => {
         const el = document.getElementById(id);
         if (el) { el.style.display = 'none'; el.classList.add('hidden'); }
     });
-    const map = { 'main': 'mainMenu', 'calculator': 'calculatorContainer', 'documentos': 'documentosContainer', 'estoque': 'estoqueContainer', 'venda': 'vendaContainer', 'configuracoes': 'configuracoesContainer', 'reparos': 'reparosContainer', 'reposicao': 'reposicaoContainer', 'credscan': 'credscanContainer', 'financeiro': 'financeiroContainer' };
-    const target = document.getElementById(map[sectionId] || sectionId);
     if (target) {
         target.style.display = '';
         target.classList.remove('hidden');

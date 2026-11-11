@@ -153,6 +153,19 @@ button, [role="button"] { -webkit-user-select: none; user-select: none; -webkit-
    container vira o referencial deles). */
 .vs-transicao .apr-copy-fab { visibility: hidden; }
 
+/* Transição "completo" (core.js, _vsAnimarCobertura): a camada guarda a cópia da tela que sai.
+   frente: fica ABAIXO de tudo (z-index -1), a tela nova (opaca) desliza por cima dela.
+   tras:   fica ACIMA da tela (e abaixo da barra de baixo), a cópia desliza pra direita descobrindo a de baixo.
+   Só transform/opacity animam; a camada some inteira no fim. */
+.vs-camada { position: fixed; inset: 0; overflow: hidden; pointer-events: none; contain: layout paint; }
+.vs-camada-baixo { z-index: -1; }
+.vs-camada-cima  { z-index: 1000; }
+.vs-camada *, .vs-camada *::before, .vs-camada *::after { animation: none !important; transition: none !important; }
+.vs-camada-painel { position: absolute; inset: 0; background: var(--bg); }
+.vs-camada-escuro { position: absolute; inset: 0; background: #000; opacity: 0; }
+.vs-camada-sombra { position: absolute; top: 0; bottom: 0; left: -24px; width: 24px; background: linear-gradient(to left, rgba(0, 0, 0, .30), transparent); }
+.vs-trans-real { position: relative; z-index: 2; background: var(--bg); animation: none !important; }
+
 /* Faixa sólida sob a status bar translúcida do iPhone (entalhe/Dynamic
    Island): o conteúdo rola por trás dela sem encostar na hora. A cor é
    sempre escura porque a status bar do iOS PWA tem texto branco fixo

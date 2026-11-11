@@ -69,6 +69,22 @@
                     </div>
                 </div>
 
+                ${document.documentElement.getAttribute('data-shell') === 'mobile' ? `
+                <div class="cz-item">
+                    <div class="cz-item-ic" style="background:linear-gradient(135deg,#34d399,#0d9488);">✨</div>
+                    <div class="cz-item-body">
+                        <div class="cz-item-title">Animações de tela</div>
+                        <div class="cz-item-sub" id="cfgCustomAnimSub">Como as telas entram e saem. Vale só neste aparelho</div>
+                        <div class="stq-cats" id="cfgCustomAnimPills" style="padding:0;margin-top:10px;">
+                            <button type="button" class="stq-cat-pill" data-v="auto" style="color:var(--primary);">Automático</button>
+                            <button type="button" class="stq-cat-pill" data-v="completo" style="color:var(--primary);">Completo</button>
+                            <button type="button" class="stq-cat-pill" data-v="leve" style="color:var(--primary);">Leve</button>
+                            <button type="button" class="stq-cat-pill" data-v="off" style="color:var(--primary);">Desligado</button>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+
                 ${temWidgetsAndroid() ? `
                 <div class="cz-sec-title">📱 Widgets do Android</div>
                 <div class="cz-item">
@@ -133,12 +149,26 @@
         document.querySelectorAll('#cfgCustomCoresRow .cz-cor-swatch').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.v === corAtual);
         });
+        marcarAnimacao();
         if (temWidgetsAndroid()) {
             const visiveis = !!window.VortexAndroid.widgetsValoresVisiveis();
             document.querySelectorAll('#cfgCustomWidgetsPills .stq-cat-pill').forEach(btn => {
                 btn.classList.toggle('active', (btn.dataset.v === 'visiveis') === visiveis);
             });
         }
+    }
+
+    const NOME_MODO_ANIM = { completo: 'Completo', leve: 'Leve', off: 'Desligado' };
+    // Mostra a escolha e, em "Automático", o que o app está usando agora (ele mede o aparelho e pode ter rebaixado).
+    function marcarAnimacao() {
+        const api = window._vsAnimacao;
+        if (!api || !el('cfgCustomAnimPills')) return;
+        const pref = api.preferencia();
+        document.querySelectorAll('#cfgCustomAnimPills .stq-cat-pill').forEach(btn => btn.classList.toggle('active', btn.dataset.v === pref));
+        const sub = el('cfgCustomAnimSub');
+        if (sub) sub.textContent = pref === 'auto'
+            ? `O app escolhe pelo desempenho do aparelho. Agora: ${NOME_MODO_ANIM[api.efetivo()]}`
+            : 'Como as telas entram e saem. Vale só neste aparelho';
     }
 
     function salvar() {
@@ -178,6 +208,13 @@
             btn.addEventListener('click', () => {
                 if (typeof window._aplicarCorDestaque === 'function') window._aplicarCorDestaque(btn.dataset.v);
                 document.querySelectorAll('#cfgCustomCoresRow .cz-cor-swatch').forEach(b => b.classList.toggle('active', b === btn));
+            });
+        });
+
+        document.querySelectorAll('#cfgCustomAnimPills .stq-cat-pill').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window._vsAnimacao) window._vsAnimacao.definir(btn.dataset.v);
+                marcarAnimacao();
             });
         });
 

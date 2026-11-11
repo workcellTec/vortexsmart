@@ -71,7 +71,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_VERSION = 'vortexsmart-v67';
+const CACHE_VERSION = 'vortexsmart-v68';
 
 const APP_SHELL = [
   './',
