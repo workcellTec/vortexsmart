@@ -164,7 +164,7 @@ button, [role="button"] { -webkit-user-select: none; user-select: none; -webkit-
 .vs-camada-painel { position: absolute; inset: 0; background: var(--bg); }
 .vs-camada-escuro { position: absolute; inset: 0; background: #000; opacity: 0; }
 .vs-camada-sombra { position: absolute; top: 0; bottom: 0; left: -24px; width: 24px; background: linear-gradient(to left, rgba(0, 0, 0, .30), transparent); }
-.vs-trans-real { position: relative; z-index: 2; background: var(--bg); animation: none !important; }
+.vs-trans-real { position: relative; z-index: 2; background: var(--bg); }
 
 /* Faixa sólida sob a status bar translúcida do iPhone (entalhe/Dynamic
    Island): o conteúdo rola por trás dela sem encostar na hora. A cor é
@@ -230,11 +230,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar {
     text-align: center;
 }
 
-/* Sem will-change: ele fixava Início e Calculadora numa camada de GPU própria, que no app Android
-   ficava vazia (tela preta) ao voltar do segundo plano. O fade já é feito só durante a animação. */
-#mainMenu, #calculatorContainer {
-    animation: fadeUp 0.3s ease;
-}
+/* O fade de entrada de Início e Calculadora agora é do motor de transição (core.js, pedirTransicao). Uma animação de CSS aqui
+   recomeçava quando a transição terminava e a tela piscava (opacidade 0 → 1) a cada volta. */
 @keyframes fadeUp {
     from { opacity: 0; }
     to   { opacity: 1; }
