@@ -89,6 +89,7 @@
         finalizado:      { ic: 'shop',  cor: 'var(--primary)',        ver: 'Reparo finalizado', acao: 'Finalizar reparo', chip: 'Finalizado' },
         fin_loja:        { ic: 'shop',  cor: 'var(--primary)',        ver: 'Retornou à loja', acao: 'Retornou à Loja', chip: 'Fin. Loja' },
         entregue:        { ic: 'ok',    cor: 'var(--success)',        ver: 'Entregue ao cliente', acao: 'Entregar ao Cliente' },
+        garantia:        { ic: 'shield', cor: 'var(--warning)',       ver: 'Garantia acionada', rotulo: 'Garantia acionada' },
     };
     const CZ_EM_REPARO = {
         terceirizada: { ver: 'Entregue ao técnico', acao: 'Entregar ao Técnico' },
@@ -97,7 +98,7 @@
     function czEtapa(modo, k) {
         const base = CZ[k] || { ic: 'tool', cor: 'var(--text-secondary)' };
         const meta = flowMeta(modo, k);
-        const label = meta ? meta.label : k;
+        const label = meta ? meta.label : (base.rotulo || k);
         const extra = k === 'em_reparo' ? (CZ_EM_REPARO[modo] || CZ_EM_REPARO.terceirizada) : {};
         const r = { ...base, ...extra, label };
         r.ver = r.ver || label;
@@ -121,10 +122,12 @@
         if (!d.startsWith('55') || d.length <= 11) d = '55' + d;
         return `https://wa.me/${d}`;
     }
-    // Tempo desde o cadastro: "5h" até 24h, depois "3d".
+    // Tempo desde o cadastro (ou desde o último acionamento de garantia): "5h" até 24h, depois "3d".
     function idadeOS(os) {
-        if (!os.criadoEm) return '';
-        const h = (Date.now() - os.criadoEm) / 3600000;
+        const n = cicloGarantia(os), g = n > 0 && os.timeline['garantia@' + n];
+        const inicio = (g && g.ts) || os.criadoEm;
+        if (!inicio) return '';
+        const h = (Date.now() - inicio) / 3600000;
         return h < 24 ? `${Math.max(1, Math.round(h))}h` : `${Math.round(h / 24)}d`;
     }
     function textoAtraso(os) {
@@ -132,9 +135,22 @@
         return h >= 72 ? `${Math.round(h / 24)}d atraso` : `${Math.max(1, h)}h atraso`;
     }
     // Registro da linha do tempo, na ordem em que aconteceram.
+    // Garantia: cada vez que o aparelho volta, a OS ganha um ciclo novo. O ciclo 0 (o original) usa chaves simples
+    // ("em_reparo"); do ciclo N em diante a chave leva o número ("em_reparo@1", "entregue@1"), pra não apagar a data
+    // nem a foto de quem já passou por ali. A marca "garantia@N" registra quem acionou, quando e o motivo.
+    const chaveTL = (etapa, ciclo) => ciclo > 0 ? `${etapa}@${ciclo}` : etapa;
+    function cicloGarantia(os) {
+        return Object.keys(os.timeline || {}).reduce((maior, k) => {
+            const g = /^garantia@(\d+)$/.exec(k);
+            return g ? Math.max(maior, +g[1]) : maior;
+        }, 0);
+    }
+    window._reparosCicloGarantia = cicloGarantia;   // o assistente de entrega pula venda e termo nos ciclos de garantia
+    // Terceirizada: o aparelho precisa ir de novo até o técnico; própria: volta direto pro reparo.
+    const etapaDaGarantia = modo => modo === 'terceirizada' ? 'levar_tecnico' : 'em_reparo';
     function entradasTimeline(os) {
         return Object.entries(os.timeline || {})
-            .map(([k, v]) => ({ etapa: k, ...v }))
+            .map(([k, v]) => { const m = /^(.+)@(\d+)$/.exec(k); return { chave: k, etapa: m ? m[1] : k, ciclo: m ? +m[2] : 0, ...v }; })
             .sort((a, b) => (a.ts || 0) - (b.ts || 0));
     }
 
@@ -438,7 +454,7 @@
 
     function buildNextBtn(os, meta) {
         if (!tp('reparos_avancar_etapa')) return '';
-        if (os.status === 'entregue') return `<button class="rep-btn-next" disabled><i class="bi bi-check-lg"></i> OS finalizada</button>`;
+        if (os.status === 'entregue') return `<button class="rep-btn-next" data-action="garantia"><i class="bi bi-shield-check"></i> Acionar garantia</button>`;
         const proxima = proximaEtapaSequencial(os);
         const label = proxima ? `Avançar: ${proxima.label}` : 'Avançar';
         return `<button class="rep-btn-next" data-action="avancar"><i class="bi bi-arrow-right-circle-fill"></i> ${label}</button>`;
@@ -469,6 +485,7 @@
                     <div class="rep-card-nome">${esc(os.cliente?.nome || 'Sem nome')} <span style="color:var(--text-muted);font-weight:500;">· ${esc(os.aparelho || '')}</span></div>
                     <div class="rep-card-meta">
                         <span>${meta ? meta.label : os.status}</span>
+                        ${cicloGarantia(os) ? `<span class="rep-badge garantia"><i class="bi bi-shield-check"></i> Garantia${cicloGarantia(os) > 1 ? ' ' + cicloGarantia(os) : ''}</span>` : ''}
                         ${prazo ? `<span class="rep-badge ${prazo.cls}"><i class="bi bi-flag-fill"></i> ${prazo.label}</span>` : ''}
                         <i class="bi ${senhaResumoIcon(os)}" style="font-size:.8rem;"></i>
                     </div>
@@ -487,6 +504,7 @@
         const atrasada = !!prazo && prazo.cls === 'atrasado';
         const proximo = !!prazo && prazo.cls === 'proximo';
         const idade = os.status !== 'entregue' ? idadeOS(os) : '';
+        const garantiaN = cicloGarantia(os);
         const foto = os.fotoThumbUrl
             ? `<img src="${esc(os.fotoThumbUrl)}" loading="lazy" alt=""/>`
             : ic('phone');
@@ -503,6 +521,7 @@
                 </div>
                 <div class="rep-card-mid">
                     <span class="rep-pill"><i></i>${esc(e.label)}</span>
+                    ${garantiaN ? `<span class="rep-prz garantia">${ic('shield')}Garantia${garantiaN > 1 ? ' ' + garantiaN : ''}</span>` : ''}
                     ${atrasada ? `<span class="rep-prz atrasado">${ic('warn')}${textoAtraso(os)}</span>` : ''}
                     ${proximo ? `<span class="rep-prz proximo">${ic('clock')}${Math.max(1, Math.round((os.prazoTs - Date.now()) / 3600000))}h restantes</span>` : ''}
                     ${idade ? `<span class="rep-prz">${ic('clock')}${idade}</span>` : ''}
@@ -517,7 +536,8 @@
     // ANTERIOR do fluxo (uma troca manual pra trás deixa histórico fora de ordem).
     function etapaAnterior(os) {
         if (os.status === 'entregue') return null;
-        const entradas = entradasTimeline(os);
+        const ciclo = cicloGarantia(os);   // Desfazer só anda dentro do ciclo atual (nunca desfaz o acionamento da garantia)
+        const entradas = entradasTimeline(os).filter(t => t.etapa !== 'garantia' && t.ciclo === ciclo);
         if (entradas.length < 2 || entradas[entradas.length - 1].etapa !== os.status) return null;
         const anterior = entradas[entradas.length - 2];
         const etapas = FLOWS[os.modo] || [];
@@ -538,7 +558,7 @@
 
         const cel = (cls, icone, rotulo, valor) => `
             <div class="rep-ig${cls ? ' ' + cls : ''}"><span class="rep-ig-ib">${ic(icone)}</span><span class="rep-ig-it"><small>${rotulo}</small><b>${valor}</b></span></div>`;
-        const entregaEm = entregue && os.timeline && os.timeline.entregue && os.timeline.entregue.ts;
+        const entregaEm = entregue && os.timeline && os.timeline[chaveTL('entregue', cicloGarantia(os))] && os.timeline[chaveTL('entregue', cicloGarantia(os))].ts;
         const celEntrega = entregue
             ? cel('ok', 'ok', 'Entregue em', entregaEm ? `${fmtDia(entregaEm)} ${fmtHora(entregaEm)}` : '—')
             : cel(atrasada ? 'atrasada' : '', 'flag', 'Entrega', os.prazoTs ? `${fmtDia(os.prazoTs)} ${fmtHora(os.prazoTs)}` : 'Sem prazo');
@@ -551,13 +571,15 @@
         };
         const tl = entradas.map((t, i) => {
             const x = czEtapa(os.modo, t.etapa);
+            const ver = t.ciclo > 0 && t.etapa === 'levar_tecnico' ? 'Garantia: levar ao técnico' : x.ver;   // "OS cadastrada" não vale pra quem voltou
             return `
             <div class="rep-tl-it" style="--c:${x.cor}">
                 <span class="rep-tl-dot">${ic(x.ic)}</span>
                 <div class="rep-tl-tx">
-                    <div class="rep-tl-t">${esc(x.ver)}</div>
+                    <div class="rep-tl-t">${esc(ver)}</div>
                     <div class="rep-tl-d">${t.ts ? fmtDiaHora(t.ts) : '—'}${t.nome ? ' · ' + esc(t.nome) : ''}</div>
-                    ${botaoFotos(i, x.ver)}
+                    ${t.motivo ? `<div class="rep-tl-d">Motivo: ${esc(t.motivo)}</div>` : ''}
+                    ${botaoFotos(i, ver)}
                 </div>
             </div>`;
         }).join('') || (fotos.length ? `
@@ -587,7 +609,7 @@
         if (tp('reparos_apagar')) ferramentas.push(`<button type="button" class="rep-tb apagar" data-action="apagar">${ic('trash')}Apagar</button>`);
 
         const botaoPrincipal = !podeAvancar ? ''
-            : entregue ? `<button type="button" class="rep-btn-pri" disabled>${ic('ok')}OS entregue</button>`
+            : entregue ? `<button type="button" class="rep-btn-pri" data-action="garantia">${ic('shield')}Acionar garantia</button>`
             : proxima ? `<button type="button" class="rep-btn-pri" data-action="avancar">${esc(czEtapa(os.modo, proxima.k).acao)}</button>` : '';
         const botaoManual = podeManual ? `<button type="button" class="rep-btn-sq" data-action="toggle-manual" aria-label="Escolher etapa manualmente">${ic('more')}</button>` : '';
 
@@ -759,15 +781,16 @@
     }
 
     function salvarStatus(os, novoStatus, fotoBlob) {
-        const etapaSendoConcluida = os.status;
+        const ciclo = cicloGarantia(os);
+        const chaveConcluida = chaveTL(os.status, ciclo);
         const aplicar = fotoUrl => {
             const payload = { status: novoStatus };
-            payload['timeline/' + novoStatus] = { ts: Date.now(), uid: window._firebaseAuthUid || null, nome: window._nomeUsuario || null };
-            if (fotoUrl) payload['timeline/' + etapaSendoConcluida + '/fotoUrl'] = fotoUrl;
+            payload['timeline/' + chaveTL(novoStatus, ciclo)] = { ts: Date.now(), uid: window._firebaseAuthUid || null, nome: window._nomeUsuario || null };
+            if (fotoUrl) payload['timeline/' + chaveConcluida + '/fotoUrl'] = fotoUrl;
             return window._dbUpdate(window._lojaRef('reparos/' + os.id), payload);
         };
         const promessa = fotoBlob
-            ? window._uploadFotoStorage(fotoBlob, `reparos/${os.id}/etapas/${etapaSendoConcluida}.jpg`).then(aplicar)
+            ? window._uploadFotoStorage(fotoBlob, `reparos/${os.id}/etapas/${chaveConcluida}.jpg`).then(aplicar)
             : aplicar(null);
         return promessa; // quem chama decide o que fazer com sucesso/erro
     }
@@ -811,12 +834,12 @@
             const anterior = etapaAnterior(fresca);
             if (!anterior) throw new Error('Não há etapa anterior para voltar.');
             const payload = { status: anterior.etapa };
-            payload['timeline/' + fresca.status] = null;
-            payload['timeline/' + anterior.etapa + '/fotoUrl'] = null;
+            payload['timeline/' + chaveTL(fresca.status, cicloGarantia(fresca))] = null;
+            payload['timeline/' + anterior.chave + '/fotoUrl'] = null;
             return window._dbUpdate(ref, payload).then(() => {
                 // A foto saiu do histórico; apagar o arquivo é só faxina (se a regra do Storage recusar, sobra um arquivo solto).
                 if (anterior.fotoUrl && typeof window._storageDeleteObject === 'function' && typeof window._lojaStorageRef === 'function') {
-                    try { Promise.resolve(window._storageDeleteObject(window._lojaStorageRef(`reparos/${os.id}/etapas/${anterior.etapa}.jpg`))).catch(() => {}); } catch (e) { /* faxina opcional */ }
+                    try { Promise.resolve(window._storageDeleteObject(window._lojaStorageRef(`reparos/${os.id}/etapas/${anterior.chave}.jpg`))).catch(() => {}); } catch (e) { /* faxina opcional */ }
                 }
                 return anterior;
             });
@@ -978,6 +1001,146 @@
         });
     }
 
+    // ── Garantia: o aparelho voltou com defeito ──────────────────
+    // Relê a OS antes de gravar (como o Desfazer): se alguém mexeu nela enquanto a janela estava aberta, não reabre às cegas.
+    // Volta pra "Em reparo" (própria) ou "Levar ao técnico" (terceirizada), abre um ciclo novo no histórico e limpa o prazo
+    // antigo (senão a OS já voltaria "atrasada" e a função de aviso de atraso dispararia); o prazo novo é opcional.
+    // Não mexe na venda: garantia não se cobra de novo. Se a regra do banco recusar o texto do motivo, grava sem ele e avisa.
+    function acionarGarantia(os, motivo, prazoTs) {
+        const ref = window._lojaRef('reparos/' + os.id);
+        return window._dbGet(ref).then(snap => {
+            const dados = snap.val();
+            if (!dados) throw new Error('Essa OS não existe mais.');
+            const fresca = { id: os.id, ...dados };
+            if (fresca.status !== 'entregue') throw new Error('Essa OS não está mais entregue. Confira e tente de novo.');
+            const etapa = etapaDaGarantia(fresca.modo);
+            if (!flowMeta(fresca.modo, etapa)) throw new Error('Essa OS está com o modo de reparo desconfigurado. Confira em Configurações.');
+            const n = cicloGarantia(fresca) + 1, agora = Date.now();
+            const quem = { uid: window._firebaseAuthUid || null, nome: window._nomeUsuario || null };
+            const montar = comMotivo => {
+                const payload = { status: etapa, prazoTs: prazoTs || null };
+                payload['timeline/garantia@' + n] = { ts: agora, ...quem, ...(comMotivo && motivo ? { motivo } : {}) };
+                payload['timeline/' + etapa + '@' + n] = { ts: agora + 1, ...quem };   // +1 ms: a marca vem sempre antes da etapa na linha do tempo
+                return payload;
+            };
+            return window._dbUpdate(ref, montar(true)).then(() => ({ etapa, motivoSalvo: true }), e => {
+                if (motivo && /permission/i.test(String((e && (e.code || e.message)) || ''))) {
+                    return window._dbUpdate(ref, montar(false)).then(() => ({ etapa, motivoSalvo: false }));
+                }
+                throw e;
+            });
+        });
+    }
+
+    // Lê e confere os campos da janela de garantia (celular e PC usam os mesmos ids).
+    function lerCamposGarantia() {
+        const motivo = (el('repGarMotivo').value || '').trim().slice(0, 200);
+        const bruto = el('repGarPrazo').value;
+        if (!bruto) return { motivo, prazoTs: null };
+        const prazoTs = new Date(bruto).getTime();
+        if (isNaN(prazoTs) || prazoTs <= Date.now()) return { erro: 'O novo prazo precisa ser uma data e hora no futuro.' };
+        return { motivo, prazoTs };
+    }
+    function avisoGarantiaFeita(os, r) {
+        const destino = czEtapa(os.modo, r.etapa).label;
+        avisar(`Garantia acionada. A OS voltou para "${destino}".` + (r.motivoSalvo ? '' : ' O motivo não foi salvo (o banco recusou esse campo).'));
+    }
+
+    function abrirGarantia(os) {
+        if (!tp('reparos_avancar_etapa')) return;
+        if (MOB) abrirFolhaGarantia(os); else abrirModalGarantia(os);
+    }
+
+    function abrirFolhaGarantia(os) {
+        const destino = czEtapa(os.modo, etapaDaGarantia(os.modo)).label;
+        const primeiro = (os.cliente && os.cliente.nome || 'cliente').split(/\s+/)[0];
+        const caixa = abrirFolha(`
+            <div class="vs-folha-titulo">Acionar garantia de ${esc(primeiro)}?</div>
+            <div class="vs-folha-sub">A OS volta para "${esc(destino)}" e a garantia fica marcada na linha do tempo. Não lança nova venda.</div>
+            <label class="rep-campo"><span>Motivo (opcional)</span><input type="text" id="repGarMotivo" maxlength="200" placeholder="Ex.: a tela voltou a falhar" autocomplete="off"/></label>
+            <label class="rep-campo"><span>Novo prazo (opcional)</span><input type="datetime-local" id="repGarPrazo"/></label>
+            <p class="rep-campo-erro" id="repGarErro" style="display:none;"></p>
+            <button type="button" class="rep-btn-pri" id="repFolhaOk">Acionar garantia</button>
+            <button type="button" class="rep-pular" id="repFolhaNao">Cancelar</button>`);
+        caixa.querySelector('#repFolhaNao').addEventListener('click', () => fecharFolha());
+        caixa.querySelector('#repFolhaOk').addEventListener('click', () => {
+            const c = lerCamposGarantia();
+            if (c.erro) { const e = el('repGarErro'); e.textContent = c.erro; e.style.display = ''; return; }
+            folhaSalvando('Acionando a garantia...');
+            acionarGarantia(os, c.motivo, c.prazoTs).then(r => {
+                fecharFolha(true);
+                avisoGarantiaFeita(os, r);
+            }).catch(e => {
+                fecharFolha(true);
+                avisar(`Erro ao acionar a garantia: ${e.message}`);
+            });
+        });
+    }
+
+    let garantiaBackdrop = null, _garantiaOs = null;
+    function ensureModalGarantia() {
+        if (garantiaBackdrop) return;
+        document.body.insertAdjacentHTML('beforeend', `
+            <div class="stq-modal-backdrop" id="repModalGarantia">
+                <div class="stq-modal-card">
+                    <div class="stq-modal-header primary">
+                        <div class="stq-modal-header-title">Acionar garantia</div>
+                        <button class="stq-modal-close" id="repGarClose"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                    <div class="stq-modal-body">
+                        <p id="repGarTexto" style="font-size:.78rem;color:var(--text);margin-bottom:12px;"></p>
+                        <label class="form-label">Motivo (opcional)</label>
+                        <input class="form-control" id="repGarMotivo" type="text" maxlength="200" placeholder="Ex.: a tela voltou a falhar" autocomplete="off"/>
+                        <label class="form-label" style="margin-top:10px;">Novo prazo (opcional)</label>
+                        <input class="form-control" id="repGarPrazo" type="datetime-local"/>
+                        <p id="repGarErro" style="display:none;color:#f87171;font-size:.72rem;margin-top:8px;"></p>
+                        <div style="display:flex;gap:8px;margin-top:14px;">
+                            <button type="button" class="rep-btn-manual" style="width:auto;flex:1;height:auto;padding:11px;font-size:.72rem;font-weight:700;" id="repGarNao">Cancelar</button>
+                            <button type="button" class="rep-btn-next" style="flex:1;" id="repGarOk"><i class="bi bi-shield-check"></i> Acionar garantia</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`);
+        garantiaBackdrop = el('repModalGarantia');
+        const fechar = () => {
+            garantiaBackdrop.classList.remove('show');
+            window._vsDestravarScroll && window._vsDestravarScroll();
+            if (typeof window._vsFecharModal === 'function') window._vsFecharModal();
+        };
+        garantiaBackdrop._fechar = fechar;
+        el('repGarClose').addEventListener('click', fechar);
+        el('repGarNao').addEventListener('click', fechar);
+        garantiaBackdrop.addEventListener('click', e => { if (e.target.id === 'repModalGarantia') fechar(); });
+        el('repGarOk').addEventListener('click', () => {
+            const c = lerCamposGarantia();
+            if (c.erro) { const e = el('repGarErro'); e.textContent = c.erro; e.style.display = ''; return; }
+            const os = _garantiaOs, ok = el('repGarOk');
+            ok.disabled = true;
+            acionarGarantia(os, c.motivo, c.prazoTs).then(r => {
+                ok.disabled = false;
+                fechar();
+                avisoGarantiaFeita(os, r);
+            }).catch(e => {
+                ok.disabled = false;
+                fechar();
+                avisar(`Erro ao acionar a garantia: ${e.message}`);
+            });
+        });
+    }
+    function abrirModalGarantia(os) {
+        ensureModalGarantia();
+        _garantiaOs = os;
+        const destino = czEtapa(os.modo, etapaDaGarantia(os.modo)).label;
+        el('repGarTexto').textContent = `A OS de ${os.cliente?.nome || 'cliente'} volta para "${destino}" e a garantia fica marcada na linha do tempo. Não lança nova venda.`;
+        el('repGarMotivo').value = '';
+        el('repGarPrazo').value = '';
+        el('repGarErro').style.display = 'none';
+        el('repGarOk').disabled = false;
+        garantiaBackdrop.classList.add('show');
+        window._vsTravarScroll && window._vsTravarScroll();
+        if (typeof window._vsAbrirModal === 'function') window._vsAbrirModal(garantiaBackdrop._fechar);
+    }
+
     function abrirFolhaApagar(os) {
         const primeiro = (os.cliente && os.cliente.nome || 'cliente').split(/\s+/)[0];
         const caixa = abrirFolha(`
@@ -1067,6 +1230,7 @@
                 if (acao === 'avancar') avancarEtapa(os);
                 else if (acao === 'toggle-manual') { if (MOB) abrirFolhaManual(os); else panel.querySelector('[data-manual-wrap]')?.classList.toggle('show'); }
                 else if (acao === 'desfazer') abrirFolhaDesfazer(os);
+                else if (acao === 'garantia') abrirGarantia(os);
                 else if (acao === 'padrao') abrirPatternLightbox((senhaCache[os.id] && senhaCache[os.id].sequencia) || []);
                 else if (acao === 'whatsapp') { const url = linkWhatsApp(os.cliente && os.cliente.telefone); if (url) window.open(url, '_blank', 'noopener'); }
                 else if (acao === 'comprovante') { if (typeof window._reparosAbrirModalDoc === 'function') window._reparosAbrirModalDoc(os); }
@@ -1327,7 +1491,7 @@
     function abrirTimeline(os) {
         ensureModalTimeline();
         const etapas = FLOWS[os.modo] || [];
-        const entradas = entradasTimeline(os).map(e => ({ ...e, meta: flowMeta(os.modo, e.etapa) }));
+        const entradas = entradasTimeline(os).map(e => ({ ...e, meta: e.etapa === 'garantia' ? { label: 'Garantia acionada', color: '#fbbf24' } : flowMeta(os.modo, e.etapa) }));
         const body = el('repTimelineBody');
         if (!entradas.length) {
             body.innerHTML = `<p style="font-size:.76rem;color:var(--text-muted);">Nenhum histórico registrado ainda.</p>`;
@@ -1336,8 +1500,9 @@
                 <div class="rep-timeline-item">
                     <div class="rep-timeline-dot" style="background:${e.meta ? e.meta.color : '#64748b'};"></div>
                     <div class="rep-timeline-info">
-                        <div class="rep-timeline-etapa">${esc(e.meta ? e.meta.label : e.etapa)}</div>
-                        <div class="rep-timeline-data">${e.ts ? new Date(e.ts).toLocaleString('pt-BR') : '—'}</div>
+                        <div class="rep-timeline-etapa">${esc(e.meta ? e.meta.label : e.etapa)}${e.ciclo > 0 && e.etapa !== 'garantia' ? ' · garantia' : ''}</div>
+                        <div class="rep-timeline-data">${e.ts ? new Date(e.ts).toLocaleString('pt-BR') : '—'}${e.nome ? ' · ' + esc(e.nome) : ''}</div>
+                        ${e.motivo ? `<div class="rep-timeline-data">Motivo: ${esc(e.motivo)}</div>` : ''}
                         ${e.fotoUrl ? `<img src="${esc(e.fotoUrl)}" class="rep-timeline-foto" data-ver-foto-timeline="${esc(e.fotoUrl)}"/>` : ''}
                     </div>
                 </div>`).join('');

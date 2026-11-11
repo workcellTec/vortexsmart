@@ -2708,6 +2708,7 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 .rep-prz { display:inline-flex; align-items:center; gap:5px; height:24px; padding:0 9px; border-radius:12px; font-size:12px; font-weight:700; background:var(--surface-raised); color:var(--text-secondary); }
 .rep-prz.proximo { background:color-mix(in srgb, var(--warning) 16%, transparent); color:var(--warning); }
 .rep-prz.atrasado { background:color-mix(in srgb, var(--danger) 14%, transparent); color:var(--danger); }
+.rep-prz.garantia { background:color-mix(in srgb, var(--warning) 16%, transparent); color:var(--warning); }
 
 /* Painel aberto */
 .rep-painel { border-top:1px solid var(--border); }
@@ -2777,6 +2778,10 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 .rep-duo { display:flex; gap:8px; margin-bottom:10px; flex-shrink:0; }
 .rep-duo button { flex:1; height:46px; border-radius:14px; background:var(--surface-raised); border:1px solid var(--border); font-family:inherit; font-size:13px; font-weight:700; color:var(--text-strong); display:flex; align-items:center; justify-content:center; gap:7px; cursor:pointer; }
 #repFolha .rep-btn-pri { flex:none; width:100%; margin-top:8px; }
+.rep-campo { display:flex; flex-direction:column; gap:6px; margin:10px 0 0; }
+.rep-campo span { font-size:12px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); }
+.rep-campo input { height:46px; border-radius:14px; border:1px solid var(--border); background:var(--surface-raised); color:var(--text-strong); font-family:inherit; font-size:15px; padding:0 14px; min-width:0; }
+.rep-campo-erro { margin:8px 0 0; font-size:13px; font-weight:700; color:var(--danger); }
 /* Duas escolhas lado a lado na folha (assistente de entrega: "Não" / "Sim, ..."), no mesmo tamanho. */
 .rep-acts2 { display:flex; gap:8px; margin-top:12px; flex-shrink:0; }
 .rep-btn-sec { flex:1; min-width:0; height:48px; border-radius:16px; border:1px solid var(--border); background:var(--surface-raised); color:var(--text-strong); font-family:inherit; font-size:14px; font-weight:800; cursor:pointer; -webkit-tap-highlight-color:transparent; }

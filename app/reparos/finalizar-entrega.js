@@ -16,6 +16,8 @@
 // a janela central de sempre. Regras, textos e gravações são os mesmos nos dois.
 //
 // Passo 1 — Foto (opcional)
+//   OS que voltou por garantia (ciclo > 0, ver reparos/lista.js): termina aqui. Não lança venda nova nem
+//   oferece termo — garantia não se cobra de novo, e o termo original continua valendo.
 // Passo 2 — "Deseja criar uma venda de concerto?"
 //   Sim → lança a venda (aberta, sem forma de pagamento — mesma
 //         trava de transaction contra duplicar, como já era) e
@@ -140,8 +142,13 @@
         el('repWizFotoInputGal').addEventListener('change', onArquivo);
         el('repWizFotoCam').addEventListener('click', () => el('repWizFotoInputCam').click());
         el('repWizFotoGal').addEventListener('click', () => el('repWizFotoInputGal').click());
-        el('repWizP1Continuar').addEventListener('click', renderPasso2Venda);
-        el('repWizP1Pular').addEventListener('click', () => { _fotoBlobPendente = null; renderPasso2Venda(); });   // "sem foto" não pode mandar a que já foi escolhida
+        el('repWizP1Continuar').addEventListener('click', depoisDaFoto);
+        el('repWizP1Pular').addEventListener('click', () => { _fotoBlobPendente = null; depoisDaFoto(); });   // "sem foto" não pode mandar a que já foi escolhida
+    }
+
+    function depoisDaFoto() {
+        if (typeof window._reparosCicloGarantia === 'function' && window._reparosCicloGarantia(_os) > 0) finalizarComResultado('garantia');
+        else renderPasso2Venda();
     }
 
     // ── Passo 2 — Criar venda de concerto? ────────────────────────

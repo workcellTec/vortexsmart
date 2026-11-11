@@ -2893,6 +2893,7 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 .rep-badge.ok { background:rgba(0,230,118,.12); color:#00e676; }
 .rep-badge.proximo { background:rgba(251,191,36,.14); color:#fbbf24; }
 .rep-badge.atrasado { background:rgba(248,113,113,.14); color:#f87171; }
+.rep-badge.garantia { background:rgba(251,191,36,.14); color:#fbbf24; }
 .rep-card-chev { color:var(--text-muted); font-size:.9rem; transition:transform .15s; }
 .rep-card.expanded .rep-card-chev { transform:rotate(90deg); color:var(--primary); }
 

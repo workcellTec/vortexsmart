@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-10.41';
+        window._VS_VERSAO = '2026-11-10.42';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -198,6 +198,7 @@
     <symbol id="vsi-userplus" viewBox="0 0 24 24"><path d="M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 20a8 8 0 0 1 14-5M19 14v6M16 17h6"/></symbol>
     <symbol id="vsi-cashplus" viewBox="0 0 24 24"><path d="M2 5h15v11H2zM9.5 13.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM19 14v7M15.5 17.5h7"/></symbol>
     <symbol id="vsi-cashminus" viewBox="0 0 24 24"><path d="M2 5h15v11H2zM9.5 13.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM15.5 17.5h7"/></symbol>
+    <symbol id="vsi-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6zM9 12l2 2 4-4"/></symbol>
     <symbol id="vsi-shieldplus" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6zM12 9v6M9 12h6"/></symbol>
 </svg>
 
@@ -1289,7 +1290,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v66';
+  const SW_VERSION = 'v67';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;
