@@ -41,8 +41,12 @@
     //    vira Capa.
     //  - "qualquer": a palavra (ou frase, ex.: "caixa de som") aparece em qualquer
     //    parte do nome, até no meio de outra palavra ("fone" acha "Microfone").
-    // As de "inicio" são checadas ANTES: "Capa Samsung A02" fica em Capas e não
-    // cai em Celulares. Dentro de cada grupo vale a ordem da lista.
+    //  - "também" (opcional, em qualquer das duas): o nome ainda precisa ter ao
+    //    menos uma destas palavras em qualquer parte. É o que separa "Capas
+    //    Samsung" (case/capa + samsung) de "Capas Motorola" (case/capa + moto).
+    // Ordem de checagem: "inicio" com "também", "inicio", "qualquer" com
+    // "também", "qualquer" — a mais específica ganha, e "Capa Samsung A02" fica
+    // em Capas e não cai em Celulares. Dentro de cada grupo vale a ordem da lista.
     // Loja que nunca mexeu (nada gravado) usa o padrão abaixo. Loja personalizada
     // antes da versão 2 não tem as 3 de fábrica gravadas: elas valem como padrão
     // até a 1ª mexida, que grava tudo e marca versao: 2.
@@ -87,18 +91,22 @@
     }
     // uma palavra de categoria é válida? ("inicio": uma palavra só; "qualquer": aceita frase)
     const palavraValida = (w, modo) => (modo === 'qualquer' ? /^[a-z0-9]+( [a-z0-9]+)*$/ : /^[a-z0-9]+$/).test(w) && w.length >= CAT_PALAVRA_MIN && w.length <= CAT_PALAVRA_MAX;
-    // Lê uma categoria como veio do banco, sem confiar: nome, modo, palavras e cor inválidos são descartados
+    // O Firebase devolve lista como array ou, se faltar índice, como objeto
+    const listaDoBanco = v => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : []);
+    // Lê uma categoria como veio do banco, sem confiar: nome, modo, palavras, "também" e cor inválidos são descartados
     function lerCategoria(id, c, posicao) {
         if (!c || typeof c !== 'object' || id === CATEGORIA_OUTROS.id) return null;
         const nome = typeof c.nome === 'string' ? c.nome.trim().slice(0, CAT_NOME_MAX) : '';
         const modo = c.modo === 'inicio' || c.modo === 'qualquer' ? c.modo : (MODO_PADRAO[id] || 'inicio');
-        const brutas = Array.isArray(c.palavras) ? c.palavras : (c.palavras && typeof c.palavras === 'object' ? Object.values(c.palavras) : []);
-        const palavras = [...new Set(brutas.map(w => textoCompacto(w)).filter(w => palavraValida(w, modo)))].slice(0, CAT_PALAVRAS_MAX);
-        if (!nome || !palavras.length) return null;
+        const lerPalavras = (bruto, m) => [...new Set(listaDoBanco(bruto).map(w => textoCompacto(w)).filter(w => palavraValida(w, m)))].slice(0, CAT_PALAVRAS_MAX);
+        const palavras = lerPalavras(c.palavras, modo);
+        const tambem = lerPalavras(c.tambem, 'qualquer');
+        // "também" gravado mas inválido: descarta a categoria em vez de deixá-la valer sem a condição (viraria um "pega tudo")
+        if (!nome || !palavras.length || (listaDoBanco(c.tambem).length && !tambem.length)) return null;
         const formas = new Set();
         palavras.forEach(w => formasDaPalavra(w).forEach(f => formas.add(f)));
         return {
-            id, nome, palavras, modo, formas,
+            id, nome, palavras, tambem, modo, formas,
             cor: typeof c.cor === 'string' && /^#[0-9a-f]{6}$/i.test(c.cor) ? c.cor : CORES_CATEGORIA[posicao % CAT_MAX],
             ordem: Number.isFinite(c.ordem) ? c.ordem : posicao
         };
@@ -106,7 +114,7 @@
     // Lista efetiva, na ordem: a gravada pelo Gestor ou, sem nada gravado, o padrão.
     // "virtual" = ainda não existe no banco (só vale "de cabeça" até a 1ª mexida).
     // (memoizada: o core.js troca o objeto inteiro a cada mudança no banco)
-    let memoCfg, memoLista;
+    let memoCfg, memoLista, memoPrioridade;
     function categoriasEditaveis() {
         const cfg = window._categoriasProduto;
         if (memoLista && memoCfg === cfg) return memoLista;
@@ -122,6 +130,9 @@
             base = CATEGORIAS_PADRAO.map((c, i) => ({ ...lerCategoria(c.id, c, i), virtual: true }));
         }
         base.sort((a, b) => a.ordem - b.ordem || a.id.localeCompare(b.id));
+        // ordem de checagem (o sort é estável: dentro de cada grupo vale a ordem da lista)
+        const grupo = c => (c.modo === 'inicio' ? 0 : 2) + (c.tambem.length ? 0 : 1);
+        memoPrioridade = base.slice().sort((a, b) => grupo(a) - grupo(b));
         memoCfg = cfg; memoLista = base;
         return base;
     }
@@ -137,13 +148,12 @@
         ];
     }
     function detectarCategoria(nome) {
-        const lista = categoriasEditaveis();
-        const inicio = primeiraPalavra(nome);
-        if (inicio) {
-            for (const c of lista) if (c.modo === 'inicio' && c.formas.has(inicio)) return c.id;
+        categoriasEditaveis();
+        const inicio = primeiraPalavra(nome), n = textoCompacto(nome);
+        for (const c of memoPrioridade) {
+            const bate = c.modo === 'inicio' ? !!inicio && c.formas.has(inicio) : c.palavras.some(w => n.includes(w));
+            if (bate && (!c.tambem.length || c.tambem.some(w => n.includes(w)))) return c.id;
         }
-        const n = textoCompacto(nome);
-        for (const c of lista) if (c.modo === 'qualquer' && c.palavras.some(w => n.includes(w))) return c.id;
         return CATEGORIA_OUTROS.id;
     }
 
@@ -327,7 +337,8 @@
     // que só existia "de cabeça" (padrão) é gravado junto (personalizado: true,
     // versao: 2) — é isso que faz um "apagar" valer, em vez de o padrão reaparecer.
     const avisoToast = msg => typeof window.showCustomModal === 'function' && window.showCustomModal({ message: msg });
-    const categoriaParaBanco = c => ({ nome: c.nome, palavras: c.palavras.slice(), modo: c.modo, cor: c.cor, ordem: c.ordem });
+    // "também" só é gravado quando existe: categoria sem ele fica igual à de antes (e o banco não ganha campo vazio)
+    const categoriaParaBanco = c => ({ nome: c.nome, palavras: c.palavras.slice(), ...(c.tambem && c.tambem.length ? { tambem: c.tambem.slice() } : {}), modo: c.modo, cor: c.cor, ordem: c.ordem });
     const jaPersonalizado = () => !!(window._categoriasProduto && window._categoriasProduto.personalizado === true);
     const jaNaVersaoAtual = () => jaPersonalizado() && window._categoriasProduto.versao === VERSAO_CATEGORIAS;
     // O que a 1ª mexida precisa gravar além da própria alteração: as categorias virtuais
@@ -389,6 +400,7 @@
                     <div class="stq-catman-nome">${esc(c.nome)}</div>
                     <div class="stq-catman-palavras">${esc(c.palavras.join(' · '))}</div>
                     <div class="stq-catman-modo">${c.modo === 'qualquer' ? 'Palavra em qualquer parte do nome' : 'Nome começa com a palavra'}</div>
+                    ${c.tambem.length ? `<div class="stq-catman-modo">e o nome também tem: ${esc(c.tambem.join(' · '))}</div>` : ''}
                 </div>
                 <button type="button" class="stq-catman-btn" data-acao="editar" aria-label="Editar ${esc(c.nome)}"><i class="bi bi-pencil-fill"></i></button>
                 <button type="button" class="stq-catman-btn danger" data-acao="apagar" aria-label="Apagar ${esc(c.nome)}"><i class="bi bi-trash3-fill"></i></button>
@@ -429,6 +441,7 @@
             id: existente ? existente.id : null,
             nome: existente ? existente.nome : '',
             palavras: existente ? existente.palavras.slice() : [],
+            tambem: existente ? existente.tambem.slice() : [],
             modo: existente ? existente.modo : 'inicio',
             tocadas: !!existente,          // true = as palavras não acompanham mais o nome
             erro: '',
@@ -450,6 +463,13 @@
                 <input class="form-control" id="catPalavra" type="text" maxlength="${CAT_PALAVRA_MAX + 2}" autocomplete="off"/>
                 <button type="button" class="stq-modal-btn-cancel" id="catPalavraAdd" style="white-space:nowrap;">Adicionar</button>
             </div>
+            <label class="form-label mt-3">E o nome também tem <span class="text-secondary">(opcional)</span></label>
+            <div class="text-secondary" style="font-size:.72rem;margin-bottom:4px;">Separa por marca ou modelo: só entra o produto que bate com as palavras acima <b>e</b> tem pelo menos uma destas no nome. Ex.: "Capas Motorola" = começa com "capa" ou "case" e também tem "moto". Separe com vírgula.</div>
+            <div class="stq-catman-chips" id="catTambemChips"></div>
+            <div style="display:flex;gap:8px;">
+                <input class="form-control" id="catTambem" type="text" maxlength="${CAT_PALAVRA_MAX + 2}" autocomplete="off" placeholder="Ex: moto, motorola + Enter"/>
+                <button type="button" class="stq-modal-btn-cancel" id="catTambemAdd" style="white-space:nowrap;">Adicionar</button>
+            </div>
             <div class="stq-catman-aviso" id="catAviso"></div>
             <div id="catSugestoesWrap"></div>
             <button type="button" class="stq-modal-btn-save w-100 mt-3" id="catSalvarBtn"><i class="bi bi-check-circle-fill"></i> Salvar</button>
@@ -469,9 +489,15 @@
         el('catPalavra').addEventListener('keydown', e => {
             if (e.key !== 'Enter') return;
             e.preventDefault();
-            adicionarPalavrasDoCampo();
+            adicionarPalavrasDoCampo('palavras');
         });
-        el('catPalavraAdd').addEventListener('click', adicionarPalavrasDoCampo);
+        el('catPalavraAdd').addEventListener('click', () => adicionarPalavrasDoCampo('palavras'));
+        el('catTambem').addEventListener('keydown', e => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            adicionarPalavrasDoCampo('tambem');
+        });
+        el('catTambemAdd').addEventListener('click', () => adicionarPalavrasDoCampo('tambem'));
         el('catModos').querySelectorAll('button[data-modo]').forEach(b => b.addEventListener('click', () => {
             if (!catForm || catForm.modo === b.dataset.modo) return;
             catForm.modo = b.dataset.modo;
@@ -501,18 +527,23 @@
         el('catPalavra').placeholder = qualquer ? 'Palavra ou frase + Enter' : 'Outra palavra + Enter';
     }
 
+    // Desenha as duas listas de palavras do formulário: as principais (#catChips) e as do "também" (#catTambemChips)
     function renderCatChips() {
-        const wrap = el('catChips');
-        if (!wrap || !catForm) return;
-        wrap.innerHTML = catForm.palavras.length
-            ? catForm.palavras.map(w => `<span class="stq-catman-chip">${esc(w)}<button type="button" data-w="${esc(w)}" aria-label="Remover ${esc(w)}"><i class="bi bi-x-lg"></i></button></span>`).join('')
-            : `<span class="text-secondary" style="font-size:.76rem;">Nenhuma palavra ainda. Digite o nome acima ou adicione uma.</span>`;
-        wrap.querySelectorAll('button[data-w]').forEach(b => b.addEventListener('click', () => {
-            catForm.palavras = catForm.palavras.filter(x => x !== b.dataset.w);
-            catForm.tocadas = true;
-            catForm.erro = '';
-            renderCatChips();
-        }));
+        if (!catForm) return;
+        [['palavras', 'catChips', 'Nenhuma palavra ainda. Digite o nome acima ou adicione uma.'],
+         ['tambem', 'catTambemChips', 'Nenhuma: não exige mais nada do nome.']].forEach(([campo, idBox, vazio]) => {
+            const wrap = el(idBox);
+            if (!wrap) return;
+            wrap.innerHTML = catForm[campo].length
+                ? catForm[campo].map(w => `<span class="stq-catman-chip">${esc(w)}<button type="button" data-w="${esc(w)}" aria-label="Remover ${esc(w)}"><i class="bi bi-x-lg"></i></button></span>`).join('')
+                : `<span class="text-secondary" style="font-size:.76rem;">${vazio}</span>`;
+            wrap.querySelectorAll('button[data-w]').forEach(b => b.addEventListener('click', () => {
+                catForm[campo] = catForm[campo].filter(x => x !== b.dataset.w);
+                if (campo === 'palavras') catForm.tocadas = true;
+                catForm.erro = '';
+                renderCatChips();
+            }));
+        });
         renderCatAviso();
         renderCatSugestoes();
     }
@@ -522,7 +553,9 @@
         const box = el('catAviso');
         if (!box || !catForm) return;
         if (catForm.erro) { box.className = 'stq-catman-aviso erro'; box.textContent = catForm.erro; return; }
-        const outras = categoriasEditaveis().filter(c => c.id !== catForm.id);
+        // Só é conflito se nenhuma das duas tem "também" (a mais específica ganha) ou se as duas têm e os "também" se cruzam
+        const cruzam = (a, b) => a.some(x => b.some(y => x.includes(y) || y.includes(x)));
+        const outras = categoriasEditaveis().filter(c => c.id !== catForm.id && (!catForm.tambem.length === !c.tambem.length) && (!catForm.tambem.length || cruzam(catForm.tambem, c.tambem)));
         const repetidas = [];
         catForm.palavras.forEach(w => {
             const f = formasDaPalavra(w);
@@ -530,7 +563,7 @@
             if (dona) repetidas.push(`"${w}" também está em "${dona.nome}"`);
         });
         box.className = 'stq-catman-aviso alerta';
-        box.textContent = repetidas.length ? `${repetidas.join('; ')}. Se o nome combinar com as duas, vale a de "começa com a palavra"; entre iguais, a que vier primeiro na lista.` : '';
+        box.textContent = repetidas.length ? `${repetidas.join('; ')}. Se o nome combinar com as duas, vale a de "começa com a palavra"; entre iguais, a que vier primeiro na lista.${catForm.tambem.length ? '' : ' Pra separar por marca ou modelo, use "E o nome também tem".'}` : '';
     }
 
     function renderCatSugestoes() {
@@ -553,29 +586,30 @@
 
     // Aceita várias de uma vez ("fonte, carregador"; em "qualquer parte" só a vírgula
     // separa, porque a palavra pode ser uma frase). Devolve false se alguma foi recusada.
-    function adicionarPalavras(texto) {
+    // campo: 'palavras' (as principais, seguem o modo escolhido) ou 'tambem' (sempre em qualquer parte, aceita frase)
+    function adicionarPalavras(texto, campo = 'palavras') {
         if (!catForm) return false;
-        const qualquer = catForm.modo === 'qualquer';
+        const qualquer = campo === 'tambem' || catForm.modo === 'qualquer';
         const partes = (qualquer ? normalizarTexto(texto).split(/[,;]+/) : normalizarTexto(texto).split(/[\s,;]+/)).map(w => w.replace(/\s+/g, ' ').trim()).filter(Boolean);
         if (!partes.length) return true;
         const erros = [];
         partes.forEach(w => {
             if (!(qualquer ? /^[a-z0-9]+( [a-z0-9]+)*$/ : /^[a-z0-9]+$/).test(w)) erros.push(`"${w}": use só letras e números`);
             else if (w.length < CAT_PALAVRA_MIN || w.length > CAT_PALAVRA_MAX) erros.push(`"${w}": use de ${CAT_PALAVRA_MIN} a ${CAT_PALAVRA_MAX} letras`);
-            else if (catForm.palavras.includes(w)) { /* já está */ }
-            else if (catForm.palavras.length >= CAT_PALAVRAS_MAX) erros.push(`no máximo ${CAT_PALAVRAS_MAX} palavras`);
-            else catForm.palavras.push(w);
+            else if (catForm[campo].includes(w)) { /* já está */ }
+            else if (catForm[campo].length >= CAT_PALAVRAS_MAX) erros.push(`no máximo ${CAT_PALAVRAS_MAX} palavras`);
+            else catForm[campo].push(w);
         });
-        catForm.tocadas = true;
+        if (campo === 'palavras') catForm.tocadas = true;
         catForm.erro = erros.length ? [...new Set(erros)].join('; ') + '.' : '';
         renderCatChips();
         return !erros.length;
     }
-    function adicionarPalavrasDoCampo() {
-        const campo = el('catPalavra');
-        if (!campo || !catForm) return true;
-        const ok = adicionarPalavras(campo.value);
-        if (ok) campo.value = '';
+    function adicionarPalavrasDoCampo(campo) {
+        const input = el(campo === 'tambem' ? 'catTambem' : 'catPalavra');
+        if (!input || !catForm) return true;
+        const ok = adicionarPalavras(input.value, campo);
+        if (ok) input.value = '';
         return ok;
     }
 
@@ -594,7 +628,7 @@
 
     function salvarCategoria() {
         if (!catForm) return;
-        if (!adicionarPalavrasDoCampo()) return;      // palavra digitada e ainda não adicionada entra junto
+        if (!adicionarPalavrasDoCampo('palavras') || !adicionarPalavrasDoCampo('tambem')) return;      // palavra digitada e ainda não adicionada entra junto
         const erro = validarCatForm();
         if (erro) { catForm.erro = erro; renderCatAviso(); return; }
 
@@ -610,7 +644,7 @@
             ordem = atual.reduce((m, c) => Math.max(m, c.ordem), -1) + 1;
             cor = CORES_CATEGORIA.find(x => !atual.some(c => c.cor.toLowerCase() === x)) || CORES_CATEGORIA[atual.length % CAT_MAX];
         }
-        dados[`lista/${id}`] = { nome: catForm.nome.trim(), palavras: catForm.palavras.slice(), modo: catForm.modo, cor, ordem };
+        dados[`lista/${id}`] = categoriaParaBanco({ nome: catForm.nome.trim(), palavras: catForm.palavras, tambem: catForm.tambem, modo: catForm.modo, cor, ordem });
 
         const btn = el('catSalvarBtn'), sessao = sessaoModal;
         window._setBtnLoading && window._setBtnLoading(btn, true, 'Salvando...');
