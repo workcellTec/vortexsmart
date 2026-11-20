@@ -4,7 +4,7 @@
 // dentro de uma janela desktop, e expõe (via preload.js) a ponte de
 // impressão térmica ESC/POS que impressao/recibo-termico.js chama.
 // ================================================================
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -55,6 +55,15 @@ if (!app.requestSingleInstanceLock()) {
         // (dava acesso a recarregar a página e ao console).
         if (app.isPackaged && !DEBUG) Menu.setApplicationMenu(null);
         createWindow();
+        // Atualização automática (ver atualizador.js). Só no programa instalado, e carregada aqui
+        // dentro de um try: se por qualquer motivo ela não subir, o PDV abre e imprime do mesmo jeito.
+        if (app.isPackaged) {
+            try {
+                require('./atualizador.js').iniciarAtualizador({ app, dialog, autoUpdater: require('electron-updater').autoUpdater, obterJanela: () => mainWindow });
+            } catch (e) {
+                console.error('Atualização automática não iniciou:', e);
+            }
+        }
     });
 }
 
@@ -74,6 +83,10 @@ function textoDoWindows(saida) {
 }
 
 const DICA_COMPARTILHAMENTO = 'Confira: a impressora precisa estar COMPARTILHADA no Windows (botão direito na impressora > Propriedades da impressora > aba Compartilhamento), com o NOME DO COMPARTILHAMENTO IGUAL ao nome da impressora.';
+
+// ── Versão do programa instalado (aparece no Diagnóstico do app: serve pra saber
+//    qual versão cada cliente está usando) ──
+ipcMain.handle('versao-programa', () => app.getVersion());
 
 // ── Lista as impressoras instaladas no Windows (usa PowerShell,
 //    já vem em qualquer Windows 10/11 do cliente, sem instalar nada) ──

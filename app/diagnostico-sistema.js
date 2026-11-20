@@ -194,7 +194,12 @@
             L.push('Aberto como: ' + location.protocol + '//' + (location.pathname.split('/').slice(-3).join('/')));
             L.push('Formato da tela: ' + (document.documentElement.getAttribute('data-shell') === 'mobile' ? 'celular' : 'computador'));
             if (window._vsAnimacao) L.push('Animações de tela: escolha=' + window._vsAnimacao.preferencia() + ' · em uso=' + window._vsAnimacao.efetivo() + ' · medido=' + (window._vsAnimacao.medido() || '—'));
-            L.push('Programa instalado (impressão): ' + (typeof window.vsmartPrint === 'object' && window.vsmartPrint ? 'SIM' : 'não (navegador/celular)'));
+            const programa = typeof window.vsmartPrint === 'object' && window.vsmartPrint;
+            let versaoPrograma = '';
+            if (programa && typeof programa.versaoPrograma === 'function') {
+                try { versaoPrograma = ' · versão ' + await comTempo(programa.versaoPrograma(), tempoLeitura()); } catch (e) { versaoPrograma = ' · versão não lida'; }
+            } else if (programa) versaoPrograma = ' · versão antiga (sem atualização automática)';
+            L.push('Programa instalado (impressão): ' + (programa ? 'SIM' + versaoPrograma : 'não (navegador/celular)'));
             L.push('Internet: ' + (navigator.onLine ? 'conectado' : 'SEM CONEXÃO'));
             if (window._storageBucket) L.push('Bucket do Storage que o app usa: gs://' + window._storageBucket);
             L.push('Sistema: ' + navigator.userAgent.replace(/\s+/g, ' ').slice(0, 150));

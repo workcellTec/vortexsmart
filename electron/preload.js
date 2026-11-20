@@ -6,7 +6,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('vsmartPrint', {
-    listarImpressoras:      ()                      => ipcRenderer.invoke('listar-impressoras'),
+    versaoPrograma:         ()                      => ipcRenderer.invoke('versao-programa'),
+    listarImpressoras:     ()                      => ipcRenderer.invoke('listar-impressoras'),
     imprimirReciboVenda:    (impressora, venda, loja) => ipcRenderer.invoke('imprimir-recibo-venda', impressora, venda, loja),
     // Mesmo canal, com o nome que o app (impressao/recibo-termico.js) chama. Sem ele o recibo dava
     // "imprimirRecibo is not a function" — e a tela ainda mostrava "Trocar impressora", que enganava.

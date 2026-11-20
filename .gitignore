@@ -75,3 +75,6 @@ apk/app/build/
 apk/local.properties
 *.jks
 !apk/vortexsmart.jks.enc
+
+# Instalador do Windows gerado localmente
+electron/dist/

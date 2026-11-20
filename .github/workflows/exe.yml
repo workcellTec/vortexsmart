@@ -1,0 +1,111 @@
+# Gera o instalador do Windows (.exe) do VortexSmart PDV e publica numa Release, de onde o programa
+# já instalado baixa a atualização sozinho (electron-updater, ver electron/atualizador.js).
+# Como usar: aba Actions > "Gerar instalador do Windows (.exe)" > Run workflow. Pronto em ~6 min.
+# Dois canais, que nunca se misturam (mesma ideia do APK):
+#   • beta (padrão): programa "VortexSmart PDV Beta" (app separado, instala AO LADO do oficial, com dados próprios)
+#     que se atualiza pela Release "exe-beta". É o que se usa pra testar no seu PC.
+#   • oficial: o programa dos clientes (VortexSmart PDV), que se atualiza pela Release "exe-latest".
+#     Só gere quando for mandar atualização pra valer.
+# O instalador leva junto uma cópia do site (pasta app/) — por isso cada versão nova do programa traz o site novo.
+# A 1ª instalação em cada computador é manual (instalador baixado da Release); dali em diante atualiza sozinho.
+# Sem certificado de assinatura do Windows: na 1ª instalação o Windows mostra "editor desconhecido".
+name: Gerar instalador do Windows (.exe)
+
+on:
+  workflow_dispatch:
+    inputs:
+      canal:
+        description: 'Canal: beta = programa de teste separado (padrão); oficial = o programa dos clientes'
+        type: choice
+        options: [beta, oficial]
+        default: beta
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: electron
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # Resolve tudo que muda entre os canais num lugar só.
+      - name: Definir canal
+        id: canal
+        env:
+          CANAL: ${{ inputs.canal }}
+        run: |
+          if [ "$CANAL" = "beta" ]; then
+            echo "tag=exe-beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=exe-latest" >> "$GITHUB_OUTPUT"
+          fi
+          echo "versao=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      # --publish never: só gera os arquivos (instalador, .blockmap e latest.yml); quem publica é o passo abaixo.
+      # extraMetadata.version: a versão do programa (a que o atualizador compara) vem do número desta execução.
+      - name: Gerar instalador
+        env:
+          CANAL: ${{ inputs.canal }}
+          TAG: ${{ steps.canal.outputs.tag }}
+          VERSAO: ${{ steps.canal.outputs.versao }}
+        run: |
+          URL="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+          if [ "$CANAL" = "beta" ]; then
+            npx electron-builder --win --x64 --publish never \
+              -c.extraMetadata.version="$VERSAO" -c.publish.url="$URL" \
+              -c.appId=com.vortexsmart.pdv.beta -c.productName="VortexSmart PDV Beta" -c.nsis.shortcutName="VortexSmart PDV Beta" \
+              -c.win.artifactName='VortexSmart-PDV-Beta-Setup-${version}.${ext}'
+          else
+            npx electron-builder --win --x64 --publish never \
+              -c.extraMetadata.version="$VERSAO" -c.publish.url="$URL"
+          fi
+          ls -la dist
+
+      # Trava os erros que só apareceriam no computador do cliente: arquivo do programa que ficou de fora do pacote,
+      # site que não entrou, atualizador apontando pra Release errada.
+      - name: Conferir o pacote
+        env:
+          TAG: ${{ steps.canal.outputs.tag }}
+          VERSAO: ${{ steps.canal.outputs.versao }}
+        run: |
+          R=dist/win-unpacked/resources
+          npx --yes @electron/asar list "$R/app.asar" | tr '\\' '/' > "$RUNNER_TEMP/asar.txt"
+          for f in main.js preload.js atualizador.js impressao/escpos-builder.js impressao/tspl-builder.js node_modules/electron-updater/package.json node_modules/iconv-lite/package.json; do
+            grep -q "/$f\$" "$RUNNER_TEMP/asar.txt" || { echo "::error::Faltou no pacote: $f"; exit 1; }
+          done
+          [ -f "$R/web/index.html" ] || { echo "::error::O site (resources/web/index.html) não entrou no pacote."; exit 1; }
+          grep -q "releases/download/${TAG}" "$R/app-update.yml" || { echo "::error::app-update.yml não aponta pra Release ${TAG}:"; cat "$R/app-update.yml"; exit 1; }
+          grep -q "^version: ${VERSAO}\$" dist/latest.yml || { echo "::error::latest.yml com versão diferente de ${VERSAO}:"; cat dist/latest.yml; exit 1; }
+          echo "Pacote conferido. latest.yml:"; cat dist/latest.yml
+
+      # Cada canal mexe só na própria Release: publicar o beta nunca troca o instalador que os clientes recebem.
+      - name: Publicar em Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.canal.outputs.tag }}
+          VERSAO: ${{ steps.canal.outputs.versao }}
+          CANAL: ${{ inputs.canal }}
+        run: |
+          EXTRA=""; TITULO="VortexSmart PDV (Windows)"
+          if [ "$CANAL" = "beta" ]; then EXTRA="--prerelease"; TITULO="VortexSmart PDV Beta (Windows)"; fi
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" dist/*.exe dist/*.exe.blockmap dist/latest.yml \
+            --title "$TITULO" $EXTRA \
+            --notes "Instalador ${VERSAO} (commit ${GITHUB_SHA::7}). 1ª instalação: baixe o arquivo .exe. Programas já instalados atualizam sozinhos." \
+            --target "$GITHUB_SHA"
+          echo "### Instalador pronto (${CANAL})" >> "$GITHUB_STEP_SUMMARY"
+          for f in dist/*.exe; do echo "https://github.com/${{ github.repository }}/releases/download/${TAG}/$(basename "$f")" >> "$GITHUB_STEP_SUMMARY"; done

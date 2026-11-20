@@ -15,6 +15,7 @@
     "electron-builder": "^25.1.8"
   },
   "dependencies": {
+    "electron-updater": "^6.8.11",
     "iconv-lite": "^0.6.3"
   },
   "author": "VortexSmart",
@@ -29,6 +30,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "atualizador.js",
       "impressao/**/*",
       "package.json"
     ],
@@ -67,6 +69,10 @@
       "shortcutName": "VortexSmart PDV",
       "language": "1046",
       "deleteAppDataOnUninstall": false
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://github.com/workcellTec/vortexsmart/releases/download/exe-latest"
     }
   }
 }
