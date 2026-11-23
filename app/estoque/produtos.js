@@ -44,9 +44,9 @@
     //  - "também" (opcional, em qualquer das duas): o nome ainda precisa ter ao
     //    menos uma destas palavras em qualquer parte. É o que separa "Capas
     //    Samsung" (case/capa + samsung) de "Capas Motorola" (case/capa + moto).
-    // Ordem de checagem: "inicio" com "também", "inicio", "qualquer" com
-    // "também", "qualquer" — a mais específica ganha, e "Capa Samsung A02" fica
-    // em Capas e não cai em Celulares. Dentro de cada grupo vale a ordem da lista.
+    // Ordem de checagem: com "também" primeiro ("inicio" e depois "qualquer"), depois as
+    // sem "também" ("inicio" e depois "qualquer") — a mais específica ganha, e "Capa Samsung
+    // A02" fica em Capas e não cai em Celulares. Dentro de cada grupo vale a ordem da lista.
     // Loja que nunca mexeu (nada gravado) usa o padrão abaixo. Loja personalizada
     // antes da versão 2 não tem as 3 de fábrica gravadas: elas valem como padrão
     // até a 1ª mexida, que grava tudo e marca versao: 2.
@@ -131,7 +131,7 @@
         }
         base.sort((a, b) => a.ordem - b.ordem || a.id.localeCompare(b.id));
         // ordem de checagem (o sort é estável: dentro de cada grupo vale a ordem da lista)
-        const grupo = c => (c.modo === 'inicio' ? 0 : 2) + (c.tambem.length ? 0 : 1);
+        const grupo = c => (c.tambem.length ? 0 : 2) + (c.modo === 'inicio' ? 0 : 1);
         memoPrioridade = base.slice().sort((a, b) => grupo(a) - grupo(b));
         memoCfg = cfg; memoLista = base;
         return base;
