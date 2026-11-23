@@ -137,6 +137,7 @@ body::before {
         radial-gradient(ellipse 60% 40% at 80% 100%, rgba(0, 176, 255, 0.12) 0%, transparent 60%);
     z-index: -2;
     pointer-events: none;
+    will-change: opacity;
     animation: bgPulse 8s ease-in-out infinite alternate;
 }
 @keyframes bgPulse {
@@ -147,16 +148,20 @@ body::before {
 /* Ambilight inferior */
 body::after {
     content: "";
-    position: fixed; bottom: 0; left: 0; width: 100%; height: 120px;
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 140px;
     background: linear-gradient(to top, rgba(var(--primary-rgb), 0.4) 0%, transparent 100%);
     filter: blur(20px);
     z-index: -1;
     pointer-events: none;
+    transform-origin: 50% 100%;
+    will-change: transform, opacity;
     animation: ambi 6s ease-in-out infinite alternate;
 }
+/* Só opacity e transform: rodam na placa de vídeo, sem recalcular layout nem repintar o desfoque a cada
+   quadro (animar a altura custava ~1/3 de um núcleo com o sistema parado). 100→140 px = scaleY(.714→1). */
 @keyframes ambi {
-    from { opacity: 0.4; height: 100px; }
-    to   { opacity: 0.7; height: 140px; }
+    from { opacity: 0.4; transform: scaleY(0.714); }
+    to   { opacity: 0.7; transform: scaleY(1); }
 }
 
 /* ── Layout principal ───────────────────────────────────────── */
