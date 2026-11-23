@@ -5,7 +5,7 @@
     <script>
         // Versão do app (mostrada no Diagnóstico do sistema — sobe a cada entrega) e captura de erros
         // desde o primeiro instante, inclusive arquivos que não carregaram. Só registra; não muda nada.
-        window._VS_VERSAO = '2026-11-23.47';
+        window._VS_VERSAO = '2026-11-23.48';
         window.__vsErros = [];
         window.__vsFalhasDeCarga = [];
         window.addEventListener('error', function (e) {
@@ -729,6 +729,11 @@
                     <div class="cfgA-name">Impressora de Recibo<span id="cfgImpressoraReciboNome" style="display:block;font-weight:500;font-size:.7rem;opacity:.7;margin-top:2px;"></span></div>
                     <span class="cfgA-chev">›</span>
                 </button>
+                <button data-electron-only type="button" class="cfgA-row" id="openConfigTesteImpressao2">
+                    <div class="cfgA-icon" style="background:linear-gradient(135deg,#fbbf24,#b45309);">🧪</div>
+                    <div class="cfgA-name">Teste de impressão<span style="display:block;font-weight:500;font-size:.7rem;opacity:.7;margin-top:2px;">Imprimir teste e ver se o Windows está certo</span></div>
+                    <span class="cfgA-chev">›</span>
+                </button>
                 <button type="button" class="cfgA-row" id="openConfigDiagnostico2">
                     <div class="cfgA-icon" style="background:linear-gradient(135deg,#34d399,#047857);">🩺</div>
                     <div class="cfgA-name">Diagnóstico do sistema<span style="display:block;font-weight:500;font-size:.7rem;opacity:.7;margin-top:2px;">Se algo não funcionar, abra aqui e copie o relatório</span></div>
@@ -1265,6 +1270,7 @@
 <script src="venda/historico.js" defer></script>
 <script src="impressao/recibo-termico.js" defer></script>
 <script src="impressao/etiqueta-termica.js" defer></script>
+<script src="impressao/teste-impressao.js" defer></script>
 <script src="venda/fechar.js" defer></script>
 <script src="venda/relatorios.js" defer></script>
 <script src="reparos/pattern-widget.js" defer></script>
@@ -1290,7 +1296,7 @@
   // novo, nem de nada estar configurado certinho do lado do servidor.
   // ⚠️ TEM QUE bater com o CACHE_VERSION lá no sw.js — sempre que subir
   // versão de um, sobe a do outro junto.
-  const SW_VERSION = 'v72';
+  const SW_VERSION = 'v73';
 
   if ('serviceWorker' in navigator) {
     let registroSW = null;

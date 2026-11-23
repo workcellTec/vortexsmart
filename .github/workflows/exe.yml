@@ -42,6 +42,11 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      # Trava da impressão: os bytes de recibo/etiqueta e o código de envio precisam ser idênticos aos do código
+      # validado no papel (electron/teste-impressao). Se algo mudou, o instalador não é gerado.
+      - name: Trava da impressão
+        run: npm run test:impressao
+
       # Resolve tudo que muda entre os canais num lugar só.
       - name: Definir canal
         id: canal

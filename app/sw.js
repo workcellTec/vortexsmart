@@ -71,7 +71,7 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_VERSION = 'vortexsmart-v72';
+const CACHE_VERSION = 'vortexsmart-v73';
 
 const APP_SHELL = [
   './',
@@ -108,6 +108,7 @@ const APP_SHELL = [
   './venda/historico.js',
   './impressao/recibo-termico.js',
   './impressao/etiqueta-termica.js',
+  './impressao/teste-impressao.js',
   './venda/fechar.js',
   './venda/relatorios.js',
   './reparos/pattern-widget.js',

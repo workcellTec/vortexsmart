@@ -1,0 +1,2 @@
+# Os arquivos de referência da trava da impressão são bytes: o git não pode converter fim de linha neles.
+golden/* -text

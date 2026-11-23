@@ -187,3 +187,27 @@ ipcMain.handle('imprimir-etiqueta-produto', async (event, nomeImpressora, opcoes
     const buffer = montarEtiquetaProduto(opcoes || {});
     return enviarBufferParaImpressora(buffer, nomeImpressora);
 });
+
+// ── Diagnóstico de impressão (SÓ LEITURA): devolve o que o Windows tem de impressoras — nome,
+//    compartilhamento, driver, porta, estado — e se o serviço de impressão está rodando. Alimenta a tela
+//    "Teste e diagnóstico de impressão" (app/impressao/teste-impressao.js). Não imprime nem altera nada. ──
+ipcMain.handle('diagnostico-impressoras', async () => {
+    const ps = [
+        "$ErrorActionPreference='Stop'",
+        '[Console]::OutputEncoding=[Text.Encoding]::UTF8',
+        '$i=@(Get-Printer | ForEach-Object { [pscustomobject]@{ nome=[string]$_.Name; compartilhamento=[string]$_.ShareName; compartilhada=[bool]$_.Shared; driver=[string]$_.DriverName; porta=[string]$_.PortName; status=[string]$_.PrinterStatus; offline=[bool]$_.WorkOffline } })',
+        '$s=[string](Get-Service -Name Spooler).Status',
+        '@{ spooler=$s; impressoras=$i } | ConvertTo-Json -Depth 4 -Compress'
+    ].join('; ');
+    const saida = await new Promise((resolve, reject) => {
+        execFile('powershell.exe', ['-NoProfile', '-Command', ps], { windowsHide: true, timeout: 20000 }, (err, stdout, stderr) => {
+            if (err) reject(new Error(`Não foi possível ler as impressoras do Windows: ${err.message}${stderr ? ' | ' + String(stderr).trim() : ''}`));
+            else resolve(String(stdout));
+        });
+    });
+    let dados;
+    try { dados = JSON.parse(saida.replace(/^﻿/, '')); }
+    catch (e) { throw new Error('O Windows respondeu algo que não deu pra entender: ' + saida.slice(0, 300)); }
+    const lista = dados.impressoras == null ? [] : (Array.isArray(dados.impressoras) ? dados.impressoras : [dados.impressoras]);
+    return { programa: app.getVersion(), windows: `${os.type()} ${os.release()} (${os.arch()})`, spooler: dados.spooler || '', impressoras: lista };
+});

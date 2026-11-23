@@ -129,6 +129,9 @@
         el('openConfigImpressoraEtiqueta2')?.addEventListener('click', () => {
             if (typeof window._abrirSeletorImpressoraEtiqueta === 'function') window._abrirSeletorImpressoraEtiqueta(atualizarNomesImpressoras);
         });
+        el('openConfigTesteImpressao2')?.addEventListener('click', () => {
+            if (typeof window._abrirTesteImpressao === 'function') window._abrirTesteImpressao();
+        });
         el('openConfigDiagnostico2')?.addEventListener('click', () => {
             if (typeof window._abrirDiagnosticoSistema === 'function') window._abrirDiagnosticoSistema();
         });

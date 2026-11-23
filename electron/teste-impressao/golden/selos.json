@@ -1,0 +1,12 @@
+{
+  "impressao/escpos-builder.js": "d96f1368b8d286651ad533199be5fcca06e8bec7cf406f10cc8af90014e7c73e",
+  "impressao/tspl-builder.js": "00fcd6d868b1677f82d0a7bed2f8eb8186892c55c19fa5c9d32919644610befc",
+  "main.js: textoDoWindows": "c2504afe877246331f3376f72f567720a0fd8aec161f89341061d9abe2fcce3b",
+  "main.js: DICA_COMPARTILHAMENTO": "b4bd41877f9f135316ab1bec8c5331aac9832b2fe1b0ae7e124af1be15f06fae",
+  "main.js: listar-impressoras": "abb88a8f32283ac5fa90e8c93b8cd0ef6c68ef0d1d8159cc328138fcdf04c56b",
+  "main.js: enviarBufferParaImpressora": "33071aed28214d964e6b71655901c6b956efc7d32c5916702e843e5277537145",
+  "main.js: handler imprimir-recibo-venda": "a422242c438ecf66de1b45a4404aa76578a6d170d2df3e9dd11d4c95bd164265",
+  "main.js: handler teste-impressao": "0172ddecadc3e3c72e400076d8598cca144866d85ea6567374841ae653287ede",
+  "main.js: handler teste-impressao-etiqueta": "f46844277f23adf0a54c11c564b78c672d42a703ca581703b1135b76d0d105ac",
+  "main.js: handler imprimir-etiqueta-produto": "048d3998d601b163b8a2c488ee2f78ef1ecacf7529088f40601c4c9d634a893a"
+}
