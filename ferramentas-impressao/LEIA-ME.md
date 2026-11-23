@@ -1,3 +1,11 @@
+# PASSO A PASSO RAPIDO (Windows) — so clicar duas vezes
+1. **1-CRIAR-impressoras-de-teste.bat** — pede permissao de administrador e cria 2 impressoras de teste (`POS-80 TESTE(copy of 2)` e `LABEL-TESTE`); nao mexe nas suas impressoras reais.
+2. No **VortexSmart PDV Beta**: Configuracoes > Impressora de Recibo / de Etiquetas > escolher essas duas > Configuracoes > **Teste de impressao** > imprimir teste de recibo e de etiqueta (e tambem uma venda real > Recibo).
+3. **2-JUNTAR-resultado-para-enviar.bat** — gera `resultado-teste-impressao.zip` na Area de Trabalho (os arquivos recebidos + a lista de impressoras). Mande o zip.
+4. Para repetir o teste do zero: **3-ZERAR-antes-de-novo-teste.bat**. Ao terminar: **4-REMOVER-impressoras-de-teste.bat**.
+
+---
+
 # Ferramentas de teste de impressão (rodam no PC de quem desenvolve, NÃO vão pro cliente)
 
 Servem pra provar, sem a impressora térmica do cliente, que o programa manda pra impressora os bytes certos

@@ -1,4 +1,4 @@
-# ================================================================
+﻿# ================================================================
 # remover-impressoras-teste.ps1 — VortexSmart PDV
 # Apaga as impressoras de teste criadas por criar-impressoras-teste.ps1 (e as portas/arquivos).
 # Só remove impressoras que usam o driver "Generic / Text Only" E cuja porta é um arquivo dentro

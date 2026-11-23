@@ -1,4 +1,4 @@
-# ================================================================
+﻿# ================================================================
 # criar-impressoras-teste.ps1 — VortexSmart PDV
 # Cria no Windows duas impressoras FALSAS (uma de recibo, uma de etiqueta) que, em vez de
 # imprimir, gravam tudo que recebem num arquivo. Servem pra testar o programa SEM a
