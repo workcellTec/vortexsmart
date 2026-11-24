@@ -31,11 +31,18 @@
 
     function atualizarNomesImpressoras() {
         const noPrograma = typeof window.vsmartPrint === 'object' && window.vsmartPrint !== null;
+        const escolhida = chave => (noPrograma && localStorage.getItem(chave)) || '';
         [['cfgImpressoraReciboNome', CHAVE_IMPRESSORA_RECIBO], ['cfgImpressoraEtiquetaNome', CHAVE_IMPRESSORA_ETIQUETA]].forEach(([id, chave]) => {
             const alvo = el(id);
             if (!alvo) return;
-            alvo.textContent = noPrograma ? (localStorage.getItem(chave) || 'Nenhuma escolhida ainda — toque para escolher') : '';
+            alvo.textContent = noPrograma ? (escolhida(chave) || 'Nenhuma escolhida ainda — toque para escolher') : '';
         });
+        // Linha "Impressoras" (que abre as três de baixo): resumo do que está escolhido, pra não precisar abrir pra saber.
+        const resumo = el('cfgImpressorasResumo');
+        if (resumo && noPrograma) {
+            const r = escolhida(CHAVE_IMPRESSORA_RECIBO), e = escolhida(CHAVE_IMPRESSORA_ETIQUETA);
+            resumo.textContent = (r || e) ? `Recibo: ${r || '—'} · Etiquetas: ${e || '—'}` : 'Escolha as impressoras de recibo e etiqueta';
+        }
     }
 
     function openConfiguracoesSection(sectionId) {
@@ -121,6 +128,13 @@
         el('openConfigDocumentos2')?.addEventListener('click', () => openConfiguracoesSection('configuracoesDocumentos'));
         el('openConfigCustomizacoes2')?.addEventListener('click', () => openConfiguracoesSection('configuracoesCustomizacoes'));
         el('openConfigBackup2')?.addEventListener('click', () => openConfiguracoesSection('configuracoesBackup'));
+        // "Impressoras" abre/fecha as três linhas de baixo (Recibo, Etiquetas e Teste de impressão).
+        el('openConfigImpressoras2')?.addEventListener('click', e => {
+            const sub = el('cfgImpressorasSub');
+            if (!sub) return;
+            sub.hidden = !sub.hidden;
+            e.currentTarget.setAttribute('aria-expanded', String(!sub.hidden));
+        });
         // Recibo e Etiquetas são escolhas SEPARADAS: cada linha abre o seletor da sua impressora
         // (as linhas só existem no programa instalado — ver data-electron-only no index.html).
         el('openConfigImpressora2')?.addEventListener('click', () => {

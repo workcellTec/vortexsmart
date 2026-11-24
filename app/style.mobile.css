@@ -3015,6 +3015,7 @@ body.tema-claro .stq-marca-pill[data-marca][style], body.tema-claro .stq-cs-chip
 .stq-cat-larga .stq-modal-body { padding:0; display:flex; flex-direction:column; overflow:hidden; }
 .cm-cols { flex:1; min-height:0; display:flex; }
 .cm-col { min-width:0; overflow-y:auto; padding:18px 20px; display:flex; flex-direction:column; gap:14px; }
+.cm-col > * { flex-shrink:0; }   /* sem isso, a coluna rolável espreme as listas de palavras e o campo de baixo passa por cima delas */
 .cm-esq { flex:1; border-right:1px solid rgba(var(--overlay-rgb),.08); }
 .cm-dir { width:470px; flex:none; }
 @media (max-width: 900px) {
@@ -3517,3 +3518,12 @@ body.tema-claro .stq-cat-pill[data-cat][style] { filter: brightness(.62) saturat
 .cd-tag:first-child { border-top:0; }
 .cd-tag code { font-size:11px; word-break:break-word; }
 .cd-tag-ins { display:none; }
+
+/* Configurações › Sistema: "Impressoras" abre as três linhas de baixo (recibo, etiquetas, teste) */
+.cfgA-sub { background:rgba(128,128,128,.07); }
+.cfgA-sub[hidden] { display:none; }
+.cfgA-sub .cfgA-row { padding-left:34px; }
+.cfgA-sub .cfgA-row:last-child { border-bottom:1px solid var(--border); }
+.cfgA-sub .cfgA-icon { width:26px; height:26px; font-size:12px; border-radius:8px; }
+#openConfigImpressoras2[aria-expanded="true"] .cfgA-chev-abre { transform:rotate(90deg); }
+.cfgA-chev-abre { transition:transform .18s ease; }

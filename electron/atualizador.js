@@ -50,6 +50,7 @@ function iniciarAtualizador({ app, dialog, autoUpdater, obterJanela, intervaloMs
         avisar(versaoBaixada);
     });
 
+    // quitAndInstall(true, true): instala em silêncio (sem o assistente do instalador) e abre o programa de novo sozinho.
     function avisar(versao) {
         const janela = typeof obterJanela === 'function' ? obterJanela() : null;
         const opcoes = {
@@ -63,7 +64,7 @@ function iniciarAtualizador({ app, dialog, autoUpdater, obterJanela, intervaloMs
             noLink: true
         };
         Promise.resolve(janela && !janela.isDestroyed() ? dialog.showMessageBox(janela, opcoes) : dialog.showMessageBox(opcoes))
-            .then(r => { if (r && r.response === 0) autoUpdater.quitAndInstall(); })
+            .then(r => { if (r && r.response === 0) autoUpdater.quitAndInstall(true, true); })
             .catch(e => log('erro', e));
     }
 

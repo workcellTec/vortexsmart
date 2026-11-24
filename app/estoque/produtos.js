@@ -160,6 +160,7 @@
             cor: typeof c.cor === 'string' && /^#[0-9a-f]{6}$/i.test(c.cor) ? c.cor : CORES_CATEGORIA[posicao % CAT_MAX],
             ordem: Number.isFinite(c.ordem) ? c.ordem : posicao,
             oculta: c.oculta === true,
+            resto: c.resto === true || (c.resto === undefined && id === 'phones'),   // Celulares de fábrica só fica com o que sobrar, a não ser que o Gestor desligue
             marcasAtivo,
             marcas: !marcasAtivo ? [] : (c.marcasAtivo === undefined ? marcasDeFabrica() : lerMarcas(c.marcas)),
             marcasVirtuais: marcasAtivo && c.marcasAtivo === undefined   // marcas de fábrica ainda não gravadas
@@ -185,8 +186,9 @@
             base = CATEGORIAS_PADRAO.map((c, i) => ({ ...lerCategoria(c.id, c, i), virtual: true }));
         }
         base.sort((a, b) => a.ordem - b.ordem || a.id.localeCompare(b.id));
-        // ordem de checagem (o sort é estável: dentro de cada grupo vale a ordem da lista)
-        const grupo = c => c.marcasAtivo ? 2.5 : (c.tambem.length ? 0 : 2) + (c.modo === 'inicio' ? 0 : 1);
+        // ordem de checagem (o sort é estável: dentro de cada grupo vale a ordem da lista).
+        // "resto" (ex.: Celulares) fica por último: só pega o produto que nenhuma outra categoria quis ("CASE SAMSUNG" é capa, não celular).
+        const grupo = c => c.resto ? 9 : c.marcasAtivo ? 2.5 : (c.tambem.length ? 0 : 2) + (c.modo === 'inicio' ? 0 : 1);
         memoPrioridade = base.slice().sort((a, b) => grupo(a) - grupo(b));
         memoCfg = cfg; memoLista = base;
         cacheNomes.clear();
@@ -483,6 +485,7 @@
     const categoriaParaBanco = c => ({
         nome: c.nome, palavras: c.palavras.slice(), ...(c.tambem && c.tambem.length ? { tambem: c.tambem.slice() } : {}), modo: c.modo, cor: c.cor, ordem: c.ordem,
         ...(c.oculta ? { oculta: true } : {}),
+        ...(c.resto ? { resto: true } : (c.id === 'phones' ? { resto: false } : {})),   // gravar o false: sem ele a Celulares de fábrica voltaria a ser "só o que sobrar" sozinha
         ...(c.marcasAtivo ? { marcasAtivo: true, marcas: marcasParaBanco(c.marcas) } : (c.id === 'capas' ? { marcasAtivo: false } : {}))
     });
     const jaPersonalizado = () => !!(window._categoriasProduto && window._categoriasProduto.personalizado === true);
@@ -585,7 +588,7 @@
             <div class="stq-catman-row ${c.oculta ? 'oculta' : ''} ${catForm && catForm.id === c.id ? 'editando' : ''}" data-id="${esc(c.id)}">
                 <span class="stq-catman-dot" style="background:${c.cor};"></span>
                 <div class="stq-catman-info">
-                    <div class="stq-catman-nome">${esc(c.nome)}${c.oculta ? ' <span class="cm-tag">oculta no filtro</span>' : ''}</div>
+                    <div class="stq-catman-nome">${esc(c.nome)}${c.oculta ? ' <span class="cm-tag">oculta no filtro</span>' : ''}${c.resto ? ' <span class="cm-tag">só o que sobrar</span>' : ''}</div>
                     <div class="stq-catman-palavras">${esc(c.palavras.join(' · '))}</div>
                     ${c.marcasAtivo
                         ? `<div class="stq-catman-modo">Dividida em marcas: ${c.marcas.length ? esc(c.marcas.map(m => m.nome).join(' · ')) : 'nenhuma ainda'}</div>`
@@ -733,6 +736,7 @@
             tambem: existente ? existente.tambem.slice() : [],
             modo: existente ? existente.modo : 'inicio',
             marcasAtivo: existente ? existente.marcasAtivo : false,
+            resto: existente ? existente.resto : false,
             tocadas: !!existente,          // true = as palavras não acompanham mais o nome
             erro: '',
             sug: existente ? undefined : sugestoesDoEstoque()
@@ -743,6 +747,7 @@
             <label class="form-label">Nome da categoria</label>
             <input class="form-control" id="catNome" type="text" maxlength="${CAT_NOME_MAX}" placeholder="Ex: Carregadores" autocomplete="off"/>
             <label class="cm-check mt-3"><input type="checkbox" id="catMarcasChk"/> <span><b>Dividir em marcas</b> (Samsung, Motorola, iPhone…). As palavras abaixo dizem só o tipo do produto e o sistema acha a marca olhando o nome inteiro.</span></label>
+            <label class="cm-check mt-3"><input type="checkbox" id="catRestoChk"/> <span><b>Só fica com o que sobrar</b> (ideal pra Celulares). Se o nome tem "case", "película", "carregador"… e existe uma categoria pra isso, o produto vai pra ela, mesmo que tenha "Samsung" no nome.</span></label>
             <div id="catModoWrap">
                 <label class="form-label mt-3">Como o filtro acha os produtos</label>
                 <div class="stq-catman-modos" id="catModos">
@@ -771,6 +776,7 @@
             <button type="button" class="stq-modal-btn-save w-100 mt-3" id="catSalvarBtn"><i class="bi bi-check-circle-fill"></i> Salvar</button>`;
         el('catNome').value = catForm.nome;
         el('catMarcasChk').checked = catForm.marcasAtivo;
+        el('catRestoChk').checked = catForm.resto;
 
         el('catNome').addEventListener('input', e => {
             if (!catForm) return;
@@ -802,6 +808,7 @@
             renderCatModo();
             renderCatChips();
         });
+        el('catRestoChk').addEventListener('change', e => { if (catForm) catForm.resto = e.target.checked; });
         el('catModos').querySelectorAll('button[data-modo]').forEach(b => b.addEventListener('click', () => {
             if (!catForm || catForm.modo === b.dataset.modo) return;
             catForm.modo = b.dataset.modo;
@@ -953,7 +960,7 @@
         if (catForm.id) {
             const c = atual.find(x => x.id === catForm.id);
             if (!c) { avisoToast('Essa categoria foi apagada em outro aparelho.'); mostrarCatForm(null); return; }
-            const campos = { nome, palavras: catForm.palavras.slice(), tambem: tambem.length ? tambem.slice() : null, modo: catForm.modo };
+            const campos = { nome, palavras: catForm.palavras.slice(), tambem: tambem.length ? tambem.slice() : null, modo: catForm.modo, resto: catForm.resto ? true : (c.id === 'phones' ? false : null) };
             if (comMarcas && !c.marcasAtivo) { campos.marcasAtivo = true; campos.marcas = marcasParaBanco(marcasDeFabrica()); }
             else if (!comMarcas && c.marcasAtivo) { campos.marcasAtivo = false; campos.marcas = null; }
             dados = dadosDaMudanca(c.id, campos);
@@ -962,7 +969,7 @@
             const ordem = atual.reduce((m, c) => Math.max(m, c.ordem), -1) + 1;
             const cor = CORES_CATEGORIA.find(x => !atual.some(c => c.cor.toLowerCase() === x)) || CORES_CATEGORIA[atual.length % CAT_MAX];
             dados = gravacaoInicial(atual);          // 1ª mexida da loja: grava junto o que só existia "de cabeça"
-            dados[`lista/${id}`] = categoriaParaBanco({ id, nome, palavras: catForm.palavras, tambem, modo: catForm.modo, cor, ordem, marcasAtivo: comMarcas, marcas: comMarcas ? marcasDeFabrica() : [] });
+            dados[`lista/${id}`] = categoriaParaBanco({ id, nome, palavras: catForm.palavras, tambem, modo: catForm.modo, cor, ordem, resto: catForm.resto, marcasAtivo: comMarcas, marcas: comMarcas ? marcasDeFabrica() : [] });
         }
 
         const btn = el('catSalvarBtn'), sessao = sessaoModal;
