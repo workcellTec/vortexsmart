@@ -3,7 +3,7 @@
 // Atualização automática do programa instalado (electron-updater).
 //
 // Como funciona: o instalador novo é publicado numa Release do GitHub (workflow
-// "Gerar instalador do Windows"). O programa confere ao abrir e a cada 4 horas;
+// "Gerar instalador do Windows"). O programa confere ao abrir e a cada 30 minutos;
 // se há versão nova, baixa sozinho em segundo plano e avisa UMA vez: "Reiniciar
 // agora" ou "Depois" — com "Depois" ela é instalada quando o programa for fechado.
 //
@@ -21,7 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const INTERVALO_MS = 4 * 60 * 60 * 1000;   // de quanto em quanto tempo confere
+const INTERVALO_MS = 30 * 60 * 1000;   // de quanto em quanto tempo confere
 const ATRASO_INICIAL_MS = 30 * 1000;       // espera o programa abrir e o caixa começar a usar
 const LOG_MAX_BYTES = 200 * 1024;          // passou disso, recomeça o arquivo
 
@@ -64,19 +64,31 @@ function iniciarAtualizador({ app, dialog, autoUpdater, obterJanela, intervaloMs
             noLink: true
         };
         Promise.resolve(janela && !janela.isDestroyed() ? dialog.showMessageBox(janela, opcoes) : dialog.showMessageBox(opcoes))
-            .then(r => { if (r && r.response === 0) autoUpdater.quitAndInstall(true, true); })
+            .then(r => { if (r && r.response === 0) instalar(); })
             .catch(e => log('erro', e));
     }
 
+    // Devolve { estado, versao }: 'atualizado' (já é a mais nova), 'pronta' (baixada, falta reiniciar),
+    // 'ocupado' (outra conferência em andamento) ou 'erro' (sem internet, Release fora do ar...).
     function conferir() {
-        if (conferindo || versaoBaixada) return Promise.resolve();
+        if (versaoBaixada) return Promise.resolve({ estado: 'pronta', versao: versaoBaixada });
+        if (conferindo) return Promise.resolve({ estado: 'ocupado' });
         conferindo = true;
         let p;
         try { p = Promise.resolve(autoUpdater.checkForUpdates()); } catch (e) { p = Promise.reject(e); }
         // o download roda à parte (downloadPromise): se ele falhar e ninguém olhar, vira "unhandled rejection"
-        return p.then(r => r && r.downloadPromise && Promise.resolve(r.downloadPromise).catch(e => log('erro', e)))
-            .catch(e => log('erro', e))
-            .then(() => { conferindo = false; });
+        return p.then(r => (r && r.downloadPromise
+                ? Promise.resolve(r.downloadPromise).then(() => (versaoBaixada ? { estado: 'pronta', versao: versaoBaixada } : { estado: 'erro' }))
+                : { estado: 'atualizado' }))
+            .catch(e => { log('erro', e); return { estado: 'erro' }; })
+            .then(res => { conferindo = false; return res; });
+    }
+
+    // Reinicia e instala a versão já baixada (o mesmo que "Reiniciar agora" do aviso).
+    function instalar() {
+        if (!versaoBaixada) return false;
+        autoUpdater.quitAndInstall(true, true);
+        return true;
     }
 
     log('info', `atualizador ligado (programa ${app.getVersion()})`);
@@ -85,7 +97,7 @@ function iniciarAtualizador({ app, dialog, autoUpdater, obterJanela, intervaloMs
     // não segura o programa aberto por causa dos temporizadores
     if (t1.unref) t1.unref();
     if (t2.unref) t2.unref();
-    return { conferir, parar: () => { clearTimeout(t1); clearInterval(t2); } };
+    return { conferir, instalar, parar: () => { clearTimeout(t1); clearInterval(t2); } };
 }
 
 module.exports = { iniciarAtualizador };

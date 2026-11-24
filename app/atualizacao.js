@@ -14,7 +14,8 @@
 // Quando checa: ~8s depois de abrir, a cada 10 min com o app aberto, ao voltar pro app e
 // ao recuperar a internet. Nunca recarrega no meio de uma digitação. "Ignorar" no aviso vale até
 // fechar o app (dos recentes) e abrir de novo: nada recarrega sozinho enquanto ele estiver aberto.
-// Não roda no programa instalado do computador (.exe): ele é uma cópia congelada de propósito.
+// No programa instalado do computador (.exe) o site é uma cópia congelada de propósito: lá o painel
+// só pergunta ao programa (electron/atualizador.js) se há instalador novo e reinicia pra instalar.
 // ================================================================
 (function () {
     'use strict';
@@ -36,6 +37,7 @@
     const noPrograma = () => typeof window.vsmartPrint === 'object' && window.vsmartPrint !== null;
     const ehWeb = () => location.protocol === 'http:' || location.protocol === 'https:';
     const ativo = () => !noPrograma() && ehWeb();
+    const programaAtualizavel = () => noPrograma() && typeof window.vsmartPrint.verificarAtualizacao === 'function';
     const automatico = () => lerLS(CHAVE_AUTO) !== '0';
 
     let ultimaChecagem = 0;
@@ -162,9 +164,49 @@
         if (el('vsAtualFundo')) desenharPainel();
     }
 
+    // Programa instalado: confere o instalador novo e reinicia pra instalar (a troca em si é do Electron).
+    const TEXTO_PROGRAMA = {
+        atualizado: 'Você está na versão mais recente.',
+        pronta: 'Reinicie o programa pra instalar (leva alguns segundos).',
+        ocupado: 'Já estou conferindo, aguarde um instante.',
+        erro: 'Não consegui verificar agora (sem internet?). Tento de novo sozinho em alguns minutos.',
+        indisponivel: 'A atualização automática não está ativa neste programa.'
+    };
+    function desenharPainelPrograma(caixa) {
+        caixa.innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px;"><strong style="flex:1;">🔄 Atualização do programa</strong><button type="button" id="vsAtualFechar" class="btn btn-sm" style="min-width:40px;" aria-label="Fechar">✕</button></div>
+            <div style="font-size:.84rem;line-height:1.7;">
+                <div>Versão do programa: <b id="vsAtualVersaoProg">—</b></div>
+                <div id="vsAtualStatus" style="margin-top:4px;color:var(--text-secondary);">O programa confere sozinho a cada 30 minutos. Se preferir, confira agora.</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="button" id="vsAtualVerificar" class="btn" style="flex:1;">Verificar agora</button>
+                <button type="button" id="vsAtualAplicar" class="btn btn-ok" style="flex:1;display:none;">Reiniciar e atualizar</button>
+            </div>`;
+        el('vsAtualFechar').addEventListener('click', fecharPainel);
+        Promise.resolve(window.vsmartPrint.versaoPrograma && window.vsmartPrint.versaoPrograma()).then(v => { const n = el('vsAtualVersaoProg'); if (n && v) n.textContent = v; }).catch(() => {});
+        const status = el('vsAtualStatus'), verificarBtn = el('vsAtualVerificar'), aplicarBtn = el('vsAtualAplicar');
+        verificarBtn.addEventListener('click', () => {
+            verificarBtn.disabled = true; verificarBtn.textContent = 'Verificando…';
+            status.textContent = 'Conferindo… se houver versão nova ela é baixada agora (pode levar um minuto).';
+            Promise.resolve(window.vsmartPrint.verificarAtualizacao()).catch(() => ({ estado: 'erro' })).then(r => {
+                const estadoProg = (r && r.estado) || 'erro';
+                status.textContent = (estadoProg === 'pronta' && r.versao ? 'Versão ' + r.versao + ' baixada. ' : '') + (TEXTO_PROGRAMA[estadoProg] || TEXTO_PROGRAMA.erro);
+                status.style.color = estadoProg === 'pronta' ? 'var(--warning)' : 'var(--text-secondary)';
+                verificarBtn.disabled = false; verificarBtn.textContent = 'Verificar agora';
+                aplicarBtn.style.display = estadoProg === 'pronta' ? '' : 'none';
+            });
+        });
+        aplicarBtn.addEventListener('click', () => {
+            aplicarBtn.disabled = true; aplicarBtn.textContent = 'Reiniciando…';
+            Promise.resolve(window.vsmartPrint.instalarAtualizacao()).catch(() => false);
+        });
+    }
+
     function desenharPainel() {
         const caixa = el('vsAtualCaixa');
         if (!caixa) return;
+        if (programaAtualizavel()) { desenharPainelPrograma(caixa); return; }
         const e = estado();
         const fixo = !e.ativo;
         caixa.innerHTML = `
@@ -205,7 +247,7 @@
         document.body.appendChild(fundo);
         fundo.addEventListener('click', e => { if (e.target === fundo) fecharPainel(); });
         desenharPainel();
-        verificar({ manual: true }).then(() => { fecharAviso(); desenharPainel(); });   // abre já conferindo
+        if (!programaAtualizavel()) verificar({ manual: true }).then(() => { fecharAviso(); desenharPainel(); });   // abre já conferindo
     };
 
     function setAuto(ligado) { gravarLS(CHAVE_AUTO, ligado ? '1' : '0'); }

@@ -110,6 +110,8 @@ body {
        botões redondos. Aplicado no body pra herdar em tudo de uma vez. */
     -webkit-tap-highlight-color: transparent;
 }
+/* Sem a barra lateral (login, conta bloqueada) não há o que reservar: a tela centraliza na janela toda. */
+body:has(#vsSidebar[style*="none"]) { padding-left: 0; }
 * { -webkit-tap-highlight-color: transparent; }
 
 /* Esconde a barrinha de rolagem nativa (WebKit/Chrome e Firefox) em
@@ -3492,21 +3494,8 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 }
 .vs-nv-header h3 { font-size: 1.35rem; font-weight: 700; margin: 0; text-align: left; }
 .vs-nv-header-date { font-size: .78rem; color: var(--text-secondary); margin-top: 3px; text-align: left; }
-.vs-nv-header-actions { display: flex; gap: 10px; flex-shrink: 0; }
-.vs-nv-btn-cancelar {
-    position: static; width: auto; height: auto; border-radius: 10px;
-    padding: 10px 18px; font-size: 13px; font-weight: 600;
-    background: rgba(var(--overlay-rgb),.04); border: 1px solid rgba(var(--overlay-rgb),.15);
-    color: var(--text-strong); display: inline-flex; align-items: center;
-}
-.vs-nv-btn-salvar {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: #d97706; color: #1a0f00; border: none;
-    padding: 10px 20px; border-radius: 10px; font-size: 13.5px; font-weight: 700;
-    cursor: pointer; transition: filter .12s, transform .12s;
-}
-.vs-nv-btn-salvar:hover { filter: brightness(1.08); }
-.vs-nv-btn-salvar:active { transform: scale(.97); }
+/* No PC o "Salvar Venda" fica abaixo do Total e sair é pela barra lateral; Cancelar/Salvar do topo são do celular. */
+.vs-nv-header-actions { display: none; }
 
 .vs-nv-layout {
     width: 100%; max-width: 1200px; display: grid;
@@ -3779,9 +3768,6 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 .rep-card-foto img { width:100%; height:100%; object-fit:cover; display:block; }
 .rep-card-info { flex:1; min-width:0; padding:12px 0; }
 .rep-card-chev { color:var(--text-muted); font-size:.9rem; transition:transform .15s; align-self:center; margin-right:12px; flex-shrink:0; }
-
-/* A seta do botão de voltar da Nova Venda é do celular; no PC o botão mostra o texto "Cancelar". */
-.vs-nv-btn-cancelar .vs-nv-ic { display: none; }
 
 /* ── Configurações · Documentos — abas (Loja · Garantia · Contrato), cartões e Salvar fixo ── */
 #configuracoesDocumentos .cd-seg { display:inline-flex; gap:4px; margin:0 0 18px; padding:3px; border-radius:12px; background:var(--surface); border:1px solid var(--border); backdrop-filter:blur(10px); }

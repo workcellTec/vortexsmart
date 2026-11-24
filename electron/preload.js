@@ -7,6 +7,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('vsmartPrint', {
     versaoPrograma:         ()                      => ipcRenderer.invoke('versao-programa'),
+    verificarAtualizacao:   ()                      => ipcRenderer.invoke('verificar-atualizacao'),
+    instalarAtualizacao:    ()                      => ipcRenderer.invoke('instalar-atualizacao'),
     listarImpressoras:     ()                      => ipcRenderer.invoke('listar-impressoras'),
     diagnosticoImpressoras: ()                      => ipcRenderer.invoke('diagnostico-impressoras'),
     imprimirReciboVenda:    (impressora, venda, loja) => ipcRenderer.invoke('imprimir-recibo-venda', impressora, venda, loja),

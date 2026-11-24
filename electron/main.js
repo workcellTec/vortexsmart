@@ -15,6 +15,7 @@ const { montarReciboVenda } = require('./impressao/escpos-builder.js');
 const { montarEtiquetaTeste, montarEtiquetaProduto } = require('./impressao/tspl-builder.js');
 
 let mainWindow;
+let atualizador = null;   // só existe no programa instalado (ver atualizador.js)
 
 // Pasta do VortexSmart (o site). Em desenvolvimento (npm start) é ../app. No programa
 // instalado, o electron-builder copia ela pra resources/web — NÃO pode se chamar "app":
@@ -59,7 +60,7 @@ if (!app.requestSingleInstanceLock()) {
         // dentro de um try: se por qualquer motivo ela não subir, o PDV abre e imprime do mesmo jeito.
         if (app.isPackaged) {
             try {
-                require('./atualizador.js').iniciarAtualizador({ app, dialog, autoUpdater: require('electron-updater').autoUpdater, obterJanela: () => mainWindow });
+                atualizador = require('./atualizador.js').iniciarAtualizador({ app, dialog, autoUpdater: require('electron-updater').autoUpdater, obterJanela: () => mainWindow });
             } catch (e) {
                 console.error('Atualização automática não iniciou:', e);
             }
@@ -87,6 +88,10 @@ const DICA_COMPARTILHAMENTO = 'Confira: a impressora precisa estar COMPARTILHADA
 // ── Versão do programa instalado (aparece no Diagnóstico do app: serve pra saber
 //    qual versão cada cliente está usando) ──
 ipcMain.handle('versao-programa', () => app.getVersion());
+
+// ── Atualização do programa pedida pela tela (Configurações → Atualização do app) ──
+ipcMain.handle('verificar-atualizacao', () => (atualizador ? atualizador.conferir() : { estado: 'indisponivel' }));
+ipcMain.handle('instalar-atualizacao', () => !!(atualizador && atualizador.instalar()));
 
 // ── Lista as impressoras instaladas no Windows (usa PowerShell,
 //    já vem em qualquer Windows 10/11 do cliente, sem instalar nada) ──
