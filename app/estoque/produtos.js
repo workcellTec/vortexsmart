@@ -30,7 +30,7 @@
     ];
 
     // ── Categorias do filtro ──────────────────────────────────────
-    // TODAS são do Gestor: cria, edita e apaga em "Categorias" (botão ao lado dos
+    // TODAS são do Gestor: cria, edita, oculta e apaga em "Categorias" (botão ao lado dos
     // chips). Celulares, Áudio, Notebooks, Capas, Películas, Carregadores e Cabos
     // já vêm de fábrica; "Outros" é a única fixa (guarda o que não se encaixa).
     // Ficam em lojas/{loja}/categoriasProduto (window._categoriasProduto, mantido
@@ -44,12 +44,28 @@
     //  - "também" (opcional, em qualquer das duas): o nome ainda precisa ter ao
     //    menos uma destas palavras em qualquer parte. É o que separa "Capas
     //    Samsung" (case/capa + samsung) de "Capas Motorola" (case/capa + moto).
+    //  - "marcas" (a Capas já vem assim): a categoria é dividida em marcas. Aqui as
+    //    palavras dela dizem só o TIPO ("case", "capa", "capinha"): vale em QUALQUER
+    //    posição do nome, com singular e plural. A marca é achada olhando TODAS as
+    //    palavras do nome ("CASE MOTO E7" é Motorola mesmo com "case" na frente).
+    //    Cada marca tem palavras-chave: uma palavra ("moto", "galaxy") vale se o nome
+    //    tem ela inteira (a partir de 4 letras vale também o começo: "motorola" acha
+    //    "moto"); uma LETRA sozinha ("s", "a", "e") vale pra modelo "letra + número"
+    //    (S23, A10, E7, A54S). Palavra da marca vence letra+número; entre iguais vence
+    //    a que aparece primeiro no nome e depois a ordem das marcas. Sem nenhuma
+    //    marca batendo o produto fica em "Sem marca": nunca some. Ocultar uma marca
+    //    (ou uma categoria) só tira o chip do filtro; o produto continua no estoque.
     // Ordem de checagem: com "também" primeiro ("inicio" e depois "qualquer"), depois as
     // sem "também" ("inicio" e depois "qualquer") — a mais específica ganha, e "Capa Samsung
-    // A02" fica em Capas e não cai em Celulares. Dentro de cada grupo vale a ordem da lista.
+    // A02" fica em Capas e não cai em Celulares. As categorias com marcas entram logo depois
+    // das de "começa com" (o tipo vale em qualquer parte do nome, mas "Película case friendly"
+    // continua Película) e antes das de "qualquer parte". Dentro de cada grupo vale a ordem da lista.
+    // O Gestor também pode forçar a categoria (e a marca) de UM produto no cadastro ("Trocar"):
+    // fica em catManual/marcaManual do produto e vale mais que o nome.
     // Loja que nunca mexeu (nada gravado) usa o padrão abaixo. Loja personalizada
     // antes da versão 2 não tem as 3 de fábrica gravadas: elas valem como padrão
-    // até a 1ª mexida, que grava tudo e marca versao: 2.
+    // até a 1ª mexida, que grava tudo e marca versao: 2. A Capas que ainda não tem
+    // "marcasAtivo" gravado vale com as marcas de fábrica até a 1ª mexida nelas.
     const CATEGORIA_OUTROS = { id: 'outros', label: 'Outros', cor: '#64748b' };
     const NOMES_RESERVADOS = new Set(['outros', 'todos', 'todas']);
     const VERSAO_CATEGORIAS = 2;
@@ -58,6 +74,8 @@
     const CORES_CATEGORIA = ['#f59e0b', '#10b981', '#3b82f6', '#84cc16', '#f97316', '#14b8a6', '#eab308', '#6366f1', '#0ea5e9', '#a3e635', '#fb923c', '#2dd4bf'];
     const CAT_MAX = CORES_CATEGORIA.length;   // 12 categorias (fora "Outros")
     const CAT_NOME_MAX = 20, CAT_PALAVRAS_MAX = 10, CAT_PALAVRA_MIN = 2, CAT_PALAVRA_MAX = 24;
+    const MARCA_NOME_MAX = 20, MARCA_TERMOS_MAX = 16, MARCAS_MAX = 24, MARCA_TERMO_MAX = 24;
+    const SEM_MARCA = '_sem';
     const CATEGORIAS_PADRAO = [
         { id: 'phones',       nome: 'Celulares',    modo: 'qualquer', cor: '#8b5cf6', ordem: -3, palavras: ['iphone', 'honor', 'realme', 'redmi', 'xiaomi', 'samsung', 'galaxy', 'motorola', 'poco', 'zenfone'] },
         { id: 'audio',        nome: 'Áudio',        modo: 'qualquer', cor: '#ec4899', ordem: -2, palavras: ['jbl', 'bombox', 'fone', 'caixa de som', 'speaker', 'headset', 'aiwa', 'soundbar'] },
@@ -67,14 +85,24 @@
         { id: 'carregadores', nome: 'Carregadores', modo: 'inicio',   cor: CORES_CATEGORIA[2], ordem: 2, palavras: ['carregador', 'fonte'] },
         { id: 'cabos',        nome: 'Cabos',        modo: 'inicio',   cor: CORES_CATEGORIA[3], ordem: 3, palavras: ['cabo'] }
     ];
+    // Marcas de fábrica da Capas (palavra inteira + letras de modelo). Ids fixos: é por eles que "Juntar categorias antigas" encontra a marca certa.
+    const MARCAS_PADRAO = [
+        { id: 'samsung',  nome: 'Samsung',  termos: ['samsung', 'galaxy', 'a', 's', 'm', 'j'] },
+        { id: 'motorola', nome: 'Motorola', termos: ['moto', 'motorola', 'e', 'g'] },
+        { id: 'iphone',   nome: 'iPhone',   termos: ['iphone'] },
+        { id: 'xiaomi',   nome: 'Xiaomi',   termos: ['xiaomi', 'redmi', 'poco'] },
+        { id: 'realme',   nome: 'Realme',   termos: ['realme'] }
+    ];
     const MODO_PADRAO = Object.fromEntries(CATEGORIAS_PADRAO.map(c => [c.id, c.modo]));
     const FABRICA_SEM_GRAVAR = new Set(['phones', 'audio', 'notebooks']);   // não estavam gravadas antes da versão 2
     // Primeiras palavras que não dizem nada sobre o tipo do produto (não viram sugestão)
     const PALAVRAS_IGNORADAS = new Set(['kit', 'kits', 'para', 'de', 'da', 'do', 'das', 'dos', 'com', 'sem', 'em', 'novo', 'nova', 'original', 'universal', 'aparelho', 'produto', 'item', 'lote', 'varios', 'varias']);
+    // Palavras de modelo que não dizem a marca (não viram sugestão de marca nova)
+    const PALAVRAS_DE_MODELO = new Set(['pro', 'plus', 'max', 'ultra', 'power', 'lite', 'note', 'neo', 'play', 'prime', 'mini', 'fe']);
 
     // minúsculas e sem acento — "Película" e "pelicula" viram a mesma coisa
     function normalizarTexto(t) {
-        return String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        return String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     }
     // idem, com qualquer sequência de espaços virando um só ("caixa  de som" = "caixa de som")
     const textoCompacto = t => normalizarTexto(t).replace(/\s+/g, ' ').trim();
@@ -82,6 +110,8 @@
     function primeiraPalavra(nome) {
         return (normalizarTexto(nome).match(/[a-z0-9]+/g) || []).find(t => /^[a-z]+$/.test(t)) || '';
     }
+    // todas as palavras do nome, na ordem ("CASE MOTO E7 / E8" → case, moto, e7, e8)
+    const tokensDoNome = nome => normalizarTexto(nome).match(/[a-z0-9]+/g) || [];
     // singular e plural nos dois sentidos: "carregadores" acha "carregador" e vice-versa
     function formasDaPalavra(w) {
         const f = new Set([w, w + 's', w + 'es']);
@@ -91,30 +121,55 @@
     }
     // uma palavra de categoria é válida? ("inicio": uma palavra só; "qualquer": aceita frase)
     const palavraValida = (w, modo) => (modo === 'qualquer' ? /^[a-z0-9]+( [a-z0-9]+)*$/ : /^[a-z0-9]+$/).test(w) && w.length >= CAT_PALAVRA_MIN && w.length <= CAT_PALAVRA_MAX;
+    // palavra-chave de marca: letras/números, 1 a 24; uma só letra vale (é o "letra + número" dos modelos), um só número não
+    const termoDeMarcaValido = t => /^[a-z0-9]+$/.test(t) && t.length <= MARCA_TERMO_MAX && (t.length > 1 || /[a-z]/.test(t));
     // O Firebase devolve lista como array ou, se faltar índice, como objeto
     const listaDoBanco = v => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : []);
+    // Lê as marcas de uma categoria como vieram do banco, sem confiar: marca sem nome ou sem palavra válida é descartada
+    function lerMarcas(bruto) {
+        const itens = bruto && typeof bruto === 'object' ? Object.entries(bruto) : [];
+        return itens.map(([id, m], i) => {
+            if (!m || typeof m !== 'object') return null;
+            const nome = typeof m.nome === 'string' ? m.nome.trim().slice(0, MARCA_NOME_MAX) : '';
+            const termos = [...new Set(listaDoBanco(m.termos).map(t => normalizarTexto(t).trim()).filter(termoDeMarcaValido))].slice(0, MARCA_TERMOS_MAX);
+            if (!nome || !termos.length) return null;
+            return {
+                id, nome, termos, oculta: m.oculta === true, ordem: Number.isFinite(m.ordem) ? m.ordem : i,
+                palavras: termos.filter(t => t.length > 1), letras: new Set(termos.filter(t => t.length === 1))
+            };
+        }).filter(Boolean).sort((a, b) => a.ordem - b.ordem || a.id.localeCompare(b.id)).slice(0, MARCAS_MAX);
+    }
+    const marcasDeFabrica = () => lerMarcas(Object.fromEntries(MARCAS_PADRAO.map((m, i) => [m.id, { ...m, ordem: i }])));
     // Lê uma categoria como veio do banco, sem confiar: nome, modo, palavras, "também" e cor inválidos são descartados
     function lerCategoria(id, c, posicao) {
         if (!c || typeof c !== 'object' || id === CATEGORIA_OUTROS.id) return null;
         const nome = typeof c.nome === 'string' ? c.nome.trim().slice(0, CAT_NOME_MAX) : '';
         const modo = c.modo === 'inicio' || c.modo === 'qualquer' ? c.modo : (MODO_PADRAO[id] || 'inicio');
+        // com marcas, as palavras são só o tipo ("case"): uma palavra cada, em qualquer parte do nome.
+        // A "Capas" de fábrica já vem com marcas; se o Gestor a renomeou ou deu "também" a ela (ex.: virou "Capas Samsung"), é uma categoria dele e fica como está.
+        const marcasAtivo = c.marcasAtivo === true || (c.marcasAtivo === undefined && id === 'capas' && nome === 'Capas' && !listaDoBanco(c.tambem).length);
         const lerPalavras = (bruto, m) => [...new Set(listaDoBanco(bruto).map(w => textoCompacto(w)).filter(w => palavraValida(w, m)))].slice(0, CAT_PALAVRAS_MAX);
-        const palavras = lerPalavras(c.palavras, modo);
-        const tambem = lerPalavras(c.tambem, 'qualquer');
+        const palavras = lerPalavras(c.palavras, marcasAtivo ? 'inicio' : modo);
+        const tambem = marcasAtivo ? [] : lerPalavras(c.tambem, 'qualquer');
         // "também" gravado mas inválido: descarta a categoria em vez de deixá-la valer sem a condição (viraria um "pega tudo")
-        if (!nome || !palavras.length || (listaDoBanco(c.tambem).length && !tambem.length)) return null;
+        if (!nome || !palavras.length || (!marcasAtivo && listaDoBanco(c.tambem).length && !tambem.length)) return null;
         const formas = new Set();
         palavras.forEach(w => formasDaPalavra(w).forEach(f => formas.add(f)));
         return {
             id, nome, palavras, tambem, modo, formas,
             cor: typeof c.cor === 'string' && /^#[0-9a-f]{6}$/i.test(c.cor) ? c.cor : CORES_CATEGORIA[posicao % CAT_MAX],
-            ordem: Number.isFinite(c.ordem) ? c.ordem : posicao
+            ordem: Number.isFinite(c.ordem) ? c.ordem : posicao,
+            oculta: c.oculta === true,
+            marcasAtivo,
+            marcas: !marcasAtivo ? [] : (c.marcasAtivo === undefined ? marcasDeFabrica() : lerMarcas(c.marcas)),
+            marcasVirtuais: marcasAtivo && c.marcasAtivo === undefined   // marcas de fábrica ainda não gravadas
         };
     }
     // Lista efetiva, na ordem: a gravada pelo Gestor ou, sem nada gravado, o padrão.
     // "virtual" = ainda não existe no banco (só vale "de cabeça" até a 1ª mexida).
     // (memoizada: o core.js troca o objeto inteiro a cada mudança no banco)
     let memoCfg, memoLista, memoPrioridade;
+    const cacheNomes = new Map();   // nome do produto → { cat, marca }; zera quando as categorias mudam
     function categoriasEditaveis() {
         const cfg = window._categoriasProduto;
         if (memoLista && memoCfg === cfg) return memoLista;
@@ -131,30 +186,73 @@
         }
         base.sort((a, b) => a.ordem - b.ordem || a.id.localeCompare(b.id));
         // ordem de checagem (o sort é estável: dentro de cada grupo vale a ordem da lista)
-        const grupo = c => (c.tambem.length ? 0 : 2) + (c.modo === 'inicio' ? 0 : 1);
+        const grupo = c => c.marcasAtivo ? 2.5 : (c.tambem.length ? 0 : 2) + (c.modo === 'inicio' ? 0 : 1);
         memoPrioridade = base.slice().sort((a, b) => grupo(a) - grupo(b));
         memoCfg = cfg; memoLista = base;
+        cacheNomes.clear();
         return base;
     }
     function infoCategoria(id) {
         const c = categoriasEditaveis().find(x => x.id === id);
         return c ? { label: c.nome, cor: c.cor } : CATEGORIA_OUTROS;
     }
-    // chips do filtro, na ordem da tela: as do Gestor, depois "Outros"
+    // chips do filtro, na ordem da tela: as do Gestor (menos as ocultas), depois "Outros"
     function opcoesDeFiltro() {
         return [
-            ...categoriasEditaveis().map(c => ({ id: c.id, label: c.nome, cor: c.cor })),
+            ...categoriasEditaveis().filter(c => !c.oculta).map(c => ({ id: c.id, label: c.nome, cor: c.cor })),
             { id: CATEGORIA_OUTROS.id, label: CATEGORIA_OUTROS.label, cor: CATEGORIA_OUTROS.cor }
         ];
     }
-    function detectarCategoria(nome) {
+    // Qual marca ganha: palavra (força 2) vence letra+número (força 1); empate: a que aparece
+    // primeiro no nome; depois a ordem da lista. Devolve o id da marca ou SEM_MARCA.
+    function marcaDoNome(tokens, marcas) {
+        let melhor = null;
+        marcas.forEach((m, ordem) => {
+            tokens.forEach((t, pos) => {
+                let forca = 0;
+                if (m.palavras.some(w => t === w || (w.length >= 4 && t.startsWith(w)))) forca = 2;
+                else if (m.letras.size) {
+                    const modelo = /^([a-z])\d{1,3}[a-z]?$/.exec(t);
+                    if (modelo && m.letras.has(modelo[1])) forca = 1;
+                }
+                if (!forca) return;
+                if (!melhor || forca > melhor.forca || (forca === melhor.forca && (pos < melhor.pos || (pos === melhor.pos && ordem < melhor.ordem)))) melhor = { id: m.id, forca, pos, ordem };
+            });
+        });
+        return melhor ? melhor.id : SEM_MARCA;
+    }
+    // Categoria (e marca, se a categoria tiver marcas) que o NOME do produto diz
+    function classificarNome(nome) {
         categoriasEditaveis();
-        const inicio = primeiraPalavra(nome), n = textoCompacto(nome);
+        const chave = String(nome == null ? '' : nome);
+        const guardado = cacheNomes.get(chave);
+        if (guardado) return guardado;
+        const inicio = primeiraPalavra(chave), n = textoCompacto(chave), tokens = tokensDoNome(chave);
+        let r = { cat: CATEGORIA_OUTROS.id, marca: null };
         for (const c of memoPrioridade) {
-            const bate = c.modo === 'inicio' ? !!inicio && c.formas.has(inicio) : c.palavras.some(w => n.includes(w));
-            if (bate && (!c.tambem.length || c.tambem.some(w => n.includes(w)))) return c.id;
+            const bate = c.marcasAtivo ? tokens.some(t => c.formas.has(t))
+                : c.modo === 'inicio' ? !!inicio && c.formas.has(inicio) : c.palavras.some(w => n.includes(w));
+            if (bate && (c.marcasAtivo || !c.tambem.length || c.tambem.some(w => n.includes(w)))) {
+                r = { cat: c.id, marca: c.marcasAtivo ? marcaDoNome(tokens, c.marcas) : null };
+                break;
+            }
         }
-        return CATEGORIA_OUTROS.id;
+        if (cacheNomes.size > 3000) cacheNomes.clear();
+        cacheNomes.set(chave, r);
+        return r;
+    }
+    // Categoria e marca de um PRODUTO: o que o Gestor escolheu no cadastro vale mais que o nome.
+    // Escolha que ficou pra trás (categoria ou marca apagada) é ignorada: volta a valer o nome.
+    function classificar(p) {
+        const auto = classificarNome(p.nome);
+        const id = typeof p.catManual === 'string' ? p.catManual : '';
+        if (!id) return auto;
+        const c = id === CATEGORIA_OUTROS.id ? CATEGORIA_OUTROS : categoriasEditaveis().find(x => x.id === id);
+        if (!c) return auto;
+        if (!c.marcasAtivo) return { cat: id, marca: null, manual: true };
+        const m = p.marcaManual;
+        const marca = m === SEM_MARCA || c.marcas.some(x => x.id === m) ? m : (auto.cat === id ? auto.marca : marcaDoNome(tokensDoNome(p.nome), c.marcas));
+        return { cat: id, marca, manual: true };
     }
 
     let editingId = null;
@@ -164,6 +262,7 @@
     let mounted = false;
     let expandedId = null;
     let filtroCategoria = null;
+    let filtroMarca = null;          // marca (id, ou SEM_MARCA) dentro da categoria filtrada; null = todas
     const ESTOQUE_PAGINA = 40;       // cards desenhados por vez na lista (o resto vem em "Ver mais")
     let limiteExibicao = ESTOQUE_PAGINA;
     let assinaturaFiltro = '';       // busca+categoria+ordem da última renderização — mudou, volta pra primeira página
@@ -174,8 +273,11 @@
     let renderAdiado = false;        // chegou atualização do Firebase durante o arraste — redesenha quando soltar
     let idPiscar = null;             // produto recém-solto: pisca quando a lista é redesenhada
     let fornecedoresCache = [];
-    let catTela = null;  // 'lista' | 'form' enquanto o modal de Categorias está aberto
-    let catForm = null;  // rascunho do formulário de categoria
+    let catTela = null;  // 'lista' | 'marcas' enquanto o modal de Categorias está aberto
+    let catForm = null;  // rascunho do formulário de categoria (coluna da direita da tela 'lista')
+    let catEscolha = null;   // categoria/marca escolhida à mão no formulário do produto: { cat, marca } (null = vale o nome)
+    let catTrocando = false; // painel "Trocar" do formulário do produto aberto
+    let marcasEst = null; // estado da tela de marcas: { catId, tipoRascunho, novoNome, novoTermos, novoRascunho, nomeTeste, rascunhos, erro }
 
     const el  = id => document.getElementById(id);
     const esc = t  => typeof window.escapeHtml === 'function' ? window.escapeHtml(t) : t;
@@ -226,6 +328,7 @@
                 <button type="button" id="stqOrgConcluir">Concluir</button>
             </div>
             <div class="stq-cats" id="stqCats"></div>
+            <div class="stq-marcas" id="stqMarcas" hidden></div>
             <div id="stqAviso"></div>
             <div class="stq-list" id="stqList"></div>
 
@@ -271,6 +374,7 @@
         header.className = 'stq-modal-header ' + corClasse;
         el('stqModalTitle').textContent = titulo;
         backdrop.classList.remove('stq-fp-tela'); // tela cheia (celular) é só do formulário de produto: ele se marca depois de abrir
+        backdrop.classList.remove('stq-cat-larga'); // janela larga é só a de Categorias: ela se marca depois de abrir
         backdrop.classList.add('show');
         // Trava a rolagem de fundo enquanto o modal tá aberto (sem isso a
         // lista de produtos por baixo continua respondendo ao dedo).
@@ -292,6 +396,7 @@
         produtoAtualDoAlerta = null;
         catTela = null;
         catForm = null;
+        marcasEst = null;
         if (typeof window._vsFecharModal === 'function') window._vsFecharModal();
     }
 
@@ -310,6 +415,7 @@
             btn.addEventListener('click', () => {
                 const cat = btn.dataset.cat;
                 filtroCategoria = (filtroCategoria === cat) ? null : cat;
+                filtroMarca = null;
                 renderCategoriaChips();
                 renderLista();
                 // No PC o cursor volta pra busca (dá pra seguir digitando ou usar o leitor);
@@ -317,28 +423,68 @@
                 if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) el('stqBusca')?.focus();
             });
         });
-        el('stqCatGerenciar')?.addEventListener('click', abrirGerenciarCategorias);
+        el('stqCatGerenciar')?.addEventListener('click', () => abrirGerenciarCategorias());
+        renderMarcaChips();
+    }
+
+    // Segunda linha, só quando a categoria filtrada tem marcas: "Capas › Todas · Samsung · … · Sem marca".
+    // Marca oculta não tem chip, mas os produtos dela continuam em "Todas" (e na categoria).
+    function renderMarcaChips() {
+        const wrap = el('stqMarcas');
+        if (!wrap) return;
+        const cat = filtroCategoria && categoriasEditaveis().find(c => c.id === filtroCategoria && c.marcasAtivo);
+        if (!cat) { filtroMarca = null; wrap.hidden = true; wrap.innerHTML = ''; return; }
+        const visiveis = cat.marcas.filter(m => !m.oculta);
+        if (filtroMarca && filtroMarca !== SEM_MARCA && !visiveis.some(m => m.id === filtroMarca)) filtroMarca = null;
+        const cont = new Map();
+        getProdutos().forEach(p => { const k = classificar(p); if (k.cat === cat.id) cont.set(k.marca, (cont.get(k.marca) || 0) + 1); });
+        const sem = cont.get(SEM_MARCA) || 0;
+        const itens = [{ id: '', nome: 'Todas', n: [...cont.values()].reduce((a, b) => a + b, 0) },
+            ...visiveis.map(m => ({ id: m.id, nome: m.nome, n: cont.get(m.id) || 0 })),
+            ...(sem || filtroMarca === SEM_MARCA ? [{ id: SEM_MARCA, nome: 'Sem marca', n: sem }] : [])];
+        wrap.hidden = false;
+        wrap.innerHTML = `<span class="stq-marcas-rot" style="color:${cat.cor};">${esc(cat.nome)} ›</span>` + itens.map(i => {
+            const ativo = (filtroMarca || '') === i.id;
+            return `<button type="button" class="stq-marca-pill ${ativo ? 'active' : ''}" data-marca="${esc(i.id)}"
+                style="${ativo ? `background:${cat.cor};color:#0b1220;border-color:${cat.cor};` : `background:${cat.cor}1a;color:${cat.cor};border-color:${cat.cor}55;`}">${esc(i.nome)} <span class="stq-marca-n">${i.n}</span></button>`;
+        }).join('') + (souGestor() ? `<button type="button" class="stq-marca-pill stq-marca-gerir" id="stqMarcaGerir">+ Marca / Gerenciar</button>` : '');
+        wrap.querySelectorAll('[data-marca]').forEach(b => b.addEventListener('click', () => {
+            filtroMarca = b.dataset.marca || null;
+            renderMarcaChips();
+            renderLista();
+        }));
+        el('stqMarcaGerir')?.addEventListener('click', () => abrirGerenciarCategorias('marcas', cat.id));
     }
 
     // Outro aparelho mudou as categorias (ou o Gestor acabou de salvar): redesenha os
     // chips, solta o filtro se a categoria dele sumiu e atualiza a janela se estiver aberta.
     window._onCategoriasProdutoAtualizadas = function () {
         if (!mounted) return;
-        if (filtroCategoria && !opcoesDeFiltro().some(c => c.id === filtroCategoria)) filtroCategoria = null;
+        if (filtroCategoria && !opcoesDeFiltro().some(c => c.id === filtroCategoria)) { filtroCategoria = null; filtroMarca = null; }
         renderCategoriaChips();
         renderLista();
         if (catTela === 'lista' && el('catLista')) renderCatLista();
+        else if (catTela === 'marcas' && marcasEst) atualizarTelaMarcas();
     };
 
     // ── Gerenciar categorias (só Gestor) ───────────────────────────
-    // Tudo dentro do modal do estoque: a janela troca entre a lista e o formulário.
-    // Cada categoria é gravada no próprio caminho (lista/{id}), então dois Gestores
-    // mexendo em categorias diferentes não se atropelam. Na 1ª mexida da loja o
-    // que só existia "de cabeça" (padrão) é gravado junto (personalizado: true,
-    // versao: 2) — é isso que faz um "apagar" valer, em vez de o padrão reaparecer.
+    // Janela larga (no celular as colunas empilham) com duas telas, dentro do modal do estoque:
+    //  - 'lista': à esquerda as categorias (marcas, ocultar, editar, apagar); à direita o formulário de criar/editar.
+    //  - 'marcas': as marcas de UMA categoria (a Capas): o que é capa, as marcas com suas palavras, marca nova
+    //    com teste ao vivo, capas sem marca (com sugestões) e "testar um nome".
+    // Cada mudança é gravada no próprio caminho (lista/{id}/...), então dois Gestores mexendo em partes
+    // diferentes não se atropelam. Na 1ª mexida da loja o que só existia "de cabeça" (padrão) é gravado
+    // junto (personalizado: true, versao: 2) — é isso que faz um "apagar" valer, em vez de o padrão reaparecer.
     const avisoToast = msg => typeof window.showCustomModal === 'function' && window.showCustomModal({ message: msg });
-    // "também" só é gravado quando existe: categoria sem ele fica igual à de antes (e o banco não ganha campo vazio)
-    const categoriaParaBanco = c => ({ nome: c.nome, palavras: c.palavras.slice(), ...(c.tambem && c.tambem.length ? { tambem: c.tambem.slice() } : {}), modo: c.modo, cor: c.cor, ordem: c.ordem });
+    const marcaParaBanco = m => ({ nome: m.nome, termos: m.termos.slice(), ordem: m.ordem, ...(m.oculta ? { oculta: true } : {}) });
+    const marcasParaBanco = lista => Object.fromEntries(lista.map(m => [m.id, marcaParaBanco(m)]));
+    // Só grava o que existe: categoria sem "também", sem marcas e visível fica igual à de antes (e o banco não ganha campo vazio).
+    // A Capas que o Gestor desligou as marcas grava marcasAtivo: false, senão as marcas de fábrica voltariam sozinhas.
+    const categoriaParaBanco = c => ({
+        nome: c.nome, palavras: c.palavras.slice(), ...(c.tambem && c.tambem.length ? { tambem: c.tambem.slice() } : {}), modo: c.modo, cor: c.cor, ordem: c.ordem,
+        ...(c.oculta ? { oculta: true } : {}),
+        ...(c.marcasAtivo ? { marcasAtivo: true, marcas: marcasParaBanco(c.marcas) } : (c.id === 'capas' ? { marcasAtivo: false } : {}))
+    });
     const jaPersonalizado = () => !!(window._categoriasProduto && window._categoriasProduto.personalizado === true);
     const jaNaVersaoAtual = () => jaPersonalizado() && window._categoriasProduto.versao === VERSAO_CATEGORIAS;
     // O que a 1ª mexida precisa gravar além da própria alteração: as categorias virtuais
@@ -347,6 +493,28 @@
         if (jaNaVersaoAtual()) return {};
         const dados = { personalizado: true, versao: VERSAO_CATEGORIAS };
         atual.filter(c => c.virtual).forEach(c => { dados[`lista/${c.id}`] = categoriaParaBanco(c); });
+        return dados;
+    }
+    // Monta a gravação que muda UMA categoria sem tocar nas outras. campos: caminho dentro da categoria → valor
+    // (null apaga). Ex.: { oculta: true, 'marcas/samsung/termos': [...] }. A categoria que ainda não está
+    // no banco (ou cujas marcas de fábrica ainda não foram gravadas) vai inteira, já com a mudança.
+    function dadosDaMudanca(id, campos) {
+        const atual = categoriasEditaveis();
+        const alvo = atual.find(c => c.id === id);
+        if (!alvo) return null;
+        const dados = gravacaoInicial(atual);
+        if (alvo.virtual || alvo.marcasVirtuais) {
+            const obj = categoriaParaBanco(alvo);
+            Object.entries(campos).forEach(([caminho, valor]) => {
+                const ps = caminho.split('/');
+                let o = obj;
+                ps.slice(0, -1).forEach(k => { if (!o[k] || typeof o[k] !== 'object') o[k] = {}; o = o[k]; });
+                if (valor === null) delete o[ps[ps.length - 1]]; else o[ps[ps.length - 1]] = valor;
+            });
+            dados[`lista/${id}`] = obj;
+        } else {
+            Object.entries(campos).forEach(([caminho, valor]) => { dados[`lista/${id}/${caminho}`] = valor; });
+        }
         return dados;
     }
 
@@ -361,23 +529,43 @@
         return Promise.resolve(window._dbUpdate(window._lojaRef('categoriasProduto'), dados));
     }
 
-    function abrirGerenciarCategorias() {
-        if (!souGestor()) return;
-        abrirModal('primary', 'Categorias');
-        mostrarCatLista();
+    // Redesenhar um painel sem perder o que a pessoa está digitando: devolve a função que devolve o foco
+    function guardarFoco(raiz) {
+        const a = document.activeElement;
+        if (!raiz || !a || !raiz.contains(a) || !a.dataset || !a.dataset.foco) return () => {};
+        const chave = a.dataset.foco, ini = a.selectionStart, fim = a.selectionEnd;
+        return () => {
+            const n = [...raiz.querySelectorAll('[data-foco]')].find(x => x.dataset.foco === chave);
+            if (!n) return;
+            n.focus();
+            try { n.setSelectionRange(ini, fim); } catch (_) { /* campo sem seleção */ }
+        };
     }
 
+    function abrirGerenciarCategorias(tela, catId) {
+        if (!souGestor()) return;
+        abrirModal('primary', 'Categorias');
+        el('stqModalBackdrop').classList.add('stq-cat-larga');
+        if (tela === 'marcas') mostrarMarcas(catId); else mostrarCatLista();
+    }
+
+    // ── Tela 1: categorias (esquerda) + criar/editar (direita) ──
     function mostrarCatLista() {
-        catTela = 'lista'; catForm = null;
+        catTela = 'lista'; marcasEst = null;
         el('stqModalTitle').textContent = 'Categorias';
         el('stqModalBody').innerHTML = `
-            <p class="text-secondary" style="font-size:.78rem;margin-bottom:10px;">Cada categoria acha os produtos por palavras do nome: pela <b>primeira palavra</b> ou em <b>qualquer parte</b> do nome, você escolhe. Mexer aqui não altera nenhum produto, só como eles aparecem nos filtros, em todos os aparelhos da loja.</p>
-            <div id="catLista"></div>
-            <button type="button" class="stq-modal-btn-save w-100 mt-3" id="catNovaBtn"><i class="bi bi-plus-lg"></i> Nova categoria</button>
-            <button type="button" class="stq-modal-btn-cancel w-100 mt-2" id="catRestaurarBtn">Restaurar padrão</button>`;
-        el('catNovaBtn').addEventListener('click', () => mostrarCatForm(null));
+            <div class="cm-cols">
+                <div class="cm-col cm-esq">
+                    <div class="cm-tit">Suas categorias</div>
+                    <div class="cm-dica">Cada categoria acha os produtos pelas palavras do nome. Mexer aqui não altera nenhum produto, só como eles aparecem nos filtros, em todos os aparelhos da loja.</div>
+                    <div id="catAntigas"></div>
+                    <div id="catLista"></div>
+                    <button type="button" class="stq-modal-btn-cancel w-100" id="catRestaurarBtn">Restaurar padrão</button>
+                </div>
+                <div class="cm-col cm-dir" id="catColDir"></div>
+            </div>`;
         el('catRestaurarBtn').addEventListener('click', restaurarPadraoCategorias);
-        renderCatLista();
+        mostrarCatForm(null);   // desenha também a lista da esquerda
     }
 
     function renderCatLista() {
@@ -394,34 +582,127 @@
                 <span class="stq-catman-trava" title="Não pode ser editada nem apagada"><i class="bi bi-lock-fill"></i></span>
             </div>`;
         wrap.innerHTML = (lista.length ? lista.map(c => `
-            <div class="stq-catman-row" data-id="${esc(c.id)}">
+            <div class="stq-catman-row ${c.oculta ? 'oculta' : ''} ${catForm && catForm.id === c.id ? 'editando' : ''}" data-id="${esc(c.id)}">
                 <span class="stq-catman-dot" style="background:${c.cor};"></span>
                 <div class="stq-catman-info">
-                    <div class="stq-catman-nome">${esc(c.nome)}</div>
+                    <div class="stq-catman-nome">${esc(c.nome)}${c.oculta ? ' <span class="cm-tag">oculta no filtro</span>' : ''}</div>
                     <div class="stq-catman-palavras">${esc(c.palavras.join(' · '))}</div>
-                    <div class="stq-catman-modo">${c.modo === 'qualquer' ? 'Palavra em qualquer parte do nome' : 'Nome começa com a palavra'}</div>
-                    ${c.tambem.length ? `<div class="stq-catman-modo">e o nome também tem: ${esc(c.tambem.join(' · '))}</div>` : ''}
+                    ${c.marcasAtivo
+                        ? `<div class="stq-catman-modo">Dividida em marcas: ${c.marcas.length ? esc(c.marcas.map(m => m.nome).join(' · ')) : 'nenhuma ainda'}</div>`
+                        : `<div class="stq-catman-modo">${c.modo === 'qualquer' ? 'Palavra em qualquer parte do nome' : 'Nome começa com a palavra'}</div>
+                           ${c.tambem.length ? `<div class="stq-catman-modo">e o nome também tem: ${esc(c.tambem.join(' · '))}</div>` : ''}`}
                 </div>
-                <button type="button" class="stq-catman-btn" data-acao="editar" aria-label="Editar ${esc(c.nome)}"><i class="bi bi-pencil-fill"></i></button>
-                <button type="button" class="stq-catman-btn danger" data-acao="apagar" aria-label="Apagar ${esc(c.nome)}"><i class="bi bi-trash3-fill"></i></button>
+                <div class="cm-acoes">
+                    ${c.marcasAtivo ? `<button type="button" class="cm-btn destaque" data-acao="marcas">Marcas</button>` : ''}
+                    <button type="button" class="cm-btn" data-acao="ocultar" title="${c.oculta ? 'Volta a aparecer no filtro' : 'Tira o botão do filtro. Os produtos continuam no estoque'}">${c.oculta ? 'Mostrar' : 'Ocultar'}</button>
+                    <button type="button" class="stq-catman-btn" data-acao="editar" aria-label="Editar ${esc(c.nome)}"><i class="bi bi-pencil-fill"></i></button>
+                    <button type="button" class="stq-catman-btn danger" data-acao="apagar" aria-label="Apagar ${esc(c.nome)}"><i class="bi bi-trash3-fill"></i></button>
+                </div>
             </div>`).join('')
-            : `<div class="text-secondary" style="font-size:.8rem;padding:12px 0;">Nenhuma categoria além de "Outros". Toque em "Nova categoria" ou restaure o padrão.</div>`) + linhaOutros;
+            : `<div class="text-secondary" style="font-size:.8rem;padding:12px 0;">Nenhuma categoria além de "Outros". Crie uma ao lado ou restaure o padrão.</div>`) + linhaOutros;
         wrap.querySelectorAll('.stq-catman-row[data-id]').forEach(row => {
             const id = row.dataset.id;
+            row.querySelector('[data-acao="marcas"]')?.addEventListener('click', () => mostrarMarcas(id));
+            row.querySelector('[data-acao="ocultar"]').addEventListener('click', () => alternarOculta(id));
             row.querySelector('[data-acao="editar"]').addEventListener('click', () => mostrarCatForm(id));
             row.querySelector('[data-acao="apagar"]').addEventListener('click', () => apagarCategoria(id));
         });
-        const cheio = lista.length >= CAT_MAX;
-        if (cheio) wrap.insertAdjacentHTML('beforeend', `<div class="text-secondary" style="font-size:.74rem;padding-top:8px;">Limite de ${CAT_MAX} categorias atingido. Apague uma para criar outra.</div>`);
-        const nova = el('catNovaBtn');
-        if (nova) nova.disabled = cheio;
+        renderCatAntigas();
+    }
+
+    function alternarOculta(id) {
+        const c = categoriasEditaveis().find(x => x.id === id);
+        if (!c) { avisoToast('Essa categoria não existe mais (foi apagada em outro aparelho).'); return; }
+        gravarCategorias(dadosDaMudanca(id, { oculta: c.oculta ? null : true })).catch(e => avisoToast(textoDoErroCategoria(e)));
+    }
+
+    // ── "Juntar categorias antigas": quem separou as capas em uma categoria por marca ("CAPAS SAMSUNG",
+    //    "CAPAS MOTOROLA") passa a ter uma só, com as marcas dentro. Só acontece quando o Gestor confirma. ──
+    const TIPO_DE_CAPA_PADRAO = ['capa', 'capinha', 'case', 'bumper'];
+    const FORMAS_DO_TIPO_DE_CAPA = new Set(TIPO_DE_CAPA_PADRAO.flatMap(w => [...formasDaPalavra(w)]));
+    const NOMES_DE_SEM_MARCA = new Set(['outras', 'outros', 'outra', 'outro', 'geral', 'diversas', 'diversos', 'universal', 'universais', 'generica', 'genericas', 'generico', 'genericos', 'marca']);
+    const tituloDaMarca = palavras => palavras.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ').slice(0, MARCA_NOME_MAX);
+    // Categorias que o Gestor criou "uma por marca" (nome = tipo + marca, ex.: "CAPAS SAMSUNG"). Cada uma vira
+    // { de: categoria, nome, termos } (nome vazio = era a "capas sem marca": só some)
+    function categoriasAntigasDeCapas() {
+        const tipo = new Set(FORMAS_DO_TIPO_DE_CAPA);
+        categoriasEditaveis().filter(c => c.marcasAtivo).forEach(c => c.formas.forEach(f => tipo.add(f)));
+        return categoriasEditaveis().filter(c => !c.marcasAtivo).map(c => {
+            const toks = tokensDoNome(c.nome);
+            if (toks.length < 2 || !tipo.has(toks[0])) return null;
+            const resto = toks.slice(1).filter(t => !tipo.has(t));
+            const semMarca = !resto.length || resto.every(t => NOMES_DE_SEM_MARCA.has(t));
+            const extras = [...resto, ...c.tambem.flatMap(w => tokensDoNome(w)), ...c.palavras.flatMap(w => tokensDoNome(w))]
+                .filter(t => !tipo.has(t) && !NOMES_DE_SEM_MARCA.has(t) && termoDeMarcaValido(t));
+            return { de: c, nome: semMarca ? '' : tituloDaMarca(resto), termos: [...new Set(extras)].slice(0, MARCA_TERMOS_MAX) };
+        }).filter(Boolean);
+    }
+    // Onde as marcas ficam: a categoria que já tem marcas ou, senão, a de id "capas" (mesmo renomeada, ex.: "Capas Samsung") convertida no lugar
+    const destinoDasMarcas = () => categoriasEditaveis().find(c => c.marcasAtivo && c.id === 'capas') || categoriasEditaveis().find(c => c.marcasAtivo && FORMAS_DO_TIPO_DE_CAPA.has(c.palavras[0])) || categoriasEditaveis().find(c => c.id === 'capas') || null;
+    function renderCatAntigas() {
+        const box = el('catAntigas');
+        if (!box) return;
+        const antigas = categoriasAntigasDeCapas();
+        box.innerHTML = antigas.length ? `
+            <div class="cm-aviso-juntar">
+                <div><b>Você tem categorias de capa separadas por marca</b> (${esc(antigas.map(a => a.de.nome).join(', '))}).
+                Dá pra juntar tudo numa só, <b>Capas</b>, com as marcas dentro. O sistema acha a marca pelo nome inteiro, então "CASE MOTO E7" vai pra Motorola mesmo com "case" na frente.</div>
+                <button type="button" class="cm-btn destaque" id="catJuntarBtn">Juntar em Capas › marcas</button>
+            </div>` : '';
+        el('catJuntarBtn')?.addEventListener('click', juntarCategoriasAntigas);
+    }
+    function juntarCategoriasAntigas() {
+        const antigas = categoriasAntigasDeCapas();
+        if (!antigas.length) { avisoToast('Não há mais categorias antigas de capa para juntar.'); return; }
+        const marcasDoDestino = () => { const d = destinoDasMarcas(); return d && d.marcasAtivo ? d.marcas : marcasDeFabrica(); };
+        const nomeFinal = a => marcasDoDestino().find(m => normalizarTexto(m.nome) === normalizarTexto(a.nome))?.nome || a.nome;
+        window.showCustomModal({
+            message: `Juntar em Capas › marcas: ${antigas.map(a => `"${a.de.nome}" → ${a.nome ? `marca ${nomeFinal(a)}` : 'Sem marca'}`).join('; ')}. As categorias antigas deixam de existir, em todos os aparelhos da loja. Nenhum produto é alterado: eles passam a aparecer em Capas, na marca que o nome dizer.`,
+            confirmText: 'Juntar', cancelText: 'Cancelar', onCancel: () => {},
+            onConfirm: () => {
+                const sessao = sessaoModal;
+                const atual = categoriasEditaveis();
+                const lista = categoriasAntigasDeCapas();   // relê: outro aparelho pode ter mexido entre o aviso e o "Juntar"
+                if (!lista.length) { avisoToast('Essas categorias já foram mexidas em outro aparelho.'); return; }
+                const destino = destinoDasMarcas();
+                // marcas de destino: as que já existem (ou as de fábrica) + as novas, com as palavras das categorias antigas somadas
+                const marcas = (destino && destino.marcasAtivo ? destino.marcas : marcasDeFabrica()).map(m => ({ ...m, termos: m.termos.slice() }));
+                lista.filter(a => a.nome).forEach(a => {
+                    let m = marcas.find(x => normalizarTexto(x.nome) === normalizarTexto(a.nome));
+                    if (!m) {
+                        if (marcas.length >= MARCAS_MAX) return;
+                        const id = normalizarTexto(a.nome).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || ('m' + Date.now().toString(36));
+                        m = { id: marcas.some(x => x.id === id) ? id + '-' + Math.random().toString(36).slice(2, 5) : id, nome: a.nome, termos: [], oculta: false, ordem: marcas.reduce((n, x) => Math.max(n, x.ordem), -1) + 1 };
+                        marcas.push(m);
+                    }
+                    m.termos = [...new Set([...m.termos, ...a.termos])].slice(0, MARCA_TERMOS_MAX);
+                });
+                let dados, idDestino;
+                if (destino && destino.marcasAtivo) {
+                    idDestino = destino.id;
+                    dados = dadosDaMudanca(idDestino, { marcas: marcasParaBanco(marcas) });
+                } else if (destino) {      // a "Capas" de id fixo, hoje separada por marca (ex.: "Capas Samsung"): vira a categoria única, no mesmo lugar
+                    idDestino = destino.id;
+                    dados = dadosDaMudanca(idDestino, { nome: 'Capas', palavras: TIPO_DE_CAPA_PADRAO.slice(), tambem: null, marcasAtivo: true, marcas: marcasParaBanco(marcas) });
+                } else {
+                    idDestino = 'capas';
+                    const base = CATEGORIAS_PADRAO.find(c => c.id === 'capas');
+                    dados = gravacaoInicial(atual);
+                    dados['lista/capas'] = categoriaParaBanco({ ...lerCategoria('capas', base, base.ordem), id: 'capas', ordem: atual.reduce((n, c) => Math.max(n, c.ordem), -1) + 1, cor: CORES_CATEGORIA.find(x => !atual.some(c => c.cor.toLowerCase() === x)) || base.cor, marcasAtivo: true, marcas });
+                }
+                lista.filter(a => a.de.id !== idDestino).forEach(a => { if (a.de.virtual) delete dados[`lista/${a.de.id}`]; else dados[`lista/${a.de.id}`] = null; });
+                gravarCategorias(dados)
+                    .then(() => { if (sessao === sessaoModal && catTela === 'lista') mostrarCatForm(null); avisoToast('Pronto: as capas agora estão numa categoria só, com as marcas dentro.'); })
+                    .catch(e => avisoToast(textoDoErroCategoria(e)));
+            }
+        });
     }
 
     // As palavras mais comuns no começo dos produtos que hoje estão em "Outros" (≥ 2 produtos)
     function sugestoesDoEstoque() {
         const cont = new Map();
         getProdutos().forEach(p => {
-            if (detectarCategoria(p.nome) !== CATEGORIA_OUTROS.id) return;
+            if (classificar(p).cat !== CATEGORIA_OUTROS.id) return;
             const w = primeiraPalavra(p.nome);
             if (w.length < 3 || PALAVRAS_IGNORADAS.has(w)) return;
             cont.set(w, (cont.get(w) || 0) + 1);
@@ -429,32 +710,45 @@
         return [...cont.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 8);
     }
 
+    // Formulário da direita: criar (id nulo) ou editar uma categoria
     function mostrarCatForm(id) {
+        const pane = el('catColDir');
+        if (!pane) return;
         const existente = id ? categoriasEditaveis().find(c => c.id === id) : null;
         if (id && !existente) {
             avisoToast('Essa categoria não existe mais (foi apagada em outro aparelho).');
-            mostrarCatLista();
+            mostrarCatForm(null);
             return;
         }
-        catTela = 'form';
+        if (!existente && categoriasEditaveis().length >= CAT_MAX) {
+            catForm = null;
+            pane.innerHTML = `<div class="cm-tit">Nova categoria</div><div class="cm-dica">Limite de ${CAT_MAX} categorias atingido. Apague ou oculte uma que você não usa para criar outra.</div>`;
+            renderCatLista();
+            return;
+        }
         catForm = {
             id: existente ? existente.id : null,
             nome: existente ? existente.nome : '',
             palavras: existente ? existente.palavras.slice() : [],
             tambem: existente ? existente.tambem.slice() : [],
             modo: existente ? existente.modo : 'inicio',
+            marcasAtivo: existente ? existente.marcasAtivo : false,
             tocadas: !!existente,          // true = as palavras não acompanham mais o nome
             erro: '',
             sug: existente ? undefined : sugestoesDoEstoque()
         };
-        el('stqModalTitle').textContent = existente ? 'Editar categoria' : 'Nova categoria';
-        el('stqModalBody').innerHTML = `
+        pane.innerHTML = `
+            <div class="cm-tit">${existente ? 'Editar categoria' : 'Nova categoria'}</div>
+            ${existente ? '<button type="button" class="cm-voltar" id="catVoltarBtn"><i class="bi bi-x-lg"></i> Cancelar edição</button>' : ''}
             <label class="form-label">Nome da categoria</label>
             <input class="form-control" id="catNome" type="text" maxlength="${CAT_NOME_MAX}" placeholder="Ex: Carregadores" autocomplete="off"/>
-            <label class="form-label mt-3">Como o filtro acha os produtos</label>
-            <div class="stq-catman-modos" id="catModos">
-                <button type="button" data-modo="inicio">Nome começa com a palavra</button>
-                <button type="button" data-modo="qualquer">Palavra em qualquer parte</button>
+            <label class="cm-check mt-3"><input type="checkbox" id="catMarcasChk"/> <span><b>Dividir em marcas</b> (Samsung, Motorola, iPhone…). As palavras abaixo dizem só o tipo do produto e o sistema acha a marca olhando o nome inteiro.</span></label>
+            <div id="catModoWrap">
+                <label class="form-label mt-3">Como o filtro acha os produtos</label>
+                <div class="stq-catman-modos" id="catModos">
+                    <button type="button" data-modo="inicio">Nome começa com a palavra</button>
+                    <button type="button" data-modo="qualquer">Palavra em qualquer parte</button>
+                </div>
             </div>
             <label class="form-label mt-3" id="catPalavrasLabel"></label>
             <div class="text-secondary" style="font-size:.72rem;margin-bottom:4px;" id="catPalavrasDica"></div>
@@ -463,18 +757,20 @@
                 <input class="form-control" id="catPalavra" type="text" maxlength="${CAT_PALAVRA_MAX + 2}" autocomplete="off"/>
                 <button type="button" class="stq-modal-btn-cancel" id="catPalavraAdd" style="white-space:nowrap;">Adicionar</button>
             </div>
-            <label class="form-label mt-3">E o nome também tem <span class="text-secondary">(opcional)</span></label>
-            <div class="text-secondary" style="font-size:.72rem;margin-bottom:4px;">Separa por marca ou modelo: só entra o produto que bate com as palavras acima <b>e</b> tem pelo menos uma destas no nome. Ex.: "Capas Motorola" = começa com "capa" ou "case" e também tem "moto". Separe com vírgula.</div>
-            <div class="stq-catman-chips" id="catTambemChips"></div>
-            <div style="display:flex;gap:8px;">
-                <input class="form-control" id="catTambem" type="text" maxlength="${CAT_PALAVRA_MAX + 2}" autocomplete="off" placeholder="Ex: moto, motorola + Enter"/>
-                <button type="button" class="stq-modal-btn-cancel" id="catTambemAdd" style="white-space:nowrap;">Adicionar</button>
+            <div id="catTambemWrap">
+                <label class="form-label mt-3">E o nome também tem <span class="text-secondary">(opcional)</span></label>
+                <div class="text-secondary" style="font-size:.72rem;margin-bottom:4px;">Separa por marca ou modelo: só entra o produto que bate com as palavras acima <b>e</b> tem pelo menos uma destas no nome. Ex.: "Capas Motorola" = começa com "capa" ou "case" e também tem "moto". Separe com vírgula.</div>
+                <div class="stq-catman-chips" id="catTambemChips"></div>
+                <div style="display:flex;gap:8px;">
+                    <input class="form-control" id="catTambem" type="text" maxlength="${CAT_PALAVRA_MAX + 2}" autocomplete="off" placeholder="Ex: moto, motorola + Enter"/>
+                    <button type="button" class="stq-modal-btn-cancel" id="catTambemAdd" style="white-space:nowrap;">Adicionar</button>
+                </div>
             </div>
             <div class="stq-catman-aviso" id="catAviso"></div>
             <div id="catSugestoesWrap"></div>
-            <button type="button" class="stq-modal-btn-save w-100 mt-3" id="catSalvarBtn"><i class="bi bi-check-circle-fill"></i> Salvar</button>
-            <button type="button" class="stq-modal-btn-cancel w-100 mt-2" id="catVoltarBtn">Voltar</button>`;
+            <button type="button" class="stq-modal-btn-save w-100 mt-3" id="catSalvarBtn"><i class="bi bi-check-circle-fill"></i> Salvar</button>`;
         el('catNome').value = catForm.nome;
+        el('catMarcasChk').checked = catForm.marcasAtivo;
 
         el('catNome').addEventListener('input', e => {
             if (!catForm) return;
@@ -498,6 +794,14 @@
             adicionarPalavrasDoCampo('tambem');
         });
         el('catTambemAdd').addEventListener('click', () => adicionarPalavrasDoCampo('tambem'));
+        el('catMarcasChk').addEventListener('change', e => {
+            if (!catForm) return;
+            catForm.marcasAtivo = e.target.checked;
+            if (catForm.marcasAtivo) catForm.palavras = catForm.palavras.filter(w => !w.includes(' '));   // com marcas a palavra é uma só
+            catForm.erro = '';
+            renderCatModo();
+            renderCatChips();
+        });
         el('catModos').querySelectorAll('button[data-modo]').forEach(b => b.addEventListener('click', () => {
             if (!catForm || catForm.modo === b.dataset.modo) return;
             catForm.modo = b.dataset.modo;
@@ -506,25 +810,33 @@
             renderCatChips();
         }));
         el('catSalvarBtn').addEventListener('click', salvarCategoria);
-        el('catVoltarBtn').addEventListener('click', mostrarCatLista);
+        el('catVoltarBtn')?.addEventListener('click', () => mostrarCatForm(null));
         renderCatModo();
         renderCatChips();
+        renderCatLista();   // destaca na lista a categoria em edição
     }
 
-    // Textos que dependem de "começa com" x "em qualquer parte" (botões, explicação, campo)
+    // com marcas a palavra é sempre uma só, em qualquer parte do nome; sem marcas vale o modo escolhido
+    const modoDasPalavras = f => (f.marcasAtivo ? 'inicio' : f.modo);
+
+    // Textos que dependem de "começa com" x "em qualquer parte" x "com marcas" (botões, explicação, campo)
     function renderCatModo() {
         if (!catForm || !el('catModos')) return;
-        const qualquer = catForm.modo === 'qualquer';
+        const comMarcas = catForm.marcasAtivo, qualquer = catForm.modo === 'qualquer';
+        el('catModoWrap').hidden = comMarcas;
+        el('catTambemWrap').hidden = comMarcas;
         el('catModos').querySelectorAll('button[data-modo]').forEach(b => {
             const ativo = b.dataset.modo === catForm.modo;
             b.classList.toggle('active', ativo);
             b.setAttribute('aria-pressed', ativo ? 'true' : 'false');
         });
-        el('catPalavrasLabel').textContent = qualquer ? 'Palavras que aparecem no nome do produto' : 'Palavras com que o nome do produto começa';
-        el('catPalavrasDica').textContent = qualquer
-            ? 'Vale em qualquer lugar do nome, até no meio de outra palavra ("fone" acha "Microfone"). Pode ser uma frase, como "caixa de som". Separe com vírgula.'
-            : 'Singular e plural valem. A palavra do nome já vem preenchida; acrescente outras se quiser.';
-        el('catPalavra').placeholder = qualquer ? 'Palavra ou frase + Enter' : 'Outra palavra + Enter';
+        el('catPalavrasLabel').textContent = comMarcas ? 'Palavras que dizem o tipo do produto' : qualquer ? 'Palavras que aparecem no nome do produto' : 'Palavras com que o nome do produto começa';
+        el('catPalavrasDica').textContent = comMarcas
+            ? 'Ex.: case, capa, capinha. Vale em qualquer posição do nome ("MOTO CASE G84" também é capa), com singular e plural. A marca vem das palavras de cada marca, em "Marcas".'
+            : qualquer
+                ? 'Vale em qualquer lugar do nome, até no meio de outra palavra ("fone" acha "Microfone"). Pode ser uma frase, como "caixa de som". Separe com vírgula.'
+                : 'Singular e plural valem. A palavra do nome já vem preenchida; acrescente outras se quiser.';
+        el('catPalavra').placeholder = qualquer && !comMarcas ? 'Palavra ou frase + Enter' : 'Outra palavra + Enter';
     }
 
     // Desenha as duas listas de palavras do formulário: as principais (#catChips) e as do "também" (#catTambemChips)
@@ -554,8 +866,9 @@
         if (!box || !catForm) return;
         if (catForm.erro) { box.className = 'stq-catman-aviso erro'; box.textContent = catForm.erro; return; }
         // Só é conflito se nenhuma das duas tem "também" (a mais específica ganha) ou se as duas têm e os "também" se cruzam
+        const tambemDoForm = catForm.marcasAtivo ? [] : catForm.tambem;
         const cruzam = (a, b) => a.some(x => b.some(y => x.includes(y) || y.includes(x)));
-        const outras = categoriasEditaveis().filter(c => c.id !== catForm.id && (!catForm.tambem.length === !c.tambem.length) && (!catForm.tambem.length || cruzam(catForm.tambem, c.tambem)));
+        const outras = categoriasEditaveis().filter(c => c.id !== catForm.id && (!tambemDoForm.length === !c.tambem.length) && (!tambemDoForm.length || cruzam(tambemDoForm, c.tambem)));
         const repetidas = [];
         catForm.palavras.forEach(w => {
             const f = formasDaPalavra(w);
@@ -563,7 +876,7 @@
             if (dona) repetidas.push(`"${w}" também está em "${dona.nome}"`);
         });
         box.className = 'stq-catman-aviso alerta';
-        box.textContent = repetidas.length ? `${repetidas.join('; ')}. Se o nome combinar com as duas, vale a de "começa com a palavra"; entre iguais, a que vier primeiro na lista.${catForm.tambem.length ? '' : ' Pra separar por marca ou modelo, use "E o nome também tem".'}` : '';
+        box.textContent = repetidas.length ? `${repetidas.join('; ')}. Se o nome combinar com as duas, vale a de "começa com a palavra"; entre iguais, a que vier primeiro na lista.${tambemDoForm.length || catForm.marcasAtivo ? '' : ' Pra separar por marca ou modelo, use "Dividir em marcas".'}` : '';
     }
 
     function renderCatSugestoes() {
@@ -589,7 +902,7 @@
     // campo: 'palavras' (as principais, seguem o modo escolhido) ou 'tambem' (sempre em qualquer parte, aceita frase)
     function adicionarPalavras(texto, campo = 'palavras') {
         if (!catForm) return false;
-        const qualquer = campo === 'tambem' || catForm.modo === 'qualquer';
+        const qualquer = campo === 'tambem' || modoDasPalavras(catForm) === 'qualquer';
         const partes = (qualquer ? normalizarTexto(texto).split(/[,;]+/) : normalizarTexto(texto).split(/[\s,;]+/)).map(w => w.replace(/\s+/g, ' ').trim()).filter(Boolean);
         if (!partes.length) return true;
         const erros = [];
@@ -619,8 +932,9 @@
         const norm = normalizarTexto(nome).replace(/\s+/g, ' ');
         if (NOMES_RESERVADOS.has(norm)) return `"${nome}" já é um filtro fixo do sistema. Escolha outro nome.`;
         if (categoriasEditaveis().some(c => c.id !== catForm.id && normalizarTexto(c.nome).replace(/\s+/g, ' ') === norm)) return `Já existe uma categoria chamada "${nome}".`;
-        if (!catForm.palavras.length) return catForm.modo === 'qualquer' ? 'Coloque pelo menos uma palavra: ela precisa aparecer no nome do produto.' : 'Coloque pelo menos uma palavra: o nome do produto precisa começar com ela.';
-        const frase = catForm.modo === 'inicio' && catForm.palavras.find(w => w.includes(' '));
+        const qualquer = modoDasPalavras(catForm) === 'qualquer';
+        if (!catForm.palavras.length) return catForm.marcasAtivo ? 'Coloque pelo menos uma palavra de tipo (ex.: case): ela precisa aparecer no nome do produto.' : qualquer ? 'Coloque pelo menos uma palavra: ela precisa aparecer no nome do produto.' : 'Coloque pelo menos uma palavra: o nome do produto precisa começar com ela.';
+        const frase = !qualquer && catForm.palavras.find(w => w.includes(' '));
         if (frase) return `"${frase}" tem mais de uma palavra. Em "nome começa com a palavra" use uma palavra só, ou troque para "palavra em qualquer parte".`;
         if (!catForm.id && categoriasEditaveis().length >= CAT_MAX) return `Limite de ${CAT_MAX} categorias atingido.`;
         return '';
@@ -633,25 +947,30 @@
         if (erro) { catForm.erro = erro; renderCatAviso(); return; }
 
         const atual = categoriasEditaveis();
-        const dados = gravacaoInicial(atual);          // 1ª mexida da loja: grava junto o que só existia "de cabeça"
-        let id = catForm.id, ordem, cor;
-        if (id) {
-            const c = atual.find(x => x.id === id);
-            if (!c) { avisoToast('Essa categoria foi apagada em outro aparelho.'); mostrarCatLista(); return; }
-            ordem = c.ordem; cor = c.cor;
+        const nome = catForm.nome.trim(), comMarcas = !!catForm.marcasAtivo;
+        const tambem = comMarcas ? [] : catForm.tambem;
+        let dados;
+        if (catForm.id) {
+            const c = atual.find(x => x.id === catForm.id);
+            if (!c) { avisoToast('Essa categoria foi apagada em outro aparelho.'); mostrarCatForm(null); return; }
+            const campos = { nome, palavras: catForm.palavras.slice(), tambem: tambem.length ? tambem.slice() : null, modo: catForm.modo };
+            if (comMarcas && !c.marcasAtivo) { campos.marcasAtivo = true; campos.marcas = marcasParaBanco(marcasDeFabrica()); }
+            else if (!comMarcas && c.marcasAtivo) { campos.marcasAtivo = false; campos.marcas = null; }
+            dados = dadosDaMudanca(c.id, campos);
         } else {
-            id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-            ordem = atual.reduce((m, c) => Math.max(m, c.ordem), -1) + 1;
-            cor = CORES_CATEGORIA.find(x => !atual.some(c => c.cor.toLowerCase() === x)) || CORES_CATEGORIA[atual.length % CAT_MAX];
+            const id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+            const ordem = atual.reduce((m, c) => Math.max(m, c.ordem), -1) + 1;
+            const cor = CORES_CATEGORIA.find(x => !atual.some(c => c.cor.toLowerCase() === x)) || CORES_CATEGORIA[atual.length % CAT_MAX];
+            dados = gravacaoInicial(atual);          // 1ª mexida da loja: grava junto o que só existia "de cabeça"
+            dados[`lista/${id}`] = categoriaParaBanco({ id, nome, palavras: catForm.palavras, tambem, modo: catForm.modo, cor, ordem, marcasAtivo: comMarcas, marcas: comMarcas ? marcasDeFabrica() : [] });
         }
-        dados[`lista/${id}`] = categoriaParaBanco({ nome: catForm.nome.trim(), palavras: catForm.palavras, tambem: catForm.tambem, modo: catForm.modo, cor, ordem });
 
         const btn = el('catSalvarBtn'), sessao = sessaoModal;
         window._setBtnLoading && window._setBtnLoading(btn, true, 'Salvando...');
         gravarCategorias(dados)
             .then(() => {
                 if (sessao !== sessaoModal) return;
-                mostrarCatLista();
+                mostrarCatForm(null);
                 avisoToast('Categoria salva!');
             })
             .catch(e => {
@@ -689,7 +1008,10 @@
                 else dados[`lista/${id}`] = null;
                 const sessao = sessaoModal;
                 gravarCategorias(dados)
-                    .then(() => { if (sessao === sessaoModal && catTela === 'lista') renderCatLista(); avisoToast('Categoria apagada.'); })
+                    .then(() => {
+                        if (sessao === sessaoModal && catTela === 'lista') { if (catForm && catForm.id === id) mostrarCatForm(null); else renderCatLista(); }
+                        avisoToast('Categoria apagada.');
+                    })
                     .catch(e => avisoToast(textoDoErroCategoria(e)));
             }
         );
@@ -698,16 +1020,309 @@
     function restaurarPadraoCategorias() {
         if (!jaPersonalizado()) { avisoToast('As categorias já estão no padrão.'); return; }
         confirmarEmDuasEtapas(
-            'Restaurar as categorias para o padrão (Celulares, Áudio, Notebooks, Capas, Películas, Carregadores e Cabos)? As categorias que você criou ou mudou serão apagadas, em todos os aparelhos da loja. Nenhum produto é alterado.',
+            'Restaurar as categorias para o padrão (Celulares, Áudio, Notebooks, Capas com as marcas de fábrica, Películas, Carregadores e Cabos)? As categorias e marcas que você criou ou mudou serão apagadas, em todos os aparelhos da loja. Nenhum produto é alterado.',
             'Última confirmação: voltar tudo para o padrão? Isso não dá para desfazer.',
             'Sim, restaurar',
             () => {
                 const sessao = sessaoModal;
                 Promise.resolve(window._dbRemove(window._lojaRef('categoriasProduto')))
-                    .then(() => { if (sessao === sessaoModal && catTela === 'lista') renderCatLista(); avisoToast('Categorias restauradas para o padrão.'); })
+                    .then(() => { if (sessao === sessaoModal && catTela === 'lista') mostrarCatForm(null); avisoToast('Categorias restauradas para o padrão.'); })
                     .catch(e => avisoToast(textoDoErroCategoria(e)));
             }
         );
+    }
+
+    // ── Tela 2: marcas de uma categoria (a Capas) ──
+    // Palavras-chave de marca digitadas: "gt, infinix  tecno" → gt · infinix · tecno (só letras e números, sem acento)
+    const termosDoTexto = txt => [...new Set(normalizarTexto(txt).split(/[\s,;]+/).map(t => t.replace(/[^a-z0-9]/g, '')).filter(termoDeMarcaValido))];
+    const rotuloDoTermo = t => (t.length === 1 ? t + ' + número' : t);
+    const catDasMarcas = () => marcasEst ? categoriasEditaveis().find(c => c.id === marcasEst.catId && c.marcasAtivo) || null : null;
+    // Produtos que hoje estão na categoria, com a marca que têm agora
+    const produtosDaCategoria = cat => getProdutos().map(p => ({ p, k: classificar(p) })).filter(x => x.k.cat === cat.id);
+    const nomeDaMarca = (cat, id) => id === SEM_MARCA ? 'Sem marca' : (cat.marcas.find(m => m.id === id) || {}).nome || 'Sem marca';
+    const chipTermoHtml = (t, dados) => `<span class="cm-chip">${esc(rotuloDoTermo(t))}<button type="button" ${dados} aria-label="Remover ${esc(t)}">✕</button></span>`;
+
+    function mostrarMarcas(catId) {
+        const cat = categoriasEditaveis().find(c => c.id === catId && c.marcasAtivo);
+        if (!cat) { mostrarCatLista(); return; }
+        catTela = 'marcas'; catForm = null;
+        marcasEst = { catId, novoNome: '', novoTermos: [], novoRascunho: '', nomeTeste: '', rascunhos: {}, erro: '' };
+        el('stqModalTitle').textContent = `${cat.nome} · marcas`;
+        el('stqModalBody').innerHTML = `
+            <div class="cm-cols">
+                <div class="cm-col cm-esq">
+                    <button type="button" class="cm-voltar" id="cmVoltar"><i class="bi bi-arrow-left"></i> Categorias</button>
+                    <div class="stq-catman-aviso erro" id="cmErro"></div>
+                    <div id="cmEsq"></div>
+                </div>
+                <div class="cm-col cm-dir">
+                    <div class="cm-tit">Adicionar marca nova</div>
+                    <input class="form-control" id="cmNovoNome" type="text" maxlength="${MARCA_NOME_MAX}" placeholder="Nome da marca (ex.: Infinix)" autocomplete="off"/>
+                    <div class="cm-chipbox"><span id="cmNovoChips" class="cm-chips-inline"></span><input id="cmNovoRascunho" type="text" placeholder="Palavras do nome: gt, infinix… (Enter)" autocomplete="off" aria-label="Palavras-chave da marca nova"/></div>
+                    <div id="cmTeste"></div>
+                    <div id="cmSem"></div>
+                    <div class="cm-testar">
+                        <div class="cm-tit">Testar um nome</div>
+                        <input class="form-control" id="cmNomeTeste" type="text" placeholder="Ex.: CASE GT 20 PRO" autocomplete="off"/>
+                        <div class="cm-resultado" id="cmNomeResultado"></div>
+                    </div>
+                </div>
+            </div>`;
+        el('cmVoltar').addEventListener('click', mostrarCatLista);
+        const esq = el('cmEsq');
+        esq.addEventListener('click', aoClicarMarcas);
+        esq.addEventListener('keydown', e => {
+            const alvo = e.target.closest('input[data-foco]');
+            if (alvo && (e.key === 'Enter' || e.key === ',')) { e.preventDefault(); adicionarTermoDaMarca(alvo.dataset.foco); }
+        });
+        esq.addEventListener('input', e => {
+            const alvo = e.target.closest('input[data-foco]');
+            if (alvo && marcasEst) marcasEst.rascunhos[alvo.dataset.foco] = alvo.value;
+        });
+        el('cmNovoNome').addEventListener('input', e => { marcasEst.novoNome = e.target.value; marcasEst.erro = ''; renderMarcasNovo(); });
+        el('cmNovoRascunho').addEventListener('input', e => { marcasEst.novoRascunho = e.target.value; renderMarcasNovo(); });
+        el('cmNovoRascunho').addEventListener('keydown', e => {
+            if (e.key !== 'Enter' && e.key !== ',') return;
+            e.preventDefault();
+            marcasEst.novoTermos = [...new Set([...marcasEst.novoTermos, ...termosDoTexto(marcasEst.novoRascunho)])].slice(0, MARCA_TERMOS_MAX);
+            marcasEst.novoRascunho = ''; e.target.value = '';
+            renderMarcasNovo();
+        });
+        el('cmNomeTeste').addEventListener('input', e => { marcasEst.nomeTeste = e.target.value; renderNomeTeste(); });
+        atualizarTelaMarcas();
+    }
+
+    // Redesenha tudo da tela de marcas (algo mudou: banco, estoque ou uma ação)
+    function atualizarTelaMarcas() {
+        const cat = catDasMarcas();
+        if (!cat) {
+            if (catTela === 'marcas') { avisoToast('Essa categoria não tem mais marcas (foi mudada em outro aparelho).'); mostrarCatLista(); }
+            return;
+        }
+        renderMarcasEsq(cat);
+        renderMarcasNovo();
+        renderMarcasSem(cat);
+        renderNomeTeste();
+        const erro = el('cmErro');
+        if (erro) erro.textContent = marcasEst.erro || '';
+    }
+
+    function renderMarcasEsq(cat) {
+        const wrap = el('cmEsq');
+        if (!wrap) return;
+        const devolverFoco = guardarFoco(wrap);
+        const contagem = new Map();
+        produtosDaCategoria(cat).forEach(x => contagem.set(x.k.marca, (contagem.get(x.k.marca) || 0) + 1));
+        const campoTermo = (chave, ph) => `<input type="text" class="cm-mini" data-foco="${esc(chave)}" value="${esc(marcasEst.rascunhos[chave] || '')}" placeholder="${ph}" aria-label="${ph}" autocomplete="off"/>
+            <button type="button" class="cm-mais" data-acao="add" data-chave="${esc(chave)}" aria-label="Adicionar palavra">+</button>`;
+        wrap.innerHTML = `
+            <div class="cm-bloco">
+                <div class="cm-tit">O que entra em ${esc(cat.nome)}?</div>
+                <div class="cm-dica">Se o nome tiver uma dessas palavras (em qualquer posição), vai pra ${esc(cat.nome)}.</div>
+                <div class="cm-chips">
+                    ${cat.palavras.map(w => `<span class="cm-chip tipo">${esc(w)}<button type="button" data-acao="tipo-x" data-w="${esc(w)}" aria-label="Remover ${esc(w)}">✕</button></span>`).join('')}
+                    ${campoTermo('tipo', '+ palavra, Enter')}
+                </div>
+            </div>
+            <div class="cm-bloco">
+                <div class="cm-tit">Marcas</div>
+                <div class="cm-dica">O sistema olha o nome inteiro. Uma letra sozinha (S, A, E…) vale pra modelos tipo S23, A10, E7. Mudar aqui não altera nenhum produto.</div>
+                ${cat.marcas.length ? cat.marcas.map(m => `
+                    <div class="cm-marca ${m.oculta ? 'oculta' : ''}">
+                        <div class="cm-marca-topo">
+                            <div class="cm-marca-nome">${esc(m.nome)}</div>
+                            <div class="cm-marca-qtd">${contagem.get(m.id) || 0} produtos</div>
+                            <button type="button" class="cm-btn" data-acao="ocultar" data-m="${esc(m.id)}">${m.oculta ? 'Mostrar no filtro' : 'Ocultar do filtro'}</button>
+                            <button type="button" class="cm-btn perigo" data-acao="apagar" data-m="${esc(m.id)}">Apagar</button>
+                        </div>
+                        <div class="cm-chips">
+                            ${m.termos.map(t => chipTermoHtml(t, `data-acao="termo-x" data-m="${esc(m.id)}" data-w="${esc(t)}"`)).join('')}
+                            ${campoTermo('b:' + m.id, '+ palavra, Enter')}
+                        </div>
+                    </div>`).join('') : '<div class="cm-dica">Nenhuma marca. Adicione ao lado.</div>'}
+            </div>`;
+        devolverFoco();
+    }
+
+    function aoClicarMarcas(e) {
+        const b = e.target.closest('button[data-acao]');
+        const cat = catDasMarcas();
+        if (!b || !cat) return;
+        const acao = b.dataset.acao, m = cat.marcas.find(x => x.id === b.dataset.m);
+        if (acao === 'add') adicionarTermoDaMarca(b.dataset.chave);
+        else if (acao === 'tipo-x') {
+            if (cat.palavras.length <= 1) { marcasEst.erro = `${cat.nome} precisa de pelo menos uma palavra de tipo.`; atualizarTelaMarcas(); return; }
+            marcasEst.erro = '';
+            mudarMarcas({ palavras: cat.palavras.filter(w => w !== b.dataset.w) });
+        } else if (!m) return;
+        else if (acao === 'termo-x') {
+            if (m.termos.length <= 1) { marcasEst.erro = `${m.nome} precisa de pelo menos uma palavra. Para tirar a marca, use Apagar.`; atualizarTelaMarcas(); return; }
+            marcasEst.erro = '';
+            mudarMarcas({ [`marcas/${m.id}/termos`]: m.termos.filter(w => w !== b.dataset.w) });
+        } else if (acao === 'ocultar') mudarMarcas({ [`marcas/${m.id}/oculta`]: m.oculta ? null : true });
+        else if (acao === 'apagar') {
+            window.showCustomModal({
+                message: `Apagar a marca "${m.nome}"? Nenhum produto é apagado: os de ${cat.nome} que eram dela passam pra outra marca que combine com o nome ou pra "Sem marca". Vale para a loja inteira.`,
+                confirmText: 'Sim, apagar', cancelText: 'Cancelar', onCancel: () => {},
+                onConfirm: () => {
+                    const c = catDasMarcas();
+                    if (!c || !c.marcas.some(x => x.id === m.id)) { avisoToast('Essa marca já foi apagada em outro aparelho.'); return; }
+                    mudarMarcas({ [`marcas/${m.id}`]: null });
+                }
+            });
+        }
+    }
+
+    // Grava uma mudança na categoria das marcas. Erro (ex.: regra do banco) aparece em vermelho no alto da coluna.
+    function mudarMarcas(campos, aoOk) {
+        if (!marcasEst) return Promise.resolve(false);
+        const dados = dadosDaMudanca(marcasEst.catId, campos);
+        if (!dados) { avisoToast('Essa categoria não existe mais (foi apagada em outro aparelho).'); mostrarCatLista(); return Promise.resolve(false); }
+        const sessao = sessaoModal;
+        return gravarCategorias(dados)
+            .then(() => { if (aoOk && sessao === sessaoModal && marcasEst) aoOk(); return true; })
+            .catch(e => {
+                if (sessao === sessaoModal && marcasEst) { marcasEst.erro = textoDoErroCategoria(e); atualizarTelaMarcas(); }
+                return false;
+            });
+    }
+
+    // Enter (ou "+") num campo de palavra: 'tipo' (palavra de tipo da categoria) ou 'b:{marca}' (palavra de uma marca)
+    function adicionarTermoDaMarca(chave) {
+        const cat = catDasMarcas();
+        if (!cat) return;
+        const texto = marcasEst.rascunhos[chave] || '';
+        if (chave === 'tipo') {
+            const novas = texto.split(/[\s,;]+/).map(w => textoCompacto(w).replace(/[^a-z0-9]/g, '')).filter(w => w);
+            const invalidas = novas.filter(w => !palavraValida(w, 'inicio'));
+            const validas = novas.filter(w => palavraValida(w, 'inicio') && !cat.palavras.includes(w));
+            if (invalidas.length) { marcasEst.erro = `"${invalidas[0]}": use de ${CAT_PALAVRA_MIN} a ${CAT_PALAVRA_MAX} letras ou números, uma palavra só.`; atualizarTelaMarcas(); return; }
+            if (!validas.length) { marcasEst.rascunhos.tipo = ''; marcasEst.erro = ''; atualizarTelaMarcas(); return; }
+            if (cat.palavras.length + validas.length > CAT_PALAVRAS_MAX) { marcasEst.erro = `No máximo ${CAT_PALAVRAS_MAX} palavras de tipo.`; atualizarTelaMarcas(); return; }
+            marcasEst.rascunhos.tipo = ''; marcasEst.erro = '';
+            mudarMarcas({ palavras: [...cat.palavras, ...validas] });
+            return;
+        }
+        const m = cat.marcas.find(x => 'b:' + x.id === chave);
+        if (!m) return;
+        const novas = termosDoTexto(texto).filter(t => !m.termos.includes(t));
+        if (!novas.length) { marcasEst.rascunhos[chave] = ''; marcasEst.erro = texto.trim() && !termosDoTexto(texto).length ? 'Use só letras e números (uma letra sozinha vale pra modelos como S23 ou A10).' : ''; atualizarTelaMarcas(); return; }
+        if (m.termos.length + novas.length > MARCA_TERMOS_MAX) { marcasEst.erro = `No máximo ${MARCA_TERMOS_MAX} palavras por marca.`; atualizarTelaMarcas(); return; }
+        marcasEst.rascunhos[chave] = ''; marcasEst.erro = '';
+        mudarMarcas({ [`marcas/${m.id}/termos`]: [...m.termos, ...novas] });
+    }
+
+    // Marca nova: chips digitados + o que está no campo e ainda não virou chip
+    const termosDoNovo = () => [...new Set([...marcasEst.novoTermos, ...termosDoTexto(marcasEst.novoRascunho)])].slice(0, MARCA_TERMOS_MAX);
+
+    // Quais produtos cairiam na marca nova, antes de salvar
+    function simularMarcaNova(cat, nome, termos) {
+        const nova = lerMarcas({ __novo: { nome: nome || 'Nova', termos, ordem: 9999 } })[0];
+        if (!nova) return [];
+        const todas = [...cat.marcas, nova];
+        return produtosDaCategoria(cat).map(({ p, k }) => {
+            const fixa = k.manual && (p.marcaManual === SEM_MARCA || cat.marcas.some(x => x.id === p.marcaManual));   // marca escolhida à mão não muda
+            return { nome: p.nome, antes: k.marca, depois: fixa ? k.marca : marcaDoNome(tokensDoNome(p.nome), todas) };
+        }).filter(x => x.depois === '__novo');
+    }
+
+    function renderMarcasNovo() {
+        const cat = catDasMarcas();
+        const chips = el('cmNovoChips'), teste = el('cmTeste');
+        if (!cat || !chips || !teste) return;
+        chips.innerHTML = marcasEst.novoTermos.map(t => chipTermoHtml(t, `data-w="${esc(t)}"`)).join('');
+        chips.querySelectorAll('button[data-w]').forEach(b => b.addEventListener('click', () => {
+            marcasEst.novoTermos = marcasEst.novoTermos.filter(x => x !== b.dataset.w);
+            renderMarcasNovo();
+        }));
+        const nome = marcasEst.novoNome.trim(), termos = termosDoNovo();
+        const duplicada = nome && (normalizarTexto(nome).replace(/\s+/g, ' ') === 'sem marca' || cat.marcas.some(m => normalizarTexto(m.nome) === normalizarTexto(nome)));
+        let estado, titulo, sub = '', itens = [];
+        if (!nome && !termos.length) { estado = 'neutro'; titulo = 'Preencha o nome e as palavras'; sub = 'Aqui aparece, na hora, quais produtos vão cair nessa marca antes de você salvar.'; }
+        else if (!termos.length) { estado = 'aviso'; titulo = 'Falta pelo menos uma palavra'; sub = 'Digite uma palavra que aparece no nome dos produtos dessa marca (ex.: gt) e aperte Enter.'; }
+        else {
+            const caem = simularMarcaNova(cat, nome, termos);
+            const mudam = caem.filter(x => x.antes !== SEM_MARCA);
+            const alvo = nome || 'Nova';
+            if (!caem.length) { estado = 'neutro'; titulo = 'Nenhum produto bate com essas palavras'; sub = 'Normal se ainda não cadastrou nenhum. Só salve se tiver certeza das palavras.'; }
+            else {
+                estado = mudam.length ? 'aviso' : 'ok';
+                titulo = `${caem.length} ${caem.length === 1 ? 'produto vai' : 'produtos vão'} cair em ${alvo}`;
+                sub = mudam.length ? `Atenção: ${mudam.length} já estava${mudam.length === 1 ? '' : 'm'} em outra marca. Confira abaixo.` : 'Nenhum deles está em outra marca. Pode salvar.';
+                itens = caem.slice(0, 7).map(x => ({ nome: x.nome, nota: x.antes !== SEM_MARCA ? `hoje em ${nomeDaMarca(cat, x.antes)}` : `sem marca → ${alvo}`, aviso: x.antes !== SEM_MARCA }));
+                if (caem.length > 7) itens.push({ nome: `…e mais ${caem.length - 7}`, nota: '', aviso: false });
+            }
+        }
+        const podeAdd = !!nome && !!termos.length && !duplicada && cat.marcas.length < MARCAS_MAX;
+        teste.innerHTML = `
+            <div class="cm-teste ${estado}">
+                <div class="cm-teste-tit">${esc(titulo)}</div>
+                <div class="cm-dica">${esc(sub)}</div>
+                ${itens.map(i => `<div class="cm-teste-item"><span>${esc(i.nome)}</span><b class="${i.aviso ? 'aviso' : ''}">${esc(i.nota)}</b></div>`).join('')}
+                ${duplicada ? `<div class="stq-catman-aviso erro">Já existe uma marca "${esc(nome)}".</div>` : ''}
+                <button type="button" class="stq-modal-btn-save w-100" id="cmAdicionar" ${podeAdd ? '' : 'disabled'}>${podeAdd ? `Adicionar marca ${esc(nome)}` : 'Adicionar marca'}</button>
+            </div>`;
+        el('cmAdicionar').addEventListener('click', adicionarMarca);
+    }
+
+    function adicionarMarca() {
+        const cat = catDasMarcas();
+        if (!cat) return;
+        const nome = marcasEst.novoNome.trim().replace(/\s+/g, ' '), termos = termosDoNovo();
+        if (!nome || !termos.length) return;
+        if (cat.marcas.length >= MARCAS_MAX) { marcasEst.erro = `Limite de ${MARCAS_MAX} marcas atingido.`; atualizarTelaMarcas(); return; }
+        if (normalizarTexto(nome) === 'sem marca' || cat.marcas.some(m => normalizarTexto(m.nome) === normalizarTexto(nome))) { renderMarcasNovo(); return; }
+        const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+        const ordem = cat.marcas.reduce((n, m) => Math.max(n, m.ordem), -1) + 1;
+        marcasEst.erro = '';
+        mudarMarcas({ [`marcas/${id}`]: marcaParaBanco({ nome, termos, ordem }) }, () => {
+            marcasEst.novoNome = ''; marcasEst.novoTermos = []; marcasEst.novoRascunho = '';
+            if (el('cmNovoNome')) el('cmNovoNome').value = '';
+            if (el('cmNovoRascunho')) el('cmNovoRascunho').value = '';
+            atualizarTelaMarcas();
+        });
+    }
+
+    // Produtos da categoria que não bateram com nenhuma marca + as palavras que mais se repetem neles
+    function renderMarcasSem(cat) {
+        const wrap = el('cmSem');
+        if (!wrap) return;
+        const sem = produtosDaCategoria(cat).filter(x => x.k.marca === SEM_MARCA).map(x => x.p);
+        const tipo = new Set(cat.formas);
+        const cont = new Map();
+        sem.forEach(p => new Set(tokensDoNome(p.nome)).forEach(t => {
+            if (t.length < 2 || /\d/.test(t) || tipo.has(t) || PALAVRAS_IGNORADAS.has(t) || PALAVRAS_DE_MODELO.has(t)) return;
+            cont.set(t, (cont.get(t) || 0) + 1);
+        }));
+        const sugestoes = [...cont.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 8);
+        wrap.innerHTML = `
+            <div class="cm-bloco">
+                <div class="cm-tit">${esc(cat.nome)} sem marca (${sem.length})</div>
+                <div class="cm-dica">Toque numa palavra pra criar a marca já preenchida.</div>
+                <div class="cm-chips">${sugestoes.length ? sugestoes.map(([t, n]) => `<button type="button" class="cm-sug" data-t="${esc(t)}">${esc(t)} <span>${n}</span></button>`).join('') : '<span class="cm-dica">Tudo encaixado.</span>'}</div>
+                <div class="cm-sem-lista">${sem.slice(0, 10).map(p => `<div>${esc(p.nome)}</div>`).join('')}${sem.length > 10 ? `<div>…e mais ${sem.length - 10}</div>` : ''}</div>
+            </div>`;
+        wrap.querySelectorAll('.cm-sug').forEach(b => b.addEventListener('click', () => {
+            const t = b.dataset.t;
+            marcasEst.novoNome = tituloDaMarca([t]); marcasEst.novoTermos = [t]; marcasEst.novoRascunho = ''; marcasEst.erro = '';
+            el('cmNovoNome').value = marcasEst.novoNome; el('cmNovoRascunho').value = '';
+            renderMarcasNovo();
+            el('cmNovoNome').focus();
+        }));
+    }
+
+    function renderNomeTeste() {
+        const out = el('cmNomeResultado'), cat = catDasMarcas();
+        if (!out || !cat) return;
+        const nome = marcasEst.nomeTeste.trim();
+        let texto = 'Digite um nome acima.', ok = null;
+        if (nome) {
+            const r = classificarNome(nome);
+            if (r.cat === cat.id) { texto = `Cai em: ${cat.nome} › ${nomeDaMarca(cat, r.marca)}`; ok = r.marca !== SEM_MARCA; }
+            else { texto = `Não cai em ${cat.nome}: ${r.cat === CATEGORIA_OUTROS.id ? 'ficaria em Outros' : `cai em ${infoCategoria(r.cat).label}`}.`; ok = false; }
+        }
+        out.textContent = texto;
+        out.className = 'cm-resultado' + (ok === true ? ' ok' : ok === false ? ' aviso' : '');
     }
 
     // ── Cor picker (form Novo/Editar) ──────────────────────────────
@@ -848,6 +1463,7 @@
                         <label class="form-label" for="stqNome"><i class="bi bi-box-seam"></i> Nome do Produto</label>
                         <input class="form-control" id="stqNome" type="text" placeholder="Ex: iPhone 11 128GB" autocomplete="off"/>
                     </div>
+                    <div class="stq-cat-sug" id="stqCatSug"></div>
                 </div>
 
                 <div class="stq-fp-sec">Preço</div>
@@ -1056,6 +1672,7 @@
     }
 
     function bindFormEvents() {
+        el('stqNome')?.addEventListener('input', () => { catEscolha = null; catTrocando = false; renderCatSugerida(); });   // mudou o nome: a categoria volta a ser a que o nome diz
         el('stqCancelFormBtn')?.addEventListener('click', fecharModal);
         el('stqSaveBtn')?.addEventListener('click', salvarProduto);
         el('stqCorAddBtn')?.addEventListener('click', adicionarCorCustom);
@@ -1514,6 +2131,68 @@
         }
     }
 
+    // ── Categoria sugerida no cadastro: "Categoria: Capas › Motorola · Sugerida pelo nome · Trocar" ──
+    // O nome decide sozinho; "Trocar" deixa o usuário corrigir UM produto (fica em catManual/marcaManual dele
+    // e vale mais que o nome). Mexer no nome volta a valer o nome.
+    const escolhaDoProduto = p => p && typeof p.catManual === 'string' && p.catManual ? { cat: p.catManual, marca: typeof p.marcaManual === 'string' && p.marcaManual ? p.marcaManual : null } : null;
+    function renderCatSugerida() {
+        const box = el('stqCatSug');
+        if (!box) return;
+        const nome = (el('stqNome')?.value || '').trim();
+        if (!nome) { box.innerHTML = `<span class="stq-cs-rot">Categoria:</span><span class="stq-cs-vazio">Digite o nome e a categoria aparece sozinha.</span>`; return; }
+        const r = classificar({ nome, catManual: catEscolha && catEscolha.cat, marcaManual: catEscolha && catEscolha.marca });
+        const cat = categoriasEditaveis().find(c => c.id === r.cat);
+        const info = infoCategoria(r.cat);
+        const pillStyle = (ativo, cor) => ativo ? `background:${cor};color:#0b1220;border-color:${cor};` : `background:${cor}1a;color:${cor};border-color:${cor}55;`;
+        const todas = [...categoriasEditaveis().map(c => ({ id: c.id, label: c.nome, cor: c.cor })), { id: CATEGORIA_OUTROS.id, label: CATEGORIA_OUTROS.label, cor: CATEGORIA_OUTROS.cor }];
+        box.innerHTML = `
+            <div class="stq-cs-linha">
+                <span class="stq-cs-rot">Categoria:</span>
+                <span class="stq-cs-chip" style="${pillStyle(false, info.cor)}">${esc(info.label)}${cat && cat.marcasAtivo ? ' › ' + esc(nomeDaMarca(cat, r.marca)) : ''}</span>
+                <span class="stq-cs-origem">${r.manual ? 'Escolhida por você.' : 'Sugerida pelo nome.'}</span>
+                <button type="button" class="stq-cs-btn" id="stqCatTrocar">${catTrocando ? 'Pronto' : 'Trocar'}</button>
+            </div>
+            ${catTrocando ? `
+            <div class="stq-cs-troca">
+                <div class="stq-cs-opcoes">${todas.map(c => `<button type="button" class="stq-cs-op" data-cat="${esc(c.id)}" style="${pillStyle(c.id === r.cat, c.cor)}">${esc(c.label)}</button>`).join('')}</div>
+                ${cat && cat.marcasAtivo ? `
+                <div class="stq-cs-opcoes"><span class="stq-cs-rot">Marca ›</span>
+                    ${[...cat.marcas.map(m => ({ id: m.id, nome: m.nome })), { id: SEM_MARCA, nome: 'Sem marca' }].map(m => `<button type="button" class="stq-cs-op" data-marca="${esc(m.id)}" style="${pillStyle(m.id === r.marca, info.cor)}">${esc(m.nome)}</button>`).join('')}
+                </div>` : ''}
+            </div>` : ''}`;
+        el('stqCatTrocar').addEventListener('click', () => { catTrocando = !catTrocando; renderCatSugerida(); });
+        box.querySelectorAll('[data-cat]').forEach(b => b.addEventListener('click', () => {
+            const c = categoriasEditaveis().find(x => x.id === b.dataset.cat);
+            catEscolha = { cat: b.dataset.cat, marca: c && c.marcasAtivo ? marcaDoNome(tokensDoNome(nome), c.marcas) : null };
+            renderCatSugerida();
+        }));
+        box.querySelectorAll('[data-marca]').forEach(b => b.addEventListener('click', () => {
+            catEscolha = { cat: r.cat, marca: b.dataset.marca };
+            renderCatSugerida();
+        }));
+    }
+    // O que gravar no produto: só a escolha que difere do que o nome já diz (null = vale o nome)
+    function escolhaParaSalvar(nome) {
+        if (!catEscolha) return null;
+        const r = classificar({ nome, catManual: catEscolha.cat, marcaManual: catEscolha.marca });
+        if (!r.manual) return null;                         // a categoria escolhida não existe mais
+        const auto = classificarNome(nome);
+        return r.cat === auto.cat && r.marca === auto.marca ? null : { cat: r.cat, marca: r.marca };
+    }
+    // Grava a escolha num passo À PARTE do produto: se as regras do banco não aceitarem o campo novo, o produto
+    // já está salvo e o aviso diz o que faltou. Devolve o texto do aviso ('' = tudo certo ou nada a gravar).
+    async function gravarEscolhaDeCategoria(id, escolha) {
+        const atual = escolhaDoProduto((window.products || []).find(p => p.id === id));
+        const novo = { catManual: escolha ? escolha.cat : null, marcaManual: escolha && escolha.marca ? escolha.marca : null };
+        if (novo.catManual === (atual ? atual.cat : null) && novo.marcaManual === (atual ? atual.marca : null)) return '';
+        try {
+            await window._dbUpdate(window._lojaRef(`products/${id}`), novo);
+            return '';
+        } catch (e) {
+            return ` Mas não consegui guardar a categoria que você escolheu (${(e && e.message) || e}): ela continua sendo a que o nome diz.`;
+        }
+    }
+
     // ── Abrir modal Novo / Editar produto ─────────────────────────
     function openFormForNew() {
         fecharPainelExpandido();
@@ -1521,10 +2200,12 @@
         quantidadeOriginalEdicao = null;
         coresSelecionadas = [];
         produtoAtualDoAlerta = null;
+        catEscolha = null; catTrocando = false;
         const body = abrirModal('primary', 'Novo Produto');
         el('stqModalBackdrop').classList.add('stq-fp-tela');
         body.innerHTML = formBodyHtml(false);
         bindFormEvents();
+        renderCatSugerida();
     }
 
     // viaAlerta: true quando veio do botão "Ajustar preço de venda" do
@@ -1546,11 +2227,13 @@
         coresSelecionadas = Array.isArray(produto.cores) ? produto.cores.map(c => ({ nome: c.nome, hex: c.hex || '#666666' })) : [];
         margemModo = 'valor';
         produtoAtualDoAlerta = viaAlerta ? produto : null;
+        catEscolha = escolhaDoProduto(produto); catTrocando = false;
         const body = abrirModal('primary', 'Editar Produto');
         el('stqModalBackdrop').classList.add('stq-fp-tela');
         body.innerHTML = formBodyHtml(!!viaAlerta);
         bindFormEvents();
         el('stqNome').value = produto.nome || '';
+        renderCatSugerida();
         if (el('stqCodigoBarras')) el('stqCodigoBarras').value = produto.codigoBarras || '';
         renderBarcodePreview(produto.codigoBarras || '');
         escreverMoeda(el('stqPrecoCompra'), produto.precoCompra);
@@ -1643,6 +2326,7 @@
 
         if (origemDoEstoqueBloqueia()) return;
         const idParaSalvar = editingId;
+        const escolhaCat = escolhaParaSalvar(nome);
         if (idParaSalvar) {
             // Quantidade mudou por edição direta (não por reposição/venda,
             // que já passam por moverEstoque) — registra como "Ajuste
@@ -1669,8 +2353,9 @@
                         return moverEstoque({ id: idParaSalvar }, deltaAjuste, 'ajuste', {});
                     }
                 })
-                .then(() => {
-                    window.showCustomModal({ message: 'Produto atualizado.' }); fecharModal(); fecharPainelExpandido();
+                .then(() => gravarEscolhaDeCategoria(idParaSalvar, escolhaCat))
+                .then(avisoCat => {
+                    window.showCustomModal({ message: 'Produto atualizado.' + avisoCat }); fecharModal(); fecharPainelExpandido();
                 })
                 .catch(e => window.showCustomModal({ message: `Erro ao salvar: ${e.message}` }));
         } else {
@@ -1684,11 +2369,12 @@
             const salvarBtn = el('stqSaveBtn');
             if (salvarBtn) salvarBtn.disabled = true;
             criarProdutoNovo(payload, quantidade, compraInicialDoFormulario())
-                .then(r => {
+                .then(async r => {
+                    const avisoCat = await gravarEscolhaDeCategoria(r.id, escolhaCat);
                     window.showCustomModal({
-                        message: r.erroCompra
+                        message: (r.erroCompra
                             ? `Produto cadastrado, mas NÃO consegui registrar a compra (${r.erroCompra.message}). O estoque ficou em 0 — use o botão Repor, com o valor de compra, pra lançar a entrada.`
-                            : (r.compraRegistrada ? 'Produto cadastrado e compra registrada no Financeiro.' : 'Produto cadastrado.')
+                            : (r.compraRegistrada ? 'Produto cadastrado e compra registrada no Financeiro.' : 'Produto cadastrado.')) + avisoCat
                     });
                     fecharModal();
                 })
@@ -2839,7 +3525,7 @@
     const estaEsgotado = p => (p.quantidade || 0) <= 0;
 
     function renderCard(p) {
-        const cat = infoCategoria(detectarCategoria(p.nome));
+        const cat = infoCategoria(classificar(p).cat);
         const zerado = estaEsgotado(p);
         const ringCor = zerado ? '#ef4444' : cat.cor;
         const cores = Array.isArray(p.cores) ? p.cores : [];
@@ -2895,12 +3581,12 @@
         const termos = normalizarTexto(el('stqBusca')?.value).split(/\s+/).filter(Boolean);
         let produtos = getProdutos();
         if (termos.length) produtos = produtos.filter(p => { const nome = normalizarTexto(p.nome); return termos.every(t => nome.includes(t)); });
-        if (filtroCategoria) produtos = produtos.filter(p => detectarCategoria(p.nome) === filtroCategoria);
+        if (filtroCategoria) produtos = produtos.filter(p => { const k = classificar(p); return k.cat === filtroCategoria && (!filtroMarca || k.marca === filtroMarca); });
         if (filtroEstoque !== 'todos') produtos = produtos.filter(p => estaEsgotado(p) === (filtroEstoque === 'esgot'));
         const ordem = ordemAtual();
         produtos = ordenarLista(produtos, ordem);
 
-        const assinatura = termos.join(' ') + '|' + (filtroCategoria || '') + '|' + filtroEstoque + '|' + ordemComoTexto(ordem);
+        const assinatura = termos.join(' ') + '|' + (filtroCategoria || '') + '|' + (filtroMarca || '') + '|' + filtroEstoque + '|' + ordemComoTexto(ordem);
         if (assinatura !== assinaturaFiltro) { assinaturaFiltro = assinatura; limiteExibicao = ESTOQUE_PAGINA; }
 
         renderFiltroEstoque();
@@ -2993,7 +3679,9 @@
     window._onProductsUpdated = function () {
         if (!mounted) return;
         if (arraste) { renderAdiado = true; return; }   // não troca a lista debaixo do dedo
+        renderMarcaChips();   // as contagens das marcas acompanham o estoque
         renderLista();
+        if (catTela === 'marcas' && marcasEst) atualizarTelaMarcas();
     };
 
 })();
