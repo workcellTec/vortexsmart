@@ -24,11 +24,23 @@ let atualizador = null;   // só existe no programa instalado (ver atualizador.j
 const DEBUG = process.argv.includes('--debug');
 const PASTA_WEB = app.isPackaged ? path.join(process.resourcesPath, 'web') : path.join(__dirname, '..', 'app');
 
+// Mesmos valores de --bg (style.pc.css) e da altura da faixa do topo (html[data-janela], style.pc.css).
+const COR_FUNDO = '#07101f';
+const ALTURA_BARRA = 36;
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1280,
         height: 800,
         icon: path.join(PASTA_WEB, 'icons', 'icon-512.png'),
+        // Windows: sem a barra de título nativa (ela pegava a cor de destaque do Windows, vermelha em alguns PCs).
+        // Os botões minimizar/maximizar/fechar continuam, desenhados sobre a faixa do app, na cor de fundo dele.
+        // A faixa (arrastar a janela) e o espaço dela estão em style.pc.css (html[data-janela]).
+        ...(process.platform === 'win32' ? {
+            backgroundColor: COR_FUNDO,
+            titleBarStyle: 'hidden',
+            titleBarOverlay: { color: COR_FUNDO, symbolColor: '#cbd5e1', height: ALTURA_BARRA }
+        } : {}),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -43,9 +55,27 @@ function createWindow() {
 // Uma janela só: abrir o programa de novo (clique duplo no atalho) traz a que já está
 // aberta pra frente, em vez de abrir um 2º PDV — dois abertos ao mesmo tempo
 // duplicariam impressões e confundiriam o caixa.
-if (!app.requestSingleInstanceLock()) {
-    app.quit();
-} else {
+// Atualização automática: o instalador abre o programa novo com "--updated" quando o antigo ainda pode estar
+// terminando de fechar. Nesse caso espera a vaga (até 30 s) em vez de desistir — sem isso o programa sumia
+// depois de "Reiniciar agora". Cada início fica registrado em atualizador.log (userData).
+function registrarInicio(msg) {
+    try {
+        const pasta = app.getPath('userData');
+        fs.mkdirSync(pasta, { recursive: true });
+        fs.appendFileSync(path.join(pasta, 'atualizador.log'), `${new Date().toISOString()} [inicio] ${msg}\n`);
+    } catch (e) { /* log nunca pode dar erro */ }
+}
+async function obterVaga() {
+    if (app.requestSingleInstanceLock()) return true;
+    if (!process.argv.includes('--updated')) return false;
+    for (let i = 0; i < 60; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        if (app.requestSingleInstanceLock()) return true;
+    }
+    return false;
+}
+
+function iniciarPrograma() {
     app.on('second-instance', () => {
         if (!mainWindow) return;
         if (mainWindow.isMinimized()) mainWindow.restore();
@@ -67,6 +97,11 @@ if (!app.requestSingleInstanceLock()) {
         }
     });
 }
+
+obterVaga().then(temVaga => {
+    registrarInicio(`versão ${app.getVersion()}, argumentos [${process.argv.slice(1).join(' ')}], ${temVaga ? 'abrindo' : 'já há outro programa aberto: saindo'}`);
+    if (temVaga) iniciarPrograma(); else app.quit();
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();

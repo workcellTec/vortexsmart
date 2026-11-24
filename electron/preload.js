@@ -5,6 +5,12 @@
 // ================================================================
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Windows: a janela não tem a barra de título nativa (ver main.js); o CSS do PC reserva a faixa do topo
+// quando a página está marcada assim.
+if (process.platform === 'win32') {
+    window.addEventListener('DOMContentLoaded', () => document.documentElement.setAttribute('data-janela', 'propria'), { once: true });
+}
+
 contextBridge.exposeInMainWorld('vsmartPrint', {
     versaoPrograma:         ()                      => ipcRenderer.invoke('versao-programa'),
     verificarAtualizacao:   ()                      => ipcRenderer.invoke('verificar-atualizacao'),
