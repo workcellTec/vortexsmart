@@ -1106,6 +1106,9 @@ html.tema-claro .fg { --fg-cinza: #9AA0A8; }
    campos grandes e botão Salvar fixo no rodapé da tela de edição. */
 .tx-sec { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted); margin:20px 4px 8px; text-align:left; }
 .tx-sec:first-child { margin-top:4px; }
+/* Colunas e barra de ações existem pro PC; aqui as telas seguem empilhadas, como sempre. */
+.tx-cols, .tx-col, .tx-barra { display:contents; }
+.tx-col + .tx-col > .tx-sec:first-child { margin-top:20px; }
 .tx-card { background:var(--surface); border:1px solid var(--border); border-radius:20px; overflow:hidden; }
 .tx-lin { display:flex; align-items:center; gap:12px; padding-right:14px; min-height:60px; border-top:1px solid rgba(var(--overlay-rgb),.07); }
 .tx-lin:first-child { border-top:none; }

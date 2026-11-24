@@ -233,6 +233,7 @@
         const maquinas = todasAsMaquinas();
 
         el('ctxBody').innerHTML = `
+          <div class="tx-cols"><div class="tx-col">
             <div class="tx-sec">Formas de pagamento</div>
             <div class="tx-card" id="txFormas">
                 ${getFormasSemTaxa().map(f => `
@@ -246,7 +247,7 @@
                     </div>`).join('')}
             </div>
             <button type="button" class="tx-add" id="txNovaForma"><i class="bi bi-plus-lg"></i> Nova forma de pagamento</button>
-
+          </div><div class="tx-col">
             <div class="tx-sec">Maquininhas de cartão</div>
             <div id="txMaquinas">
                 ${maquinas.map(m => `
@@ -265,6 +266,7 @@
                     </div>`).join('') || '<div class="tx-vazio">Nenhuma maquininha cadastrada ainda.</div>'}
             </div>
             <button type="button" class="tx-add" id="txNovaMaquina"><i class="bi bi-plus-lg"></i> Nova maquininha</button>
+          </div></div>
         `;
 
         el('txFormas').querySelectorAll('[data-forma-abrir]').forEach(b => b.addEventListener('click', () => abrirForma(b.dataset.formaAbrir)));
@@ -321,6 +323,7 @@
 
     function renderMaquina() {
         el('ctxBody').innerHTML = `
+          <div class="tx-cols tx-cols-edicao"><div class="tx-col">
             <div class="tx-sec">Dados</div>
             <div class="tx-card">
                 <div class="tx-pad">
@@ -335,11 +338,14 @@
 
             <div class="tx-sec">Bandeiras</div>
             <div class="tx-card"><div class="tx-pad" id="txBandeiras"></div></div>
-
+          </div><div class="tx-col">
             <div id="txTaxas"></div>
+          </div></div>
 
+            <div class="tx-barra">
             ${maquinaEmEdicao ? '<button type="button" class="tx-perigo" id="txExcluir">Excluir maquininha</button>' : ''}
             <div class="tx-salvar"><button type="button" id="txSalvar">${maquinaEmEdicao ? 'Salvar maquininha' : 'Cadastrar maquininha'}</button></div>
+            </div>
         `;
         renderBandeiras();
         renderTaxas();
@@ -609,6 +615,7 @@
         const nomeEditavel = !editando || nomeEditavelDaForma(editando);
 
         el('ctxBody').innerHTML = `
+          <div class="tx-cols"><div class="tx-col">
             <div class="tx-sec">Dados</div>
             <div class="tx-card"><div class="tx-pad">
                 ${nomeEditavel ? `
@@ -624,13 +631,17 @@
                 <div class="tx-campo"><input type="text" id="txFormaEmoji" maxlength="2" autocomplete="off" placeholder="💳"></div>` : ''}
             </div></div>
 
+          </div><div class="tx-col">
             ${editando && editando.semTaxa ? '' : `
             <div class="tx-sec">Taxa · opcional</div>
             <div class="tx-card"><div class="tx-pad" id="txFormaTaxa"></div></div>
             <div class="tx-simu" id="txFormaSimu"></div>`}
+          </div></div>
 
+            <div class="tx-barra">
             ${editando && editando.custom ? '<button type="button" class="tx-perigo" id="txExcluirForma">Excluir forma de pagamento</button>' : ''}
             <div class="tx-salvar"><button type="button" id="txSalvarForma">${editando ? 'Salvar' : 'Cadastrar forma de pagamento'}</button></div>
+            </div>
         `;
         if (!(editando && editando.semTaxa)) renderTaxaForma();
 
