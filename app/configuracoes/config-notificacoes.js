@@ -30,15 +30,21 @@
     let prefs = null;               // usuarios/{uid}/preferencias/notificacoes
     let estoqueLimiteBaixo = null;  // lojas/{lojaId}/notificacoesConfig/estoqueLimiteBaixo
 
+    // Estado de um tipo de aviso que NUNCA foi salvo. Precisa espelhar
+    // o que as Cloud Functions (functions/index.js) fazem nesse caso:
+    // estoque baixo, parcela, aniversário, despesa e OS atrasada só
+    // deixam de ser enviados com `=== false` explícito (ou seja, valem
+    // como LIGADOS até a pessoa desligar e salvar); vendas em aberto
+    // exige o toggle ligado. Se um lado mudar, mudar o outro junto.
     const DEFAULT_PREFS = {
         vendasAbertas: false,
         vendasAbertasHorario: '20:00',
-        aniversarioCliente: false,
-        estoqueBaixo: false,
-        parcelaVencendo: false,
+        aniversarioCliente: true,
+        estoqueBaixo: true,
+        parcelaVencendo: true,
         lembreteBackup: false,
-        reparoAtrasado: false,
-        despesaRecorrente: false,
+        reparoAtrasado: true,
+        despesaRecorrente: true,
     };
 
     function renderShell() {
@@ -178,7 +184,7 @@
     }
 
     function preencherComValorAtual() {
-        const p = prefs || DEFAULT_PREFS;
+        const p = { ...DEFAULT_PREFS, ...prefs };
         [
             ['notifSwitchVendasAbertas', p.vendasAbertas],
             ['notifSwitchAniversario', p.aniversarioCliente],
