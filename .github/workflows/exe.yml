@@ -1,6 +1,6 @@
 # Gera o instalador do Windows (.exe) do VortexSmart PDV e publica numa Release, de onde o programa
 # já instalado baixa a atualização sozinho (electron-updater, ver electron/atualizador.js).
-# Como usar: aba Actions > "Gerar instalador do Windows (.exe)" > Run workflow. Pronto em ~6 min.
+# Como usar: automático a cada push em main (beta) ou aba Actions > "Gerar instalador do Windows (.exe)" > Run workflow. Pronto em ~6 min.
 # Dois canais, que nunca se misturam (mesma ideia do APK):
 #   • beta (padrão): programa "VortexSmart PDV Beta" (app separado, instala AO LADO do oficial, com dados próprios)
 #     que se atualiza pela Release "exe-beta". É o que se usa pra testar no seu PC.
@@ -12,6 +12,11 @@
 name: Gerar instalador do Windows (.exe)
 
 on:
+  # Todo push que muda o site (app/) ou o programa (electron/) gera sozinho o instalador BETA: o programa beta instalado
+  # se atualiza sem ninguém pedir. O canal oficial (clientes) continua só por disparo manual, junto com o deploy da estável.
+  push:
+    branches: [main]
+    paths: ['app/**', 'electron/**']
   workflow_dispatch:
     inputs:
       canal:
@@ -22,6 +27,11 @@ on:
 
 permissions:
   contents: write
+
+# Uma geração por vez (a versão do programa vem do número da execução e a Release é única por canal).
+concurrency:
+  group: exe-instalador
+  cancel-in-progress: false
 
 jobs:
   exe:
@@ -51,7 +61,7 @@ jobs:
       - name: Definir canal
         id: canal
         env:
-          CANAL: ${{ inputs.canal }}
+          CANAL: ${{ inputs.canal || 'beta' }}
         run: |
           if [ "$CANAL" = "beta" ]; then
             echo "tag=exe-beta" >> "$GITHUB_OUTPUT"
@@ -64,7 +74,7 @@ jobs:
       # extraMetadata.version: a versão do programa (a que o atualizador compara) vem do número desta execução.
       - name: Gerar instalador
         env:
-          CANAL: ${{ inputs.canal }}
+          CANAL: ${{ inputs.canal || 'beta' }}
           TAG: ${{ steps.canal.outputs.tag }}
           VERSAO: ${{ steps.canal.outputs.versao }}
         run: |
@@ -103,7 +113,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.canal.outputs.tag }}
           VERSAO: ${{ steps.canal.outputs.versao }}
-          CANAL: ${{ inputs.canal }}
+          CANAL: ${{ inputs.canal || 'beta' }}
         run: |
           EXTRA=""; TITULO="VortexSmart PDV (Windows)"
           if [ "$CANAL" = "beta" ]; then EXTRA="--prerelease"; TITULO="VortexSmart PDV Beta (Windows)"; fi
