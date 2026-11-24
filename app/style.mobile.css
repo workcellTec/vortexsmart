@@ -2016,7 +2016,10 @@ button.vs-linha { width: 100%; background: none; border-top: 0; border-left: 0; 
 .stq-fp-tela .stq-modal-body { padding:0 14px; display:flex; flex-direction:column; scroll-padding-bottom:110px; }
 .stq-fp { display:flex; flex-direction:column; flex:1 0 auto; }
 .stq-fp-sec { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted); margin:20px 4px 8px; }
-.stq-fp > .stq-fp-sec:first-child { margin-top:10px; }
+.stq-fp-cols, .stq-fp-col, .stq-fp-bloco { display:contents; } /* as duas colunas e os blocos são só do PC (style.pc.css): aqui tudo segue empilhado, como sempre */
+.stq-fp-barra, .stq-fp-qtdestado, .stq-fp-rodape { display:none; }
+.stq-fp-cols > .stq-fp-col:first-child > .stq-fp-bloco:first-child > .stq-fp-sec { margin-top:10px; }
+.stq-fp [hidden] { display:none !important; }
 .stq-fp-card { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:14px; }
 .stq-fp-card > .mb-3, .stq-fp-card > .row.mb-3 { margin-bottom:0 !important; }
 .stq-fp .row { margin:0; }
@@ -2085,6 +2088,13 @@ button.vs-linha { width: 100%; background: none; border-top: 0; border-left: 0; 
 .stq-fp-lin .form-check-input:checked { background:var(--primary); }
 .stq-fp-lin .form-check-input:checked::after { left:21px; }
 .stq-fp .stq-modal-actions { position:sticky; bottom:0; z-index:5; display:grid; grid-template-columns:auto 1fr; gap:10px; margin:auto -14px 0; padding:14px 14px calc(18px + env(safe-area-inset-bottom, 0px)); background:linear-gradient(transparent, var(--bg) 35%); }
+.stq-cod-travado { color:var(--warning); }
+#stqCodigoBarras[readonly] { letter-spacing:.06em; }
+.stq-fp-codigo .btn:disabled { opacity:.4; }
+.stq-cod-confirma { display:flex; flex-direction:column; gap:10px; margin-top:10px; padding:12px 14px; border-radius:14px; background:color-mix(in srgb, #fbbf24 15%, var(--surface)); font-size:13px; line-height:1.45; color:var(--text); }
+.stq-cod-confirma-acoes { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.stq-cod-confirma .btn { height:44px; padding:0 12px; border:none; border-radius:12px; font-size:14px; font-weight:700; font-family:inherit; }
+.stq-cod-confirma .btn-warning { background:#fbbf24; color:#1a1200; }
 .stq-fp .stq-modal-btn-cancel { height:52px; padding:0 20px; border:1px solid var(--border); border-radius:16px; background:var(--surface); color:var(--text-secondary); font-size:15px; font-family:inherit; }
 .stq-fp .stq-modal-btn-save { flex-direction:column; gap:0; height:52px; padding:0 14px; border-radius:16px; background:var(--primary); box-shadow:none; font-size:16px; font-weight:800; font-family:inherit; }
 .stq-fp-salvar-sub { display:block; font-size:11.5px; font-weight:600; opacity:.85; }

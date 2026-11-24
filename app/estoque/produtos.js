@@ -119,6 +119,9 @@
         if (w.length >= 4 && w.endsWith('s')) f.add(w.slice(0, -1));
         return f;
     }
+    // Celulares é a categoria "só o que sobrar" de fábrica: a de id 'phones' ou qualquer uma que se chame Celulares/Smartphones
+    // (a loja pode ter criado a dela com outro id). O Gestor ainda pode desligar: aí o banco guarda resto: false.
+    const restoDeFabrica = (id, nome) => id === 'phones' || /^(celulares?|smartphones?|telefones?|aparelhos?)$/.test(textoCompacto(nome));
     // uma palavra de categoria é válida? ("inicio": uma palavra só; "qualquer": aceita frase)
     const palavraValida = (w, modo) => (modo === 'qualquer' ? /^[a-z0-9]+( [a-z0-9]+)*$/ : /^[a-z0-9]+$/).test(w) && w.length >= CAT_PALAVRA_MIN && w.length <= CAT_PALAVRA_MAX;
     // palavra-chave de marca: letras/números, 1 a 24; uma só letra vale (é o "letra + número" dos modelos), um só número não
@@ -160,7 +163,7 @@
             cor: typeof c.cor === 'string' && /^#[0-9a-f]{6}$/i.test(c.cor) ? c.cor : CORES_CATEGORIA[posicao % CAT_MAX],
             ordem: Number.isFinite(c.ordem) ? c.ordem : posicao,
             oculta: c.oculta === true,
-            resto: c.resto === true || (c.resto === undefined && id === 'phones'),   // Celulares de fábrica só fica com o que sobrar, a não ser que o Gestor desligue
+            resto: c.resto === true || (c.resto === undefined && restoDeFabrica(id, nome)),   // Celulares de fábrica só fica com o que sobrar, a não ser que o Gestor desligue
             marcasAtivo,
             marcas: !marcasAtivo ? [] : (c.marcasAtivo === undefined ? marcasDeFabrica() : lerMarcas(c.marcas)),
             marcasVirtuais: marcasAtivo && c.marcasAtivo === undefined   // marcas de fábrica ainda não gravadas
@@ -231,18 +234,20 @@
         if (guardado) return guardado;
         const inicio = primeiraPalavra(chave), n = textoCompacto(chave), tokens = tokensDoNome(chave);
         let r = { cat: CATEGORIA_OUTROS.id, marca: null };
+        let forte = false; // achou pela palavra de TIPO no começo do nome (ou por Capas/marcas): não há o que corrigir
         for (const c of memoPrioridade) {
             const bate = c.marcasAtivo ? tokens.some(t => c.formas.has(t))
                 : c.modo === 'inicio' ? !!inicio && c.formas.has(inicio) : c.palavras.some(w => n.includes(w));
             if (bate && (c.marcasAtivo || !c.tambem.length || c.tambem.some(w => n.includes(w)))) {
                 r = { cat: c.id, marca: c.marcasAtivo ? marcaDoNome(tokens, c.marcas) : null };
+                forte = !c.resto && (c.marcasAtivo || c.modo === 'inicio');
                 break;
             }
         }
-        // Só caiu em "o que sobrar" (Celulares) ou em Outros: se o nome ainda tem a palavra de outra categoria em QUALQUER posição
-        // ("SAMSUNG A10 PELÍCULA 3D"), não é aparelho — vai pra ela, mesmo que ela só olhe a 1ª palavra.
-        const restoOuNada = r.cat === CATEGORIA_OUTROS.id || (categoriasEditaveis().find(x => x.id === r.cat) || {}).resto;
-        if (restoOuNada) {
+        // Caiu em Outros, em "o que sobrar" (Celulares) ou numa categoria que pega a palavra solta em qualquer lugar: se o nome tem a
+        // palavra de TIPO de outra categoria em QUALQUER posição ("SAMSUNG A10 PELÍCULA 3D", "MOTOROLA G35 PELÍCULA"), não é aparelho —
+        // película é sempre película, capa é capa, cabo é cabo, carregador é carregador, seja qual for a marca escrita no nome.
+        if (!forte) {
             const c = memoPrioridade.find(x => !x.resto && (!x.tambem.length || x.tambem.some(w => n.includes(w))) && tokens.some(t => x.formas.has(t)));
             if (c) r = { cat: c.id, marca: c.marcasAtivo ? marcaDoNome(tokens, c.marcas) : null };
         }
@@ -500,7 +505,7 @@
     const categoriaParaBanco = c => ({
         nome: c.nome, palavras: c.palavras.slice(), ...(c.tambem && c.tambem.length ? { tambem: c.tambem.slice() } : {}), modo: c.modo, cor: c.cor, ordem: c.ordem,
         ...(c.oculta ? { oculta: true } : {}),
-        ...(c.resto ? { resto: true } : (c.id === 'phones' ? { resto: false } : {})),   // gravar o false: sem ele a Celulares de fábrica voltaria a ser "só o que sobrar" sozinha
+        ...(c.resto ? { resto: true } : (restoDeFabrica(c.id, c.nome) ? { resto: false } : {})),   // gravar o false: sem ele a Celulares de fábrica voltaria a ser "só o que sobrar" sozinha
         ...(c.marcasAtivo ? { marcasAtivo: true, marcas: marcasParaBanco(c.marcas) } : (c.id === 'capas' ? { marcasAtivo: false } : {}))
     });
     const jaPersonalizado = () => !!(window._categoriasProduto && window._categoriasProduto.personalizado === true);
@@ -975,7 +980,7 @@
         if (catForm.id) {
             const c = atual.find(x => x.id === catForm.id);
             if (!c) { avisoToast('Essa categoria foi apagada em outro aparelho.'); mostrarCatForm(null); return; }
-            const campos = { nome, palavras: catForm.palavras.slice(), tambem: tambem.length ? tambem.slice() : null, modo: catForm.modo, resto: catForm.resto ? true : (c.id === 'phones' ? false : null) };
+            const campos = { nome, palavras: catForm.palavras.slice(), tambem: tambem.length ? tambem.slice() : null, modo: catForm.modo, resto: catForm.resto ? true : (restoDeFabrica(c.id, nome) ? false : null) };
             if (comMarcas && !c.marcasAtivo) { campos.marcasAtivo = true; campos.marcas = marcasParaBanco(marcasDeFabrica()); }
             else if (!comMarcas && c.marcasAtivo) { campos.marcasAtivo = false; campos.marcas = null; }
             dados = dadosDaMudanca(c.id, campos);
@@ -1473,12 +1478,16 @@
 
     // Formulário Novo/Editar produto. A MESMA estrutura serve celular e PC: no celular as classes
     // stq-fp-* viram seções, cartões, seletor "Já tinha / Acabei de comprar", chips e grupos
-    // recolhíveis (style.mobile.css); no PC elas ficam neutras e o formulário continua como sempre
-    // foi (style.pc.css). Os ids e os campos de verdade (input/select/radio/checkbox) são os de sempre.
+    // recolhíveis em uma coluna (style.mobile.css); no PC viram uma janela larga de duas colunas
+    // — esquerda: produto, preço e estoque; direita: detalhes e avisos — sem sanfonas (style.pc.css).
+    // Os ids e os campos de verdade (input/select/radio/checkbox) são os mesmos nos dois formatos.
     function formBodyHtml(viaAlerta) {
         const etiquetaOk = typeof window._etiquetaTermicaDisponivel === 'function' && window._etiquetaTermicaDisponivel();
         return `
             <div class="stq-fp ${viaAlerta ? 'stq-fp-alerta' : ''}">
+              <div class="stq-fp-cols">
+               <div class="stq-fp-col">
+                <div class="stq-fp-bloco">
                 <div class="stq-fp-sec">O produto</div>
                 <div class="stq-fp-card">
                     <div class="mb-3 stq-fp-nome">
@@ -1487,7 +1496,9 @@
                     </div>
                     <div class="stq-cat-sug" id="stqCatSug"></div>
                 </div>
+                </div>
 
+                <div class="stq-fp-bloco">
                 <div class="stq-fp-sec">Preço</div>
                 <div class="stq-fp-card">
                     <div class="row w-100 mb-3" style="display:flex;gap:10px;">
@@ -1506,15 +1517,20 @@
                     <div class="stq-fp-lucro" id="stqLucroLinha"></div>
                     <div id="stqMargemWrap"></div>
                 </div>
+                </div>
 
+                <div class="stq-fp-bloco">
                 <div class="stq-fp-sec">Estoque</div>
                 <div class="stq-fp-card">
                     <div class="mb-3">
                         <label class="form-label" for="stqQuantidade"><i class="bi bi-123"></i> Quantidade em Estoque</label>
-                        <div class="stq-fp-step">
-                            <button type="button" class="stq-fp-stepbtn" id="stqQtdMenos" aria-label="Diminuir quantidade">−</button>
-                            <input class="form-control" id="stqQuantidade" type="number" step="1" min="0" placeholder="0" inputmode="numeric"/>
-                            <button type="button" class="stq-fp-stepbtn" id="stqQtdMais" aria-label="Aumentar quantidade">+</button>
+                        <div class="stq-fp-qtdlinha">
+                            <div class="stq-fp-step">
+                                <button type="button" class="stq-fp-stepbtn" id="stqQtdMenos" aria-label="Diminuir quantidade">−</button>
+                                <input class="form-control" id="stqQuantidade" type="number" step="1" min="0" placeholder="0" inputmode="numeric"/>
+                                <button type="button" class="stq-fp-stepbtn" id="stqQtdMais" aria-label="Aumentar quantidade">+</button>
+                            </div>
+                            <span class="stq-fp-qtdestado" id="stqQtdEstado"></span>
                         </div>
                     </div>
                     <div class="mb-3 small" id="stqCompraInicialDica" style="display:none;color:#fbbf24;"></div>
@@ -1533,7 +1549,10 @@
                         <div class="stq-fp-explica" id="stqOrigemExplica"></div>
                     </div>
                 </div>
+                </div>
+               </div>
 
+               <div class="stq-fp-col">
                 <div class="stq-fp-grupo" id="stqGrupoDetalhes">
                     <button type="button" class="stq-fp-gh" aria-expanded="false">
                         <span class="stq-fp-gic"><i class="bi bi-tag-fill"></i></span>
@@ -1545,8 +1564,16 @@
                             <label class="form-label" for="stqCodigoBarras"><i class="bi bi-upc-scan"></i> Código de Barras <span class="text-secondary small">(opcional)</span></label>
                             <div style="display:flex;gap:8px;">
                                 <input class="form-control" id="stqCodigoBarras" type="text" placeholder="Leia com a pistola, digite, ou gere abaixo" style="flex:1;"/>
+                                <button type="button" class="btn btn-secondary" id="stqCodigoLockBtn" hidden></button>
                                 <button type="button" class="btn btn-secondary vs-so-celular" id="stqLerCodigoBtn" title="Ler com a câmera" aria-label="Ler código de barras com a câmera"><i class="bi bi-upc-scan"></i></button>
                                 <button type="button" class="btn btn-secondary" id="stqGerarCodigoBtn" title="Gerar e salvar código de barras"><i class="bi bi-magic"></i></button>
+                            </div>
+                            <div class="stq-cod-confirma" id="stqCodigoConfirma" hidden>
+                                <div><b>Trocar o código de barras?</b> Ele pode estar impresso em etiquetas e é com ele que o leitor acha o produto na venda. Se trocar, as etiquetas antigas deixam de funcionar.</div>
+                                <div class="stq-cod-confirma-acoes">
+                                    <button type="button" class="btn btn-secondary" id="stqCodigoManter">Manter</button>
+                                    <button type="button" class="btn btn-warning" id="stqCodigoDestravar">Sim, destravar</button>
+                                </div>
                             </div>
                             <div id="stqBarcodePreviewWrap" class="hidden mt-2" style="text-align:center;background:#fff;border-radius:8px;padding:10px;">
                                 <svg id="stqBarcodePreview"></svg>
@@ -1595,8 +1622,11 @@
                         </div>
                     </div>
                 </div>
+               </div>
+              </div>
 
                 <div class="stq-modal-actions">
+                    <div class="stq-fp-rodape" id="stqRodapeResumo"></div>
                     <button class="stq-modal-btn-cancel" id="stqCancelFormBtn">Cancelar</button>
                     <button class="stq-modal-btn-save" id="stqSaveBtn">Salvar<small class="stq-fp-salvar-sub" id="stqSaveSub"></small></button>
                 </div>
@@ -1668,16 +1698,36 @@
         escreverMoeda(vendaInput, vendaSugerida);
     }
 
-    // Linha "Lucro por unidade" (celular): venda − compra, em R$ e em % sobre o custo.
+    // Linha "Lucro por unidade": venda − compra, em R$ e em % sobre o custo. A barra só aparece no PC.
     function atualizarLucroLinha() {
+        atualizarPainelPc();
         const linha = el('stqLucroLinha');
         if (!linha) return;
         const compra = lerMoeda(el('stqPrecoCompra'));
         const venda = lerMoeda(el('stqValor'));
-        if (!(compra > 0) || !(venda > 0)) { linha.innerHTML = '<span>Lucro por unidade</span><b>—</b>'; return; }
+        if (!(compra > 0) || !(venda > 0)) { linha.innerHTML = '<span>Lucro por unidade</span><span class="stq-fp-barra"><span style="width:0%"></span></span><b>—</b>'; return; }
         const lucro = venda - compra;
         const pct = (lucro / compra) * 100;
-        linha.innerHTML = `<span>Lucro por unidade</span><b class="${lucro < 0 ? 'ruim' : (pct >= 30 ? 'boa' : '')}">${fmt(lucro)} · ${pct.toFixed(0)}%</b>`;
+        const largura = Math.max(0, Math.min(100, pct));
+        linha.innerHTML = `<span>Lucro por unidade</span><span class="stq-fp-barra"><span style="width:${largura.toFixed(0)}%"></span></span><b class="${lucro < 0 ? 'ruim' : (pct >= 30 ? 'boa' : '')}">${fmt(lucro)} · ${pct.toFixed(0)}%</b>`;
+    }
+
+    // PC: pílula do estado do estoque e resumo do rodapé (quantos itens, valor em estoque a preço de
+    // venda e lucro potencial). No celular esses dois elementos ficam escondidos pelo CSS.
+    function atualizarPainelPc() {
+        const q = Math.max(0, parseInt(el('stqQuantidade')?.value, 10) || 0);
+        const compra = lerMoeda(el('stqPrecoCompra'));
+        const venda = lerMoeda(el('stqValor'));
+        const pilula = el('stqQtdEstado');
+        if (pilula) {
+            pilula.textContent = q > 0 ? 'Em estoque' : 'Esgotado';
+            pilula.className = 'stq-fp-qtdestado ' + (q > 0 ? 'ok' : 'zero');
+        }
+        const resumo = el('stqRodapeResumo');
+        if (resumo) {
+            resumo.innerHTML = `${q} un. em estoque` + (venda > 0 ? ` · valor em estoque <b>${fmt(q * venda)}</b>` : '')
+                + (venda > 0 && compra > 0 ? ` · lucro potencial <b>${fmt(q * (venda - compra))}</b>` : '');
+        }
     }
 
     function atualizarMargemAoVivo() {
@@ -1693,6 +1743,40 @@
         }
     }
 
+    // ── Trava do código de barras ──────────────────────────────────────────────
+    //    Um código que o produto já tem pode estar impresso em etiquetas e é com ele que o leitor acha
+    //    o produto na venda; trocar sem querer deixaria as etiquetas antigas sem efeito. Por isso, com
+    //    código gravado, o campo fica travado (cadeado), sem digitar, ler pela câmera nem gerar. Pra
+    //    trocar: cadeado → confirmação → "Sim, destravar". Depois disso dá pra digitar outro código,
+    //    voltar ao anterior, ou apagar e gerar um novo (que só vale depois do Salvar). O cadeado aberto
+    //    cancela a troca e devolve o código salvo. Vale nos dois formatos (PC e celular).
+    let codigoSalvo = '';          // código que o produto tem gravado ('' = ainda não tem)
+    let codigoDestravado = false;  // o usuário confirmou que quer trocar o código
+    function aplicarTravaCodigo(confirmando) {
+        const campo = el('stqCodigoBarras');
+        if (!campo) return;
+        const travado = !!codigoSalvo && !codigoDestravado;
+        campo.readOnly = travado;
+        const lock = el('stqCodigoLockBtn');
+        if (lock) {
+            const titulo = travado ? 'Código travado — clique pra trocar' : 'Cancelar a troca e voltar ao código salvo';
+            lock.hidden = !codigoSalvo;
+            lock.innerHTML = `<i class="bi ${travado ? 'bi-lock-fill' : 'bi-unlock-fill'}"></i>`;
+            lock.title = titulo;
+            lock.setAttribute('aria-label', titulo);
+            lock.classList.toggle('stq-cod-travado', travado);
+        }
+        const motivo = 'Código travado — destrave no cadeado pra trocar';
+        [['stqGerarCodigoBtn', 'Gerar e salvar código de barras'], ['stqLerCodigoBtn', 'Ler com a câmera']].forEach(([id, titulo]) => {
+            const b = el(id);
+            if (!b) return;
+            b.disabled = travado;
+            b.title = travado ? motivo : titulo;
+        });
+        const confirma = el('stqCodigoConfirma');
+        if (confirma) confirma.hidden = !(travado && confirmando);
+    }
+
     function bindFormEvents() {
         el('stqNome')?.addEventListener('input', () => { catEscolha = null; catTrocando = false; renderCatSugerida(); });   // mudou o nome: a categoria volta a ser a que o nome diz
         el('stqCancelFormBtn')?.addEventListener('click', fecharModal);
@@ -1706,6 +1790,23 @@
         el('stqQuantidade')?.addEventListener('input', atualizarCompraInicial);
         el('stqValor')?.addEventListener('input', atualizarMargemAoVivo);
         el('stqGerarCodigoBtn')?.addEventListener('click', gerarCodigoBarrasParaForm);
+        el('stqCodigoLockBtn')?.addEventListener('click', () => {
+            if (!codigoSalvo) return;
+            if (codigoDestravado) { // cadeado aberto: cancela a troca
+                codigoDestravado = false;
+                const campo = el('stqCodigoBarras');
+                if (campo) { campo.value = codigoSalvo; campo.dispatchEvent(new Event('input')); }
+                aplicarTravaCodigo(false);
+            } else {
+                aplicarTravaCodigo(true);
+            }
+        });
+        el('stqCodigoManter')?.addEventListener('click', () => aplicarTravaCodigo(false));
+        el('stqCodigoDestravar')?.addEventListener('click', () => {
+            codigoDestravado = true;
+            aplicarTravaCodigo(false);
+            el('stqCodigoBarras')?.focus();
+        });
         el('stqLerCodigoBtn')?.addEventListener('click', lerCodigoDoFormPelaCamera);
         el('stqCodigoBarras')?.addEventListener('input', () => { renderBarcodePreview(el('stqCodigoBarras').value); atualizarResumosForm(); });
         el('stqQtdMenos')?.addEventListener('click', () => passoQuantidade(-1));
@@ -1732,6 +1833,7 @@
         realcarOrigemEscolhida(); // também atualiza o bloco de origem (atualizarCompraInicial)
         atualizarLucroLinha();
         atualizarResumosForm();
+        aplicarTravaCodigo(false);
     }
 
     // Botões − / + da Quantidade (celular). Dispara 'input' pra tudo que depende do campo
@@ -1792,6 +1894,7 @@
     function atualizarCompraInicial() {
         const wrap = el('stqCompraInicialWrap');
         if (!wrap) return;
+        atualizarPainelPc();
         const quantidade = parseInt(el('stqQuantidade')?.value, 10) || 0;
         const valorUnitario = lerMoeda(el('stqPrecoCompra'));
         const calculavel = quantidade > 0 && valorUnitario > 0; // dá pra mostrar o total da compra
@@ -1987,6 +2090,7 @@
             });
             return;
         }
+        const trocandoCodigo = !!editingId && !!codigoSalvo; // só chega aqui destravado e com o campo vazio
         const idProduto = editingId; // null = produto novo
         const sessao = sessaoModal;
         const permissao = idProduto ? 'estoque_editar_produto' : 'estoque_criar_produto';
@@ -2010,7 +2114,11 @@
             let compraRegistradaNaCriacao = false;
             let erroCompraNaCriacao = null;
 
-            if (idProduto) {
+            if (trocandoCodigo) {
+                // Troca confirmada no cadeado: só preenche o campo — o código novo passa a valer no Salvar
+                // (garantirCodigoNoProduto devolveria o código antigo, que ainda está gravado).
+                codigoFinal = await proximoCodigoBarrasLivre(idProduto);
+            } else if (idProduto) {
                 ({ codigo: codigoFinal, jaTinhaCodigo } = await garantirCodigoNoProduto(idProduto));
             } else {
                 const { quantidade, payload } = lerFormularioProduto();
@@ -2038,10 +2146,16 @@
             if (el('stqCodigoBarras')) el('stqCodigoBarras').value = codigoFinal;
             renderBarcodePreview(codigoFinal);
             atualizarResumosForm();
-            if (jaTinhaCodigo) {
-                window.showCustomModal({ message: `Este produto já tinha o código ${codigoFinal} (gerado em outro caixa). Mantido esse código.` });
-            } else if (typeof window._showSuccessOverlay === 'function') {
-                window._showSuccessOverlay(compraRegistradaNaCriacao ? 'Código gerado, produto salvo e compra registrada!' : 'Código gerado e salvo no produto!');
+            if (trocandoCodigo) {
+                window.showCustomModal({ message: `Código novo ${codigoFinal} gerado. Ele só passa a valer quando você clicar em Salvar — não imprima etiquetas antes disso.` });
+            } else {
+                codigoSalvo = codigoFinal; // o produto agora tem código gravado: o campo trava
+                codigoDestravado = false;
+                if (jaTinhaCodigo) {
+                    window.showCustomModal({ message: `Este produto já tinha o código ${codigoFinal} (gerado em outro caixa). Mantido esse código.` });
+                } else if (typeof window._showSuccessOverlay === 'function') {
+                    window._showSuccessOverlay(compraRegistradaNaCriacao ? 'Código gerado, produto salvo e compra registrada!' : 'Código gerado e salvo no produto!');
+                }
             }
             if (erroCompraNaCriacao) {
                 window.showCustomModal({ message: `Produto criado, mas NÃO consegui registrar a compra (${erroCompraNaCriacao.message}). O estoque ficou em 0 — use o botão Repor, com o valor de compra, pra lançar a entrada.` });
@@ -2051,6 +2165,7 @@
         } finally {
             if (btn) btn.disabled = false;
             if (salvarBtn) salvarBtn.disabled = false;
+            if (sessao === sessaoModal) aplicarTravaCodigo(false);
         }
     }
 
@@ -2223,6 +2338,7 @@
         coresSelecionadas = [];
         produtoAtualDoAlerta = null;
         catEscolha = null; catTrocando = false;
+        codigoSalvo = ''; codigoDestravado = false;
         const body = abrirModal('primary', 'Novo Produto');
         el('stqModalBackdrop').classList.add('stq-fp-tela');
         body.innerHTML = formBodyHtml(false);
@@ -2250,6 +2366,7 @@
         margemModo = 'valor';
         produtoAtualDoAlerta = viaAlerta ? produto : null;
         catEscolha = escolhaDoProduto(produto); catTrocando = false;
+        codigoSalvo = (produto.codigoBarras || '').trim(); codigoDestravado = false;
         const body = abrirModal('primary', 'Editar Produto');
         el('stqModalBackdrop').classList.add('stq-fp-tela');
         body.innerHTML = formBodyHtml(!!viaAlerta);
