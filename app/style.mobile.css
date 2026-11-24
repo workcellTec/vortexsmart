@@ -1906,7 +1906,6 @@ button.vs-linha { width: 100%; background: none; border-top: 0; border-left: 0; 
 .stq-aviso-esg { display:flex; align-items:center; gap:10px; margin:0 12px 10px; padding:10px 12px; border-radius:16px; background:color-mix(in srgb, var(--danger) 12%, var(--surface)); border:1px solid color-mix(in srgb, var(--danger) 38%, var(--border)); color:var(--text-strong); font-size:12.5px; font-weight:800; }
 .stq-aviso-esg small { display:block; font-size:11.5px; font-weight:600; color:var(--text-secondary); }
 .stq-aviso-ic { width:32px; height:32px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; background:var(--danger); color:#fff; }
-.stq-aviso-esg button { flex:none; margin-left:auto; height:34px; padding:0 13px; border-radius:12px; border:1px solid color-mix(in srgb, var(--danger) 50%, var(--border)); background:none; color:var(--text-strong); font:inherit; font-size:12.5px; font-weight:800; cursor:pointer; }
 .stq-card-wrap.esgotado { border-color:color-mix(in srgb, var(--danger) 42%, var(--border)); background:color-mix(in srgb, var(--danger) 6%, var(--surface)); }
 .stq-tag-esgotado { padding:1px 7px; border-radius:8px; font-size:.6rem; font-weight:800; letter-spacing:.02em; color:var(--danger); background:color-mix(in srgb, var(--danger) 15%, transparent); }
 .stq-repor-rapido { flex:none; height:34px; padding:0 14px; border-radius:12px; border:0; background:var(--primary); color:var(--on-primary); font:inherit; font-size:12.5px; font-weight:800; cursor:pointer; }
@@ -3527,3 +3526,9 @@ body.tema-claro .stq-cat-pill[data-cat][style] { filter: brightness(.62) saturat
 .cfgA-sub .cfgA-icon { width:26px; height:26px; font-size:12px; border-radius:8px; }
 #openConfigImpressoras2[aria-expanded="true"] .cfgA-chev-abre { transform:rotate(90deg); }
 .cfgA-chev-abre { transition:transform .18s ease; }
+
+/* Estoque · Produtos: chip "Tudo" na frente das categorias; aba Esgotados em vermelho enquanto houver produto zerado */
+.stq-cat-tudo { background:rgba(var(--overlay-rgb),.1); color:var(--text-strong); }
+.stq-cat-tudo.active { background:var(--text-strong); color:var(--surface); box-shadow:none; }
+.stq-seg button.alerta:not(.on) { color:var(--danger); background:color-mix(in srgb, var(--danger) 14%, transparent); box-shadow:0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent) inset; }
+.stq-seg button.alerta:not(.on):hover { background:color-mix(in srgb, var(--danger) 22%, transparent); color:var(--danger); }

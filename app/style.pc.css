@@ -2196,7 +2196,6 @@ body.tema-claro .stq-marca-pill[data-marca][style], body.tema-claro .stq-cs-chip
 .stq-aviso-esg { display:flex; align-self:stretch; align-items:center; gap:12px; margin:0 12px 12px; padding:12px 16px; border-radius:14px; background:color-mix(in srgb, var(--danger) 12%, var(--surface)); border:1px solid color-mix(in srgb, var(--danger) 38%, var(--border)); color:var(--text-strong); font-size:13.5px; font-weight:700; }
 .stq-aviso-esg small { display:block; font-size:12px; font-weight:500; color:var(--text-secondary); }
 .stq-aviso-ic { width:34px; height:34px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; background:var(--danger); color:#fff; }
-.stq-aviso-esg button { flex:none; margin-left:auto; height:34px; padding:0 16px; border-radius:11px; border:1px solid color-mix(in srgb, var(--danger) 50%, var(--border)); background:none; color:var(--text-strong); font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
 .stq-card-wrap.esgotado { border-color:color-mix(in srgb, var(--danger) 42%, var(--border)); background:linear-gradient(90deg, color-mix(in srgb, var(--danger) 9%, var(--surface)), var(--surface) 60%); }
 .stq-tag-esgotado { padding:1px 7px; border-radius:8px; font-size:.6rem; font-weight:800; letter-spacing:.02em; color:var(--danger); background:color-mix(in srgb, var(--danger) 15%, transparent); }
 .stq-repor-rapido { flex:none; height:34px; padding:0 16px; border-radius:11px; border:0; background:linear-gradient(135deg, var(--acento-hero), var(--acento-hero-2)); color:#fff; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
@@ -3764,3 +3763,9 @@ button.fl-card.sel { border-color: var(--g); box-shadow: 0 0 0 1px var(--g) inse
 .cfgA-sub .cfgA-icon { width:26px; height:26px; font-size:12px; border-radius:8px; }
 #openConfigImpressoras2[aria-expanded="true"] .cfgA-chev-abre { transform:rotate(90deg); }
 .cfgA-chev-abre { transition:transform .18s ease; }
+
+/* Estoque · Produtos: chip "Tudo" na frente das categorias; aba Esgotados em vermelho enquanto houver produto zerado */
+.stq-cat-tudo { background:rgba(var(--overlay-rgb),.1); color:var(--text-strong); }
+.stq-cat-tudo.active { background:var(--text-strong); color:var(--surface); box-shadow:none; }
+.stq-seg button.alerta:not(.on) { color:var(--danger); background:color-mix(in srgb, var(--danger) 14%, transparent); box-shadow:0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent) inset; }
+.stq-seg button.alerta:not(.on):hover { background:color-mix(in srgb, var(--danger) 22%, transparent); color:var(--danger); }

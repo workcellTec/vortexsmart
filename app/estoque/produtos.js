@@ -359,10 +359,10 @@
         el('stqBusca')?.addEventListener('input', renderLista);
         el('stqOrdemBtn')?.addEventListener('click', e => { e.stopPropagation(); abrirOrdem(); });
         el('stqOrdemMenu')?.addEventListener('click', aoClicarOrdem);
-        [el('stqSeg'), el('stqAviso')].forEach(c => c?.addEventListener('click', e => {
+        el('stqSeg')?.addEventListener('click', e => {
             const b = e.target.closest('[data-f]');
             if (b) { filtroEstoque = b.dataset.f; renderLista(); }
-        }));
+        });
         el('stqOrgConcluir')?.addEventListener('click', () => sairDoOrganizar(true));
         el('stqList')?.addEventListener('touchstart', iniciarArraste, { passive: false });
         el('stqList')?.addEventListener('mousedown', iniciarArraste);
@@ -415,7 +415,8 @@
     function renderCategoriaChips() {
         const wrap = el('stqCats');
         if (!wrap) return;
-        wrap.innerHTML = opcoesDeFiltro().map(c => `
+        // "Tudo" na frente: atalho que solta o filtro de categoria (aceso quando nenhuma está escolhida).
+        wrap.innerHTML = `<button type="button" class="stq-cat-pill stq-cat-tudo ${filtroCategoria ? '' : 'active'}" data-tudo>Tudo</button>` + opcoesDeFiltro().map(c => `
             <button type="button" class="stq-cat-pill ${filtroCategoria === c.id ? 'active' : ''}" data-cat="${esc(c.id)}"
                 style="background:${c.cor}22;color:${c.cor};">${esc(c.label)}</button>
         `).join('') + (souGestor() ? `
@@ -431,6 +432,13 @@
                 // no celular não, senão o teclado abriria a cada toque no chip.
                 if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) el('stqBusca')?.focus();
             });
+        });
+        wrap.querySelector('[data-tudo]')?.addEventListener('click', () => {
+            if (!filtroCategoria) return;
+            filtroCategoria = null;
+            filtroMarca = null;
+            renderCategoriaChips();
+            renderLista();
         });
         el('stqCatGerenciar')?.addEventListener('click', () => abrirGerenciarCategorias());
         renderMarcaChips();
@@ -3576,15 +3584,12 @@
             .map(([k, nome, n]) => `<button type="button" data-f="${k}" class="${filtroEstoque === k ? 'on' : ''} ${k === 'esgot' && n ? 'alerta' : ''}">${nome} <b>${n}</b></button>`).join('');
         const aviso = el('stqAviso');
         if (!aviso) return;
-        const faixa = (titulo, sub, botao) => `
+        // Fora da aba Esgotados não há faixa: o aviso é a própria aba "Esgotados" (destacada em vermelho enquanto houver zerado).
+        aviso.innerHTML = filtroEstoque === 'esgot' && nEsg && !organizando ? `
             <div class="stq-aviso-esg">
                 <span class="stq-aviso-ic">${icSvg('alerta')}</span>
-                <div>${titulo}<small>${sub}</small></div>${botao}
-            </div>`;
-        aviso.innerHTML = !nEsg || organizando ? ''
-            : filtroEstoque === 'todos' ? faixa(`${nEsg} ${nEsg > 1 ? 'produtos esgotados' : 'produto esgotado'}`, 'Veja só eles e reponha', '<button type="button" data-f="esgot">Ver</button>')
-            : filtroEstoque === 'esgot' ? faixa(`${nEsg} pra repor`, 'Toque em Repor na linha do produto', '')
-            : '';
+                <div>${nEsg} pra repor<small>Toque em Repor na linha do produto</small></div>
+            </div>` : '';
     }
 
     function renderLista() {
