@@ -104,7 +104,7 @@
                 <h3 id="cuTitulo">Usuários &amp; Permissões</h3>
                 <button type="button" class="btn-header-action" id="cuHeaderActionBtn"><i class="bi bi-person-plus-fill"></i></button>
             </div>
-            <div class="content-card w-100" id="cuConteudo"></div>
+            <div class="content-card w-100 corpo-pagina" id="cuConteudo"></div>
 
             <!-- Modal de troca de senha — reaproveitado tanto pra "minha
                  senha" (Gestor, pede senha atual) quanto pra senha de um

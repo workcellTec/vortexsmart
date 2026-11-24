@@ -57,7 +57,7 @@
                 <button type="button" class="btn-back" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
                 <h3 id="movTitulo">Movimentação de Produto</h3>
             </div>
-            <div class="content-card w-100" id="movConteudo"></div>
+            <div class="content-card w-100 corpo-pagina" id="movConteudo"></div>
         `;
         // O botão usa a classe .btn-back, que já tem delegação central
         // no core.js (chama history.back() sozinha pra qualquer clique

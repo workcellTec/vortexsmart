@@ -58,7 +58,7 @@
                 <h3 id="ccTitulo">Clientes</h3>
                 <button type="button" class="btn-header-action" id="ccHeaderActionBtn"><i class="bi bi-person-plus-fill"></i></button>
             </div>
-            <div class="content-card w-100" id="ccConteudo"></div>
+            <div class="content-card w-100 corpo-pagina" id="ccConteudo"></div>
         `;
         el('ccBackBtn').addEventListener('click', voltar);
     }

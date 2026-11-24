@@ -222,13 +222,17 @@ body::after {
 /* ── Tipografia ─────────────────────────────────────────────── */
 h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
 
-/* ── Section header ─────────────────────────────────────────── */
+/* ── Section header ───────────────────────────────────────────
+   REGRA DO FUNDO: o fundo do app é UM só (--bg + brilho do body::before)
+   e o cabeçalho e o corpo de uma tela NÃO pintam cor própria por cima
+   dele — só os cards de verdade (.content-card avulso, itens de lista)
+   usam --surface. Cabeçalho/painel com cor própria viravam faixas
+   diferentes do fundo ("retalhos"). tools/auditar-fundo.js confere isso. */
 .section-header {
     display: grid;
     grid-template-columns: 40px 1fr minmax(40px, auto);
     align-items: center;
     padding: 22px 14px 12px;
-    background: var(--surface);
     flex-shrink: 0;
     width: 100%;
     margin-bottom: 0;
@@ -298,16 +302,19 @@ h2, h3, h4, h5 { font-weight: 600; color: var(--text-strong); }
     animation: fadeUp 0.35s ease forwards;
 }
 
-/* Quando o content-card é a continuação direta do cabeçalho da tela
-   (o caso mais comum — Relatórios, Histórico, Documentos, Estoque...),
-   ele não deve parecer um "card dentro da página": sem borda, sem
-   sombra, sem canto arredondado no topo — é a mesma superfície branca
-   do cabeçalho, só continuando pra baixo. */
-.section-header + .content-card {
+/* Quando o content-card é o corpo da tela, logo abaixo do cabeçalho
+   (Relatórios, Histórico, Documentos, Estoque...) — ou leva a classe
+   .corpo-pagina, nos casos em que existe algo entre os dois —, ele não
+   é um "card dentro da página": é a própria página. Sem fundo, borda,
+   sombra nem vidro; quem aparece é o fundo do app. */
+.section-header + .content-card,
+.content-card.corpo-pagina {
+    background: none;
     border: none;
     box-shadow: none;
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 0;
 }
 
 /* ── Formulários ────────────────────────────────────────────── */
@@ -1424,7 +1431,7 @@ button.tx-bch.novo { gap:6px; padding:9px 14px; background:transparent; border:1
 /* Taxas & Máquinas no PC: página larga em colunas (formas | maquininhas; dados e bandeiras | taxas) e barra de ações
    fixa embaixo. O título fica à esquerda e a seta de voltar ao lado dele. */
 #configuracoesTaxas { align-items:stretch !important; max-width:1180px; margin:0 auto; padding:0 28px 24px; }
-#configuracoesTaxas .section-header { grid-template-columns:44px 1fr; background:none; padding:6px 0 16px; }
+#configuracoesTaxas .section-header { grid-template-columns:44px 1fr; padding:6px 0 16px; }
 #configuracoesTaxas .section-header h3 { grid-row:1; text-align:left; font-size:1.45rem; }
 #configuracoesTaxas .section-header .btn-icon-circle { grid-row:1; }
 #configuracoesTaxas #ctxBody { max-width:none; background:none; border:none; box-shadow:none; padding:0; margin:0; backdrop-filter:none; -webkit-backdrop-filter:none; animation:none; }
@@ -1733,11 +1740,6 @@ body.tema-claro .ctw-bottom-nav {
     transition: transform var(--transition);
 }
 body.tema-claro .ctw-nav-ring { box-shadow: 0 0 0 7px var(--bg), 0 0 0 8px rgba(255,255,255,.9), 0 8px 20px -6px rgba(var(--acento-hero-rgb),.5); }
-/* Cabeçalho no tema claro: era branco chapado sem profundidade —
-   destoava do resto do tema (que usa cards brancos com sombra suave
-   flutuando sobre o fundo cinza-azulado, nunca uma cor sólida sem
-   relevo nenhum). Sombra leve + borda quase invisível resolve. */
-body.tema-claro .section-header { background: transparent; box-shadow: none; border-bottom: none; }
 .ctw-nav-dot {
     position: absolute; z-index:2; top: -3px; right: -6px; min-width: 17px; height: 17px;
     border-radius: 50%; background: #ef4444; border: 2px solid var(--bg);
@@ -3600,8 +3602,10 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 
 /* Largura compartilhada por header/busca/filtros/lista de Concertos —
    antes cada um tinha max-width:400px inline (herança mobile), que
-   travava tudo numa faixa estreita mesmo com o container pai maior. */
-.vs-rep-largura { max-width: 1400px; width: 100%; padding: 0 2px; }
+   travava tudo numa faixa estreita mesmo com o container pai maior.
+   Os 14px laterais alinham busca/filtros/lista com o conteúdo do
+   .section-header (que tem o mesmo respiro) em vez de encostar na borda. */
+.vs-rep-largura { max-width: 1400px; width: 100%; padding: 0 14px; }
 
 /* Financeiro (Gráficos, Lançamentos, Recorrentes) — mesma correção:
    tinham max-width:440px inline (herança mobile) impedindo qualquer
@@ -3616,7 +3620,7 @@ body.tema-claro .notif-card.c-rose    .titulo { color: #be123c; }
 .fl, .fl *, .fin-pd, .fin-pd * { box-sizing: border-box; }
 
 /* cabeçalho: segue o padrão section-header + .btn-back, só alinhado à esquerda com subtítulo */
-.fl .section-header { background: none; padding: 0; margin-bottom: 20px; grid-template-columns: 40px 1fr; column-gap: 16px; }
+.fl .section-header { padding: 0; margin-bottom: 20px; grid-template-columns: 40px 1fr; column-gap: 16px; }
 .fl .section-header > div { grid-column: 2; min-width: 0; }
 .fl .section-header h3 { text-align: left; font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 1.55rem; letter-spacing: -.01em; }
 .fl .section-header p { margin: 2px 0 0; font-size: .78rem; color: var(--text-secondary); }

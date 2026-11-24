@@ -29,7 +29,7 @@
                 <h3 id="cpTitulo">Produtos & Notificações</h3>
                 <button class="btn-icon-circle" id="cpBack" aria-label="Voltar"><i class="bi bi-arrow-left"></i></button>
             </div>
-            <div class="content-card w-100" id="cpBody"></div>
+            <div class="content-card w-100 corpo-pagina" id="cpBody"></div>
         `;
         el('cpBack')?.addEventListener('click', () => {
             if (tela !== 'lista') { tela = 'lista'; renderTudo(); }
