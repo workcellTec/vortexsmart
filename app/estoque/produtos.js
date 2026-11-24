@@ -581,6 +581,7 @@
                 <div class="cm-col cm-esq">
                     <div class="cm-tit">Suas categorias</div>
                     <div class="cm-dica">Cada categoria acha os produtos pelas palavras do nome. Mexer aqui não altera nenhum produto, só como eles aparecem nos filtros, em todos os aparelhos da loja.</div>
+                    <button type="button" class="cm-nova" id="catNovaBtn"><i class="bi bi-plus-lg"></i> Nova categoria</button>
                     <div id="catAntigas"></div>
                     <div id="catLista"></div>
                     <button type="button" class="stq-modal-btn-cancel w-100" id="catRestaurarBtn">Restaurar padrão</button>
@@ -588,6 +589,7 @@
                 <div class="cm-col cm-dir" id="catColDir"></div>
             </div>`;
         el('catRestaurarBtn').addEventListener('click', restaurarPadraoCategorias);
+        el('catNovaBtn').addEventListener('click', () => { mostrarCatForm(null); vistaCategorias('editor'); });
         mostrarCatForm(null);   // desenha também a lista da esquerda
     }
 
@@ -609,7 +611,7 @@
                 <span class="stq-catman-dot" style="background:${c.cor};"></span>
                 <div class="stq-catman-info">
                     <div class="stq-catman-nome">${esc(c.nome)}${c.oculta ? ' <span class="cm-tag">oculta no filtro</span>' : ''}${c.resto ? ' <span class="cm-tag">só o que sobrar</span>' : ''}</div>
-                    <div class="stq-catman-palavras">${esc(c.palavras.join(' · '))}</div>
+                    <div class="stq-catman-palavras">${c.palavras.map(w => `<span class="cm-pw">${esc(w)}</span>`).join('')}${c.palavras.length > 4 ? `<b class="cm-pw-mais">+${c.palavras.length - 4}</b>` : ''}</div>
                     ${c.marcasAtivo
                         ? `<div class="stq-catman-modo">Dividida em marcas: ${c.marcas.length ? esc(c.marcas.map(m => m.nome).join(' · ')) : 'nenhuma ainda'}</div>`
                         : `<div class="stq-catman-modo">${c.modo === 'qualquer' ? 'Palavra em qualquer parte do nome' : 'Nome começa com a palavra'}</div>
@@ -733,6 +735,15 @@
         return [...cont.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 8);
     }
 
+    // Celular: a lista e o formulário são telas separadas ('lista' | 'editor'). No PC as duas colunas aparecem juntas e isto não muda nada.
+    function vistaCategorias(vista) {
+        const cols = document.querySelector('#stqModalBody .cm-cols');
+        if (!cols) return;
+        cols.dataset.vista = vista;
+        cols.scrollTop = 0;
+        if (document.documentElement.dataset.shell === 'mobile') el('stqModalTitle').textContent = vista === 'editor' ? (catForm && catForm.id ? 'Editar categoria' : 'Nova categoria') : 'Categorias';
+    }
+
     // Formulário da direita: criar (id nulo) ou editar uma categoria
     function mostrarCatForm(id) {
         const pane = el('catColDir');
@@ -763,32 +774,44 @@
         };
         pane.innerHTML = `
             <div class="cm-tit">${existente ? 'Editar categoria' : 'Nova categoria'}</div>
-            ${existente ? '<button type="button" class="cm-voltar" id="catVoltarBtn"><i class="bi bi-x-lg"></i> Cancelar edição</button>' : ''}
-            <label class="form-label">Nome da categoria</label>
-            <input class="form-control" id="catNome" type="text" maxlength="${CAT_NOME_MAX}" placeholder="Ex: Carregadores" autocomplete="off"/>
-            <label class="cm-check mt-3"><input type="checkbox" id="catMarcasChk"/> <span><b>Dividir em marcas</b> (Samsung, Motorola, iPhone…). As palavras abaixo dizem só o tipo do produto e o sistema acha a marca olhando o nome inteiro.</span></label>
-            <label class="cm-check mt-3"><input type="checkbox" id="catRestoChk"/> <span><b>Só fica com o que sobrar</b> (ideal pra Celulares). Se o nome tem "case", "película", "carregador"… e existe uma categoria pra isso, o produto vai pra ela, mesmo que tenha "Samsung" no nome.</span></label>
-            <div id="catModoWrap">
-                <label class="form-label mt-3">Como o filtro acha os produtos</label>
-                <div class="stq-catman-modos" id="catModos">
-                    <button type="button" data-modo="inicio">Nome começa com a palavra</button>
-                    <button type="button" data-modo="qualquer">Palavra em qualquer parte</button>
+            <button type="button" class="cm-voltar ${existente ? '' : 'cm-voltar-nova'}" id="catVoltarBtn"><i class="bi ${existente ? 'bi-x-lg' : 'bi-arrow-left'}"></i> ${existente ? 'Cancelar edição' : 'Voltar à lista'}</button>
+            <div class="cm-card cm-c-nome">
+                <div class="cm-sec">Nome</div>
+                <label class="form-label">Nome da categoria</label>
+                <input class="form-control" id="catNome" type="text" maxlength="${CAT_NOME_MAX}" placeholder="Ex: Carregadores" autocomplete="off"/>
+            </div>
+            <div class="cm-card cm-c-opcoes">
+                <div class="cm-sec">Opções</div>
+                <label class="cm-check mt-3"><input type="checkbox" id="catMarcasChk"/> <span><b>Dividir em marcas</b> (Samsung, Motorola, iPhone…). As palavras abaixo dizem só o tipo do produto e o sistema acha a marca olhando o nome inteiro.</span></label>
+                <label class="cm-check mt-3"><input type="checkbox" id="catRestoChk"/> <span><b>Só fica com o que sobrar</b> (ideal pra Celulares). Se o nome tem "case", "película", "carregador"… e existe uma categoria pra isso, o produto vai pra ela, mesmo que tenha "Samsung" no nome.</span></label>
+            </div>
+            <div class="cm-card cm-c-achar">
+                <div class="cm-sec">Como o filtro acha os produtos</div>
+                <div id="catModoWrap">
+                    <label class="form-label mt-3">Como o filtro acha os produtos</label>
+                    <div class="stq-catman-modos" id="catModos">
+                        <button type="button" data-modo="inicio">Nome começa com a palavra</button>
+                        <button type="button" data-modo="qualquer">Palavra em qualquer parte</button>
+                    </div>
+                </div>
+                <label class="form-label mt-3" id="catPalavrasLabel"></label>
+                <div class="text-secondary" style="font-size:.72rem;margin-bottom:4px;" id="catPalavrasDica"></div>
+                <div class="stq-catman-chips" id="catChips"></div>
+                <div style="display:flex;gap:8px;">
+                    <input class="form-control" id="catPalavra" type="text" maxlength="${CAT_PALAVRA_MAX + 2}" autocomplete="off"/>
+                    <button type="button" class="stq-modal-btn-cancel" id="catPalavraAdd" style="white-space:nowrap;">Adicionar</button>
                 </div>
             </div>
-            <label class="form-label mt-3" id="catPalavrasLabel"></label>
-            <div class="text-secondary" style="font-size:.72rem;margin-bottom:4px;" id="catPalavrasDica"></div>
-            <div class="stq-catman-chips" id="catChips"></div>
-            <div style="display:flex;gap:8px;">
-                <input class="form-control" id="catPalavra" type="text" maxlength="${CAT_PALAVRA_MAX + 2}" autocomplete="off"/>
-                <button type="button" class="stq-modal-btn-cancel" id="catPalavraAdd" style="white-space:nowrap;">Adicionar</button>
-            </div>
-            <div id="catTambemWrap">
-                <label class="form-label mt-3">E o nome também tem <span class="text-secondary">(opcional)</span></label>
-                <div class="text-secondary" style="font-size:.72rem;margin-bottom:4px;">Separa por marca ou modelo: só entra o produto que bate com as palavras acima <b>e</b> tem pelo menos uma destas no nome. Ex.: "Capas Motorola" = começa com "capa" ou "case" e também tem "moto". Separe com vírgula.</div>
-                <div class="stq-catman-chips" id="catTambemChips"></div>
-                <div style="display:flex;gap:8px;">
-                    <input class="form-control" id="catTambem" type="text" maxlength="${CAT_PALAVRA_MAX + 2}" autocomplete="off" placeholder="Ex: moto, motorola + Enter"/>
-                    <button type="button" class="stq-modal-btn-cancel" id="catTambemAdd" style="white-space:nowrap;">Adicionar</button>
+            <div id="catTambemWrap" class="cm-c-avanc">
+                <button type="button" class="cm-avanc-btn" id="catAvancBtn" aria-expanded="false"><span><b>Avançado: o nome também tem</b><small id="catAvancRes"></small></span><i class="bi bi-chevron-right"></i></button>
+                <div class="cm-avanc-corpo">
+                    <label class="form-label mt-3">E o nome também tem <span class="text-secondary">(opcional)</span></label>
+                    <div class="text-secondary" style="font-size:.72rem;margin-bottom:4px;">Separa por marca ou modelo: só entra o produto que bate com as palavras acima <b>e</b> tem pelo menos uma destas no nome. Ex.: "Capas Motorola" = começa com "capa" ou "case" e também tem "moto". Separe com vírgula.</div>
+                    <div class="stq-catman-chips" id="catTambemChips"></div>
+                    <div style="display:flex;gap:8px;">
+                        <input class="form-control" id="catTambem" type="text" maxlength="${CAT_PALAVRA_MAX + 2}" autocomplete="off" placeholder="Ex: moto, motorola + Enter"/>
+                        <button type="button" class="stq-modal-btn-cancel" id="catTambemAdd" style="white-space:nowrap;">Adicionar</button>
+                    </div>
                 </div>
             </div>
             <div class="stq-catman-aviso" id="catAviso"></div>
@@ -837,10 +860,16 @@
             renderCatChips();
         }));
         el('catSalvarBtn').addEventListener('click', salvarCategoria);
-        el('catVoltarBtn')?.addEventListener('click', () => mostrarCatForm(null));
+        el('catVoltarBtn').addEventListener('click', () => mostrarCatForm(null));
+        el('catAvancBtn').addEventListener('click', () => {   // celular: "o nome também tem" fica recolhido; no PC o botão nem aparece
+            const aberto = el('catTambemWrap').classList.toggle('aberto');
+            el('catAvancBtn').setAttribute('aria-expanded', aberto ? 'true' : 'false');
+        });
+        if (catForm.tambem.length) el('catTambemWrap').classList.add('aberto');
         renderCatModo();
         renderCatChips();
         renderCatLista();   // destaca na lista a categoria em edição
+        vistaCategorias(existente ? 'editor' : 'lista');
     }
 
     // com marcas a palavra é sempre uma só, em qualquer parte do nome; sem marcas vale o modo escolhido
@@ -883,6 +912,8 @@
                 renderCatChips();
             }));
         });
+        const res = el('catAvancRes');
+        if (res) res.textContent = catForm.tambem.length ? catForm.tambem.join(' · ') : 'Nenhuma exigência';   // resumo do bloco recolhido (celular)
         renderCatAviso();
         renderCatSugestoes();
     }

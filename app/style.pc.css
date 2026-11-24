@@ -2092,6 +2092,10 @@ body.tema-claro .stq-marca-pill[data-marca][style], body.tema-claro .stq-cs-chip
 .cm-btn.perigo { border-color:rgba(248,113,113,.35); background:rgba(248,113,113,.1); color:#ef4444; }
 .cm-acoes { display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-shrink:0; flex-wrap:wrap; }
 .cm-tag { font-size:.6rem; font-weight:700; padding:1px 7px; border-radius:8px; background:rgba(var(--overlay-rgb),.1); color:var(--text-secondary); margin-left:6px; vertical-align:middle; }
+/* Categorias: lista em cartões, "Nova categoria" e o bloco "Avançado" são só do celular (style.mobile.css). Aqui as palavras seguem em uma linha com " · ". */
+.cm-pw + .cm-pw::before { content:' · '; }
+.cm-pw-mais, .cm-nova, .cm-sec, .cm-avanc-btn, .cm-voltar-nova { display:none; }
+.cm-card { display:contents; }
 .stq-catman-row.oculta .stq-catman-info, .stq-catman-row.oculta .stq-catman-dot { opacity:.5; }
 .stq-catman-row.editando { background:rgba(var(--primary-rgb),.07); border-radius:10px; padding-left:8px; padding-right:8px; }
 .cm-aviso-juntar { display:flex; flex-direction:column; align-items:flex-start; gap:8px; font-size:.74rem; padding:10px 12px; border-radius:12px; background:rgba(245,158,11,.08); border:1px dashed rgba(245,158,11,.4); }
