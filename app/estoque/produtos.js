@@ -239,6 +239,13 @@
                 break;
             }
         }
+        // Só caiu em "o que sobrar" (Celulares) ou em Outros: se o nome ainda tem a palavra de outra categoria em QUALQUER posição
+        // ("SAMSUNG A10 PELÍCULA 3D"), não é aparelho — vai pra ela, mesmo que ela só olhe a 1ª palavra.
+        const restoOuNada = r.cat === CATEGORIA_OUTROS.id || (categoriasEditaveis().find(x => x.id === r.cat) || {}).resto;
+        if (restoOuNada) {
+            const c = memoPrioridade.find(x => !x.resto && (!x.tambem.length || x.tambem.some(w => n.includes(w))) && tokens.some(t => x.formas.has(t)));
+            if (c) r = { cat: c.id, marca: c.marcasAtivo ? marcaDoNome(tokens, c.marcas) : null };
+        }
         if (cacheNomes.size > 3000) cacheNomes.clear();
         cacheNomes.set(chave, r);
         return r;
