@@ -110,16 +110,20 @@ body {
        botões redondos. Aplicado no body pra herdar em tudo de uma vez. */
     -webkit-tap-highlight-color: transparent;
 }
-/* Programa do Windows (.exe): janela sem a barra de título nativa (electron/main.js). A faixa do topo
-   tem a cor do app, serve pra arrastar a janela e deixa livre o canto onde o Windows desenha minimizar/
-   maximizar/fechar. 36px = ALTURA_BARRA do main.js. */
+/* Programa do Windows (.exe): janela sem a barra de título nativa (electron/main.js). A faixa do topo,
+   à direita da barra lateral, tem a cor do app, serve pra arrastar a janela e deixa livre o canto onde o
+   Windows desenha minimizar/maximizar/fechar. A barra lateral sobe até o topo (o topo dela também arrasta).
+   36px = ALTURA_BARRA do main.js. */
 html[data-janela] { --altura-barra-janela: 36px; }
 html[data-janela]::before {
-    content: ''; position: fixed; top: 0; left: 0; right: 0; height: var(--altura-barra-janela);
+    content: ''; position: fixed; top: 0; left: 232px; right: 0; height: var(--altura-barra-janela);
     background: var(--bg); -webkit-app-region: drag; z-index: 1061;
 }
+html[data-janela]:has(#vsSidebar[style*="none"])::before { left: 0; }
 html[data-janela] body { padding-top: var(--altura-barra-janela); }
-html[data-janela] .vs-sidebar, html[data-janela] .notif-drawer { top: var(--altura-barra-janela); }
+html[data-janela] .vs-sidebar { padding-top: calc(18px + var(--altura-barra-janela)); }
+html[data-janela] .vs-sidebar::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: var(--altura-barra-janela); -webkit-app-region: drag; }
+html[data-janela] .notif-drawer { top: var(--altura-barra-janela); }
 html[data-janela] #loginScreen { min-height: calc(100vh - var(--altura-barra-janela)) !important; }
 /* Sem a barra lateral (login, conta bloqueada) não há o que reservar: a tela centraliza na janela toda. */
 body:has(#vsSidebar[style*="none"]) { padding-left: 0; }
